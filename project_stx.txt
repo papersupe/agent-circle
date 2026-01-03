@@ -1,0 +1,56 @@
+agent-circle/
+├── backend/
+│   ├── api/
+│   │   └── __init__.py
+│   │   └── routes.py
+│   │   └── schemas.py
+│   ├── config/
+│   │   └── __init__.py
+│   │   └── logging.py
+│   │   └── prompts.py
+│   │   └── settings.py
+│   ├── core/
+│   │   └── __init__.py
+│   │   └── agent.py
+│   │   └── concepts.py
+│   │   └── memory.py
+│   │   └── reasoning.py
+│   ├── rag/
+│   │   └── __init__.py
+│   │   └── chunking.py
+│   │   └── embeddings.py
+│   │   └── ingestion.py
+│   │   └── retrieval.py
+│   ├── storage/
+│   │   ├── metadata/
+│   │   ├── vectorstore/
+│   │   └── __init__.py
+│   ├── tests/
+│   │   └── __init__.py
+│   │   └── test_ingestion.py
+│   └── main.py
+├── docs/
+│   └── agent-status.md
+│   └── architecture.md
+│   └── roadmap.md
+│   └── vision.md
+├── experiments/
+│   └── concept_mapping.ipynb
+│   └── reasoning_playground.ipynb
+├── frontend/
+│   ├── box/
+│   ├── website/
+│   │   └── ask.html
+│   │   └── index.html
+│   │   └── status.html
+├── integrations/
+│   ├── boxsupe/
+│   ├── papersupe/
+│   │   └── README.md
+└── .env.example
+└── .gitignore
+└── LICENSE
+└── README.md
+└── project_stx.txt
+└── pyproject.toml
+└── stx.py
