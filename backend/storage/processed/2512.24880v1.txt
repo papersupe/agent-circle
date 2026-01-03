@@ -1,0 +1,1123 @@
+mHC: Manifold-Constrained Hyper-Connections
+ZhendaXie*†,YixuanWei*,HuanqiCao*,
+ChenggangZhao,ChengqiDeng,JiashiLi,DamaiDai,HuazuoGao,JiangChang,
+LiangZhao,ShangyanZhou,ZheanXu,ZhengyanZhang,WangdingZeng,
+ShengdingHu,YuqingWang,JingyangYuan,LeanWang,WenfengLiang
+DeepSeek-AI
+Abstract
+Recently,studiesexemplifiedbyHyper-Connections(HC)haveextendedtheubiquitousresid-
+ualconnectionparadigmestablishedoverthepastdecadebyexpandingtheresidualstream
+widthanddiversifyingconnectivitypatterns. Whileyieldingsubstantialperformancegains,
+this diversification fundamentally compromises the identity mapping property intrinsic to
+theresidualconnection,whichcausesseveretraininginstabilityandrestrictedscalability,and
+additionally incurs notable memory access overhead. To address these challenges, we pro-
+pose Manifold-Constrained Hyper-Connections (mHC), a general framework that projects
+theresidualconnectionspaceofHContoaspecificmanifoldtorestoretheidentitymapping
+property, while incorporating rigorous infrastructure optimization to ensure efficiency. Em-
+piricalexperimentsdemonstratethatmHCiseffectivefortrainingatscale, offeringtangible
+performanceimprovementsandsuperiorscalability. WeanticipatethatmHC,asaflexibleand
+practicalextensionofHC,willcontributetoadeeperunderstandingoftopologicalarchitecture
+designandsuggestpromisingdirectionsfortheevolutionoffoundationalmodels.
+x x x
+!"# !"# !"#
+h’(&) h’(&)
+! !
+Post Mapping Post Mapping
+ℋ
+!
+’(&) 𝒫 ℳ$%#&(ℋ
+!
+’(&))
+h(,) h(,)
+! !
+Layerℱ Layer ℱ Layer ℱ
+h$%& h*+ h$%& h*+
+! ! ! !
+Res Mapping Pre Mapping Res Mapping Pre Mapping
+ℋ
+!
+$%& ℋ
+!
+’$% 𝒫 ℳ!"#(ℋ
+!
+$%&) 𝒫 ℳ$!"(ℋ
+!
+’$%)
+x
+! x x
+! !
+(a) Residual Connection (b) Hyper-Connections(HC) (c) Manifold-Constrained HC (mHC)
+Figure1 | IllustrationsofResidualConnectionParadigms. Thisfigurecomparesthestructural
+designof(a)standardResidualConnection,(b)Hyper-Connections(HC),and(c)ourproposed
+Manifold-ConstrainedHyper-Connections(mHC).UnliketheunconstrainedHC,mHCfocuses
+on optimizing the residual connection space by projecting the matrices onto a constrained
+manifoldtoensurestability.
+*Corecontributors. †Correspondingauthor: xie.zhenda@deepseek.com
+5202
+ceD
+13
+]LC.sc[
+1v08842.2152:viXra
+Contents
+1 Introduction 3
+2 RelatedWorks 4
+2.1 MicroDesign . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 4
+2.2 MacroDesign . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 5
+3 Preliminary 5
+3.1 NumericalInstability . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 6
+3.2 SystemOverhead . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 7
+4 Method 8
+4.1 Manifold-ConstrainedHyper-Connections . . . . . . . . . . . . . . . . . . . . . . 8
+4.2 ParameterizationandManifoldProjection . . . . . . . . . . . . . . . . . . . . . . . 9
+4.3 EfficientInfrastructureDesign . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 9
+4.3.1 KernelFusion . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 9
+4.3.2 Recomputing . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 10
+4.3.3 OverlappingCommunicationinDualPipe . . . . . . . . . . . . . . . . . . 11
+5 Experiments 12
+5.1 ExperimentalSetup . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 12
+5.2 MainResults . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 12
+5.3 ScalingExperiments . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 13
+5.4 StabilityAnalysis . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 14
+6 ConclusionandOutlook 15
+A Appendix 19
+A.1 DetailedModelSpecificationsandHyper-parameters. . . . . . . . . . . . . . . . . 19
+2
+1. Introduction
+Deepneuralnetworkarchitectureshaveundergonerapidevolutionsincetheintroductionof
+ResNets (He et al., 2016a). As illustrated in Fig. 1(a), the structure of a single-layer can be
+formulatedasfollows:
+x𝑙+1 =x𝑙 +F(x𝑙,W 𝑙 ), (1)
+where x𝑙 and x𝑙+1 denote the 𝐶-dimensional input and output of the 𝑙-th layer, respectively,
+and F represents the residual function. Although the residual function F has evolved over
+thepastdecadetoincludevariousoperationssuchasconvolution,attentionmechanisms,and
+feed forward networks, the paradigm of the residual connection has maintained its original
+form. AccompanyingtheprogressionofTransformer(Vaswanietal.,2017)architecture, this
+paradigmhascurrentlyestablisheditselfasafundamentaldesignelementinlargelanguage
+models(LLMs)(Brownetal.,2020;Liuetal.,2024b;Touvronetal.,2023).
+This success is primarily attributed to the concise form of the residual connection. More
+importantly,earlyresearch(Heetal.,2016b)revealedthattheidentitymappingpropertyofthe
+residualconnectionmaintainsstabilityandefficiencyduringlarge-scaletraining. Byrecursively
+extendingtheresidualconnectionacrossmultiplelayers,Eq.(1)yields:
+𝐿−1
+∑︁
+x𝐿 =x𝑙 + F(x𝑖,W 𝑖 ), (2)
+𝑖=𝑙
+where 𝐿 and 𝑙 correspond to deeper and shallower layers, respectively. The term identity
+mappingreferstothecomponentx𝑙 itself,whichemphasizesthepropertythatthesignalfrom
+theshallowerlayermapsdirectlytothedeeperlayerwithoutanymodification.
+Recently,studiesexemplifiedbyHyper-Connections(HC)(Zhuetal.,2024)haveintroduced
+a new dimension to the residual connection and empirically demonstrated its performance
+potential. Thesingle-layerarchitectureofHCisillustratedinFig.1(b). Byexpandingthewidthof
+theresidualstreamandenhancingconnectioncomplexity,HCsignificantlyincreasestopological
+complexitywithoutalteringthecomputationaloverheadofindividualunitsregardingFLOPs.
+Formally,single-layerpropagationinHCisdefinedas:
+x𝑙+1 =H 𝑙 resx𝑙 +H 𝑙 post⊤ F(H 𝑙 pre x𝑙,W 𝑙 ), (3)
+wherex𝑙 andx𝑙+1 denotetheinputandoutputofthe𝑙-thlayer,respectively. Unliketheformu-
+lation in Eq. (1), the feature dimension of x𝑙 and x𝑙+1 is expanded from 𝐶 to 𝑛×𝐶, where 𝑛 is
+theexpansionrate. ThetermHres ∈ R𝑛×𝑛 representsalearnablemappingthatmixesfeatures
+𝑙
+withintheresidualstream. Alsoasalearnablemapping,Hpre ∈ R1×𝑛 aggregatesfeaturesfrom
+𝑙
+the𝑛𝐶-dimstreamintoa𝐶-dimlayerinput,andconversely,Hpost ∈ R1×𝑛 mapsthelayeroutput
+𝑙
+backontothestream.
+However, asthetrainingscaleincreases, HCintroducespotentialrisksofinstability. The
+primary concern is that the unconstrained nature of HC compromises the identity mapping
+property when the architecture extends across multiple layers. In architectures comprising
+multiple parallel streams, an ideal identity mapping serves as a conservation mechanism. It
+ensuresthattheaveragesignalintensityacrossstreamsremainsinvariantduringbothforward
+andbackwardpropagation. RecursivelyextendingHCtomultiplelayersviaEq.(3)yields:
+(cid:32)𝐿−𝑙 (cid:33) 𝐿−1 𝐿−1−𝑖
+x𝐿 = (cid:214) H 𝐿 r − es 𝑖 x𝑙 + ∑︁ (cid:169) (cid:173) (cid:214) H 𝐿 r − es 𝑗 (cid:170) (cid:174) H 𝑖 post⊤ F(H 𝑖 pre x𝑖,W 𝑖 ), (4)
+𝑖=1 𝑖=𝑙 𝑗=1
+(cid:171) (cid:172)
+3
+where 𝐿and𝑙 representadeeperlayerandashallowerlayer,respectively. IncontrasttoEq.(2),
+thecompositemapping
+(cid:206)𝐿−𝑙Hres
+inHCfailstopreservetheglobalmeanofthefeatures. This
+𝑖=1 𝐿−𝑖
+discrepancy leads to unbounded signal amplification or attenuation, resulting in instability
+duringlarge-scaletraining. Afurtherconsiderationisthat,whileHCpreservescomputational
+efficiencyintermsofFLOPs,thehardwareefficiencyconcerningmemoryaccesscostsforthe
+widenedresidualstreamremainsunaddressedintheoriginaldesign. Thesefactorscollectively
+restrictthepracticalscalabilityofHCandhinderitsapplicationinlarge-scaletraining.
+Toaddressthesechallenges,weproposeManifold-ConstrainedHyper-Connections(mHC),
+asshowninFig.1(c),ageneralframeworkthatprojectstheresidualconnectionspaceofHC
+ontoaspecificmanifoldtorestoretheidentitymappingproperty,whileincorporatingrigorous
+infrastructureoptimizationtoensureefficiency. Specifically,mHCutilizestheSinkhorn-Knopp
+algorithm(SinkhornandKnopp,1967)toentropicallyprojectHres ontotheBirkhoffpolytope.
+𝑙
+This operation effectively constrains the residual connection matrices within the manifold
+that is constituted by doubly stochastic matrices. Since the row and column sums of these
+matricesequalto1,theoperationH
+𝑙
+resx𝑙 functionsasaconvexcombinationoftheinputfeatures.
+This characteristic facilitates a well-conditioned signal propagation where the feature mean
+is conserved, and the signal norm is strictly regularized, effectively mitigating the risk of
+vanishing or exploding signals. Furthermore, due to the closure of matrix multiplication for
+doublystochasticmatrices,thecompositemapping
+(cid:206)𝐿−𝑙Hres
+retainsthisconservationproperty.
+𝑖=1 𝐿−𝑖
+Consequently,mHCeffectivelymaintainsthestabilityofidentitymappingsbetweenarbitrary
+depths. To ensure efficiency, we employ kernel fusion and develop mixed precision kernels
+utilizingTileLang(Wangetal.,2025). Furthermore,wemitigatethememoryfootprintthrough
+selectiverecomputingandcarefullyoverlapcommunicationwithintheDualPipeschedule(Liu
+etal.,2024b).
+Extensive experiments on language model pretraining demonstrate that mHC exhibits
+exceptionalstabilityandscalabilitywhilemaintainingtheperformanceadvantagesofHC.In-
+houselarge-scaletrainingindicatesthatmHCsupportstrainingatscaleandintroducesonlya
+6.7%additionaltimeoverheadwhenexpansionrate𝑛 =4.
+2. Related Works
+Architecturaladvancementsindeeplearningcanbeprimarilyclassifiedintomicro-designand
+macro-design. Micro-designconcernstheinternalarchitectureofcomputationalblocks,specifying
+how features are processed across spatial, temporal, and channel dimensions. In contrast,
+macro-designestablishestheinter-blocktopologicalstructure,therebydictatinghowfeature
+representationsarepropagated,routed,andmergedacrossdistinctlayers.
+2.1. MicroDesign
+Drivenbyparametersharingandtranslationinvariance,convolutioninitiallydominatedthepro-
+cessingofstructuredsignals. Whilesubsequentvariationssuchasdepthwiseseparable(Chollet,
+2017) and grouped convolutions (Xie et al., 2017) optimized efficiency, the advent of Trans-
+formers (Vaswani et al., 2017) established Attention and Feed-Forward Networks (FFNs) as
+the fundamental building blocks of modern architecture. Attention mechanisms facilitate
+globalinformationpropagation,whileFFNsenhancetherepresentationalcapacityofindividual
+features. TobalanceperformancewiththecomputationaldemandsofLLMs,attentionmecha-
+nismshaveevolvedtowardsefficientvariantssuchasMulti-QueryAttention(MQA)(Shazeer,
+2019),Grouped-QueryAttention(GQA)(Ainslieetal.,2023),andMulti-HeadLatentAttention
+4
+(MLA)(Liuetal.,2024a). Simultaneously,FFNshavebeengeneralizedintosparsecomputing
+paradigmsviaMixture-of-Experts(MoE)(Fedusetal.,2022;Lepikhinetal.,2020;Shazeeretal.,
+2017),allowingformassiveparameterscalingwithoutproportionalcomputationalcosts.
+2.2. MacroDesign
+Macro-designgovernstheglobaltopologyofthenetwork(Srivastavaetal.,2015). Following
+ResNet (He et al., 2016a), architectures such as DenseNet (Huang et al., 2017) and Fractal-
+Net(Larssonetal.,2016)aimedtoenhanceperformancebyincreasingtopologicalcomplexity
+throughdenseconnectivityandmulti-pathstructures,respectively. DeepLayerAggregation
+(DLA)(Yuetal.,2018)furtherextendedthisparadigmbyrecursivelyaggregatingfeaturesacross
+variousdepthsandresolutions.
+More recently, the focus of macro-design has shifted toward expanding the width of the
+residual stream (Chai et al., 2020; Fang et al., 2023; Heddes et al., 2025; Mak and Flanigan,
+2025;Menghanietal.,2025;Pagliardinietal.,2024;Xiaoetal.,2025;Xieetal.,2023;Zhuetal.,
+2024). Hyper-Connections(HC)(Zhuetal.,2024)introducedlearnablematricestomodulate
+connectionstrengthsamongfeaturesatvaryingdepths,whiletheResidualMatrixTransformer
+(RMT)(MakandFlanigan,2025)replacedthestandardresidualstreamwithanouter-product
+memorymatrixtofacilitatefeaturestorage. Similarly,MUDDFormer(Xiaoetal.,2025)employs
+multiwaydynamicdenseconnectionstooptimizecross-layerinformationflow. Despitetheir
+potential,theseapproachescompromisetheinherentidentitymappingpropertyoftheresidual
+connection,therebyintroducinginstabilityandhinderingscalability. Furthermore,theyincur
+significant memory access overhead due to expanded feature widths. Building upon HC,
+theproposedmHCrestrictstheresidualconnectionspaceontoaspecificmanifoldtorestore
+theidentitymappingproperty,whilealsoincorporatingrigorousinfrastructureoptimizations
+to ensure efficiency. This approach enhances stability and scalability while maintaining the
+topologicalbenefitsofexpandedconnections.
+3. Preliminary
+Wefirstestablishthenotationusedinthiswork. IntheHCformulation,theinputtothe𝑙-thlayer,
+x𝑙 ∈ R1×𝐶 ,isexpandedbyafactorof𝑛toconstructahiddenmatrixx𝑙 = (x⊤
+𝑙,0
+,...,x⊤
+𝑙,𝑛−1
+)⊤ ∈ R𝑛×𝐶
+which can be viewed as 𝑛-stream residual. This operation effectively broadens the width of
+theresidualstream. Togoverntheread-out, write-in, andupdatingprocessesofthisstream,
+HCintroducesthreelearnablelinearmappings—Hpre ,Hpost ∈ R1×𝑛 ,andHres ∈ R𝑛×𝑛 . These
+𝑙 𝑙 𝑙
+mappingsmodifythestandardresidualconnectionshowninEq.(1),resultingintheformulation
+giveninEq.(3).
+IntheHCformulation,learnablemappingsarecomposedoftwopartsofcoefficients: the
+input-dependentoneandtheglobalone,referredtoasdynamicmappingsandstaticmappings,
+respectively. Formally,HCcomputesthecoefficientsasfollows:
+ 
+
+x˜𝑙 =RMSNorm(x𝑙 )
+
+ 
+
+H
+𝑙
+pre =𝛼p
+𝑙
+re·tanh(𝜃
+𝑙
+pre x˜⊤
+𝑙
+)+b p
+𝑙
+re
+(5)
+ 
+H
+𝑙
+post =𝛼p
+𝑙
+ost·tanh(𝜃
+𝑙
+post x˜⊤
+𝑙
+)+b p
+𝑙
+ost
+
+ 
+
+H
+𝑙
+res =𝛼r
+𝑙
+es·tanh(𝜃
+𝑙
+resx˜⊤
+𝑙
+)+br
+𝑙
+es,
+
+whereRMSNorm(·) (ZhangandSennrich,2019)isappliedtothelastdimension,andthescalars
+𝛼pre ,𝛼post and 𝛼res ∈ R are learnable gating factors initialized to small values. The dynamic
+𝑙 𝑙 𝑙
+5
+mappingsarederivedvialinearprojectionsparameterizedby𝜃pre ,𝜃post ∈ R1×𝐶 and𝜃res ∈ R𝑛×𝐶 ,
+𝑙 𝑙 𝑙
+whilethestaticmappingsarerepresentedbylearnablebiasesb pre ,b post ∈ R1×𝑛 andbres ∈ R𝑛×𝑛 .
+𝑙 𝑙 𝑙
+Itisworthnotingthattheintroductionofthesemappings—Hpre ,Hpost ,andHres—incurs
+𝑙 𝑙 𝑙
+negligiblecomputationaloverhead,asthetypicalexpansionrate𝑛,e.g. 4,ismuchsmallerthan
+the input dimension 𝐶. With this design, HC effectively decouples the information capacity
+oftheresidualstreamfromthelayer’sinputdimension,whichisstronglycorrelatedwiththe
+model’scomputationalcomplexity(FLOPs). Consequently,HCoffersanewavenueforscaling
+byadjustingtheresidualstreamwidth,complementingthetraditionalscalingdimensionsof
+model FLOPs and training data size discussed in pre-training scaling laws (Hoffmann et al.,
+2022).
+AlthoughHCnecessitatesthreemappingstomanagethedimensionalmismatchbetween
+theresidualstreamandthelayerinput,preliminaryexperimentspresentedinTab.1indicate
+that the residual mapping Hres yields the most significant performance gain. This finding
+𝑙
+underscoresthecriticalimportanceofeffectiveinformationexchangewithintheresidualstream.
+Table1 | AblationStudyofHCComponents. Whenaspecificmapping(Hpre ,Hpost ,orHres)is
+𝑙 𝑙 𝑙
+disabled,weemployafixedmappingtomaintaindimensionalconsistency: uniformweightsof
+1/𝑛forHpre ,uniformweightsofonesforHpost ,andtheidentitymatrixforHres.
+𝑙 𝑙 𝑙
+Hres Hpre Hpost AbsoluteLossGap
+𝑙 𝑙 𝑙
+0.0
+✓ −0.022
+✓ ✓ −0.025
+✓ ✓ ✓ −0.027
+3.1. NumericalInstability
+While the residual mapping Hres is instrumental for performance, its sequential application
+𝑙
+posesasignificantrisktonumericalstability. AsdetailedinEq.(4),whenHCisextendedacross
+multiplelayers,theeffectivesignalpropagationfromlayer𝑙 to 𝐿isgovernedbythecomposite
+mapping (cid:206)𝐿−𝑙Hres. SincethelearnablemappingHresisunconstrained,thiscompositemapping
+𝑖=1 𝐿−𝑖 𝑙
+inevitablydeviatesfromtheidentitymapping. Consequently,thesignalmagnitudeisproneto
+explosionorvanishingduringboththeforwardpassandbackpropagation. Thisphenomenon
+underminesthefundamentalpremiseofresiduallearning,whichreliesonunimpededsignal
+flow,therebydestabilizingthetrainingprocessindeeperorlarger-scalemodels.
+Empiricalevidencesupportsthisanalysis. Weobserveunstablelossbehaviorinlarge-scale
+experiments,asillustratedinFig.2. TakingmHCasthebaseline,HCexhibitsanunexpected
+losssurgearoundthe12kstep,whichishighlycorrelatedwiththeinstabilityinthegradient
+norm. Furthermore,theanalysisonHres validatesthemechanismofthisinstability. Toquantify
+𝑙
+howthecompositemapping
+(cid:206)𝐿−𝑙Hres
+amplifiessignalsalongtheresidualstream,weutilize
+𝑖=1 𝐿−𝑖
+twometrics. Thefirst,basedonthemaximumabsolutevalueoftherowsumsofthecomposite
+mapping, captures the worst-case expansion in the forward pass. The second, based on the
+maximumabsolutecolumnsum,correspondstothebackwardpass. Werefertothesemetrics
+astheAmaxGainMagnitudeofthecompositemapping. AsshowninFig.3(b),theAmaxGain
+Magnitudeyieldsextremevalueswithpeaksof3000,astarkdivergencefrom1thatconfirms
+thepresenceofexplodingresidualstreams.
+6
+0.012
+0.010
+0.008
+0.006
+0.004
+0.002
+0.000
+-0.002
+0 10000 20000 30000 40000 50000
+Steps
+paG
+ssoL
+etulosbA
+0.25
+mHC
+HC 0.20
+0.15
+0.10
+0.05
+0.00
+0 10000 20000 30000 40000 50000
+Steps
+(a) Absolute Training Loss Gap vs. Training Steps
+mroN
+darG
+mHC
+HC
+(b) Gradient Norm vs. Training Steps
+Figure2|TrainingInstabilityofHyper-Connections(HC).Thisfigureillustrates(a)theabsolute
+lossgapofHCrelativetomHC,and(b)thecomparisonsofgradientnorms. Allresultsarebased
+on27Bmodels.
+101
+100
+0 10 20 30 40 50 60
+Layer Index l
+edutingaM
+niaG
+xamA
+105
+res Forward Signal Gain Hl
+Hl res Backward Gradient Gain 104
+103
+102
+101
+0 10 20 30 40 50 60
+Layer Index l
+(a) Single-Layer Mapping
+edutingaM
+niaG
+xamA
+l res Forward Signal Gain i=1Hl+1
+−
+i
+Y6 i 1 =−1 l H6 re 1 s
+−
+i Backward Gradient Gain
+Y
+(b) Composite Mapping
+Figure 3 | Propagation Instability of Hyper-Connections (HC). This figure illustrates the
+propagation dynamics of (a) the single-layer mapping Hres and (b) the composite mapping
+𝑙
+(cid:206)𝐿−𝑙Hres withinthe27Bmodel. Thelayerindex𝑙 (x-axis)unrollseachstandardTransformer
+𝑖=1 𝐿−𝑖
+blockintotwoindependentlayers(AttentionandFFN).TheAmaxGainMagnitude(y-axis)is
+calculatedasthemaximumabsoluterowsum(fortheforwardsignal)andcolumnsum(forthe
+backwardgradient),averagedoveralltokensinaselectedsequence.
+3.2. SystemOverhead
+While the computational complexity of HC remains manageable due to the linearity of the
+additionalmappings,thesystem-leveloverheadpreventsanon-negligiblechallenge. Specifically,
+memoryaccess(I/O)costsoftenconstituteoneoftheprimarybottlenecksinmodernmodel
+architectures,whichiswidelyreferredtoasthe“memorywall”(Daoetal.,2022). Thisbottleneck
+isfrequentlyoverlookedinarchitecturaldesign,yetitdecisivelyimpactsruntimeefficiency.
+Focusingonthewidelyadoptedpre-normTransformer(Vaswanietal.,2017)architecture,
+weanalyzetheI/OpatternsinherenttoHC.Tab.2summarizesthepertokenmemoryaccess
+overhead in a singleresidual layerintroducedby the 𝑛-stream residual design. The analysis
+revealsthatHCincreasesthememoryaccesscostbyafactorapproximatelyproportionalto𝑛.
+ThisexcessiveI/Odemandsignificantlydegradestrainingthroughputwithoutthemitigationof
+fusedkernels. Besides,sinceHpre ,Hpost ,andHres involvelearnableparameters,theirinterme-
+𝑙 𝑙 𝑙
+diateactivationsarerequiredforbackpropagation. Thisresultsinasubstantialincreaseinthe
+GPUmemoryfootprint,oftennecessitatinggradientcheckpointingtomaintainfeasiblememory
+usage. Furthermore,HCrequires𝑛-foldmorecommunicationcostinpipelineparallelism(Qi
+etal.,2024),leadingtolargerbubblesanddecreasingthetrainingthroughput.
+7
+Table 2 | Comparison of Memory Access Costs Per Token. This analysis accounts for the
+overheadintroducedbytheresidualstreammaintenanceintheforwardpass, excludingthe
+internalI/Oofthelayerfunction F.
+Method Operation Read(Elements) Write(Elements)
+Residual ResidualMerge 2𝐶 𝐶
+Connection
+TotalI/O 2C C
+CalculateHpre ,Hpost ,Hres 𝑛𝐶 𝑛2+2𝑛
+𝑙 𝑙 𝑙
+Hpre 𝑛𝐶+𝑛 𝐶
+𝑙
+Hyper- Hpost 𝐶+𝑛 𝑛𝐶
+𝑙
+Connections Hres 𝑛𝐶+𝑛2 𝑛𝐶
+𝑙
+ResidualMerge 2𝑛𝐶 𝑛𝐶
+TotalI/O (5n+1)C+n2+2n (3n+1)C+n2+2n
+4. Method
+4.1. Manifold-ConstrainedHyper-Connections
+Drawinginspirationfromtheidentitymappingprinciple(Heetal.,2016b),thecorepremise
+ofmHCistoconstraintheresidualmappingHres ontoaspecificmanifold. Whiletheoriginal
+𝑙
+identitymappingensuresstabilitybyenforcingHres =I,itfundamentallyprecludesinformation
+𝑙
+exchange within the residual stream, which is critical for maximizing the potential of multi-
+streamarchitectures. Therefore,weproposeprojectingtheresidualmappingontoamanifold
+thatsimultaneouslymaintainsthestabilityofsignalpropagationacrosslayersandfacilitates
+mutualinteractionamongresidualstreamstopreservethemodel’sexpressivity. Tothisend,
+werestrictHres tobeadoublystochasticmatrix,whichhasnon-negativeentrieswhereboth
+𝑙
+therowsandcolumnssumto1. Formally,letMres denotethemanifoldofdoublystochastic
+matrices(alsoknownastheBirkhoffpolytope). WeconstrainH 𝑙 res to P Mres (H 𝑙 res),definedas:
+P Mres (H 𝑙 res) ≔ (cid:8) H 𝑙 res ∈ R𝑛×𝑛 | H 𝑙 res1𝑛 =1𝑛, 1 ⊤ 𝑛 H 𝑙 res =1 ⊤ 𝑛 , H 𝑙 res ⩾ 0 (cid:9) , (6)
+where1𝑛 representsthe𝑛-dimensionalvectorofallones.
+Itisworthnotingthatwhen𝑛 =1,thedoublystochasticconditiondegeneratestothescalar
+1,therebyrecoveringtheoriginalidentitymapping. Thechoiceofdoublestochasticityconfers
+severalrigoroustheoreticalpropertiesbeneficialforlarge-scalemodeltraining:
+1. Norm Preservation: The spectral norm of a doubly stochastic matrix is bounded by 1
+(i.e., ∥Hres∥ ≤ 1). Thisimpliesthatthelearnablemappingisnon-expansive,effectively
+𝑙 2
+mitigatingthegradientexplosionproblem.
+2. Compositional Closure: The set of doubly stochastic matrices is closed under matrix
+multiplication. Thisensuresthatthecompositeresidualmappingacrossmultiplelayers,
+(cid:206)𝐿−𝑙Hres,remainsdoublystochastic,therebypreservingstabilitythroughouttheentire
+𝑖=1 𝐿−𝑖
+depthofthemodel.
+3. Geometric Interpretation via the Birkhoff Polytope: The set Mres forms the Birkhoff
+polytope, which is the convex hull of the set of permutation matrices. This provides a
+clear geometric interpretation: the residual mapping acts as a convex combination of
+permutations. Mathematically,therepeatedapplicationofsuchmatricestendstoincrease
+8
+themixingofinformationacrossstreamsmonotonically,effectivelyfunctioningasarobust
+featurefusionmechanism.
+Additionally,weimposenon-negativityconstraintsontheinputmappingsHpre
+andoutput
+𝑙
+mappingsHpost
+. Thisconstrainpreventssignalcancellationarisingfromthecompositionof
+𝑙
+positiveandnegativecoefficients,whichcanalsobeconsideredasaspecialmanifoldprojection.
+4.2. ParameterizationandManifoldProjection
+In this section, we detail the calculation process of Hpre ,Hpost ,andHres in mHC. Given the
+𝑙 𝑙 𝑙
+inputhiddenmatrixx𝑙 ∈ R𝑛×𝐶 atthe𝑙-thlayer,wefirstflattenitintoavectorx(cid:174) 𝑙 =vec(x𝑙 ) ∈ R1×𝑛𝐶
+topreservefullcontextinformation. Then, wefollowtheoriginalHCformulationtogetthe
+dynamicmappingsandthestaticmappingsasfollows:
+
+ 
+x(cid:174)′
+𝑙
+=RMSNorm(x(cid:174)
+𝑙
+)
+
+ 
+
+H˜
+𝑙
+pre =𝛼p
+𝑙
+re·(x(cid:174)′
+𝑙
+𝜑p
+𝑙
+re)+b p
+𝑙
+re
+(7)
+ 
+H˜
+𝑙
+post =𝛼p
+𝑙
+ost·(x(cid:174)′
+𝑙
+𝜑p
+𝑙
+ost)+b p
+𝑙
+ost
+
+ 
+
+H˜
+𝑙
+res =𝛼r
+𝑙
+es·mat(x(cid:174)′
+𝑙
+𝜑r
+𝑙
+es)+br
+𝑙
+es,
+
+where 𝜑pre ,𝜑post ∈ R𝑛𝐶×𝑛 and 𝜑res ∈ R𝑛𝐶×𝑛2 arelinearprojectionsfordynamicmappingsand
+𝑙 𝑙 𝑙
+mat(·) isareshapefunctionfrom R1×𝑛2 to R𝑛×𝑛 .
+Then,thefinalconstrainedmappingsareobtainedvia:
+Hpre =𝜎(H˜pre)
+  𝑙 𝑙
+ Hpost =2𝜎(H˜post)
+(8)
+𝑙 𝑙
+
+ Hres =Sinkhorn-Knopp(H˜res),
+ 𝑙 𝑙
+where 𝜎(·) denotes the Sigmoid function. The Sinkhorn-Knopp(·) operator firstly makes all
+elements to be positive via an exponent operator and then conducts iterative normalization
+process that alternately rescales rows and columns to sum to 1. Specifically, given a positive
+matrixM(0) =exp(H˜res) asthestartpoint,thenormalizationiterationproceedsas:
+𝑙
+(cid:16) (cid:17)
+M (𝑡) =T 𝑟 T 𝑐 (M (𝑡−1)) , (9)
+whereT 𝑟 andT 𝑐 denoterowandcolumnnormalization,respectively. Thisprocessconvergestoa
+doublystochasticmatrixHres =M(𝑡 max ) as𝑡 → ∞. Wechoose𝑡 =20asapracticalvaluein
+𝑙 max max
+ourexperiments.
+4.3. EfficientInfrastructureDesign
+Inthissection,wedetailtheinfrastructuredesigntailoredformHC.Throughrigorousoptimiza-
+tion,weimplementmHC(with𝑛 =4)inlarge-scalemodelswithamarginaltrainingoverhead
+ofonly6.7%.
+4.3.1. KernelFusion
+Observing that RMSNorm in mHC imposes significant latency when operating on the high-
+dimensionalhiddenstatex(cid:174) 𝑙 ∈ R1×𝑛𝐶 ,wereorderthedividing-by-normoperationtofollowthe
+9
+matrixmultiplication. Thisoptimizationmaintainsmathematicalequivalencewhileimproving
+efficiency. Furthermore,weemploymixed-precisionstrategiestomaximizenumericalaccuracy
+withoutcompromisingspeed,andfusemultipleoperationswithsharedmemoryaccessinto
+unifiedcomputekernelstoreducememorybandwidthbottlenecks. Basedontheinputsand
+parametersdetailedinEq.(10)to (13),weimplementthreespecializedmHCkernelstocompute
+H
+𝑙
+pre ,H
+𝑙
+post ,andH
+𝑙
+res. Inthesekernels,thebiasesandlinearprojectionsareconsolidatedintob𝑙
+and 𝜑 𝑙,andtheRMSNormweightisalsoabsorbedin 𝜑 𝑙.
+• Eq. (14) to (15): We develop a unified kernel that fuses two scans on x(cid:174) 𝑙, leveraging ma-
+trix multiplication units to maximize memory bandwidth utilization. The backward
+pass—comprisingtwomatrixmultiplications—issimilarlyconsolidatedintoasingleker-
+nel,eliminatingredundantreloadingofx(cid:174) 𝑙. Bothkernelsfeatureafinelytunedpipeline
+(load,cast,compute,store)toefficientlyhandlemixed-precisionprocessing.
+• Eq.(16)to (18): Theselightweightoperationsonsmallcoefficientsareopportunistically
+fusedintoasinglekernel,significantlyreducingkernellaunchoverhead.
+• Eq. (19): We implement the Sinkhorn-Knopp iteration within a single kernel. For the
+backwardpass,wederiveacustombackwardkernelthatrecomputestheintermediate
+resultson-chipandtraversestheentireiteration.
+𝜑 𝑙 : tfloat32 [𝑛𝐶,𝑛2+2𝑛] (10)
+x(cid:174) 𝑙 : bfloat16 [1,𝑛𝐶] (11)
+𝛼pre ,𝛼post ,𝛼res : float32 Scalars (12)
+𝑙 𝑙 𝑙
+b𝑙 : float32 [1,𝑛2+2𝑛] (13)
+(cid:104) (cid:105)
+H ˜˜ 𝑙 pre ,H ˜˜ 𝑙 post ,H ˜˜ 𝑙 res : float32 =x(cid:174) 𝑙 𝜑 𝑙 (14)
+√
+(cid:13) (cid:13)
+𝑟 : float32 =(cid:13)x(cid:174) 𝑙(cid:13) / 𝑛𝐶 (15)
+2
+(cid:104) (cid:105) (cid:104) (cid:105)
+H˜
+𝑙
+pre ,H˜
+𝑙
+post ,H˜
+𝑙
+res : float32 =1/𝑟 𝛼p
+𝑙
+reH ˜˜
+𝑙
+pre ,𝛼p
+𝑙
+ostH ˜˜
+𝑙
+post ,𝛼r
+𝑙
+esH ˜˜
+𝑙
+res +b𝑙 (16)
+(cid:16) (cid:17)
+Hpre : float32 =𝜎 H˜pre (17)
+𝑙 𝑙
+(cid:16) (cid:17)
+Hpost : float32 =2𝜎 H˜post (18)
+𝑙 𝑙
+Hres : float32 =Sinkhorn-Knopp (cid:0) H˜res(cid:1) (19)
+𝑙 𝑙
+Using the coefficients derived from the aforementioned kernels, we introduce two addi-
+tional kernels to apply these mappings: one for F
+pre
+≔ H
+𝑙
+pre x𝑙 and another for F
+post,res
+≔
+H
+𝑙
+resx𝑙 +H
+𝑙
+post⊤ F(·,·). ThroughfusingtheapplicationofH
+𝑙
+post andH
+𝑙
+res withresidualmerging,
+wereducethenumberofelementsreadfrom (3𝑛+1)𝐶 to (𝑛+1)𝐶 andthenumberofelements
+written from 3𝑛𝐶 to 𝑛𝐶 for this kernel. We efficiently implement the majority of kernels (ex-
+cluding Eq. (14) to (15)) using TileLang (Wang et al., 2025). This framework streamlines the
+implementationofkernelswithcomplexcalculationprocessandallowsustofullyutilizethe
+memorybandwidthwithminimalengineeringeffort.
+4.3.2. Recomputing
+The 𝑛-stream residual design introduces substantial memory overhead during training. To
+mitigatethis,wediscardtheintermediateactivationsofthemHCkernelsaftertheforwardpass
+andrecomputethemon-the-flyinthebackwardpass,throughre-executingthemHCkernels
+10
+withouttheheavylayerfunction F. Consequently,forablockof 𝐿 𝑟 consecutivelayers,weneed
+onlystoretheinputx𝑙 tothefirstlayer. Excludinglightweightcoefficientswhileaccounting
+0
+forthepre-normwithinF,Tab. 3summarizestheintermediateactivationspreservedforthe
+backwardpass.
+Table3 | StoredandRecomputedIntermediateActivationsWelistpertokenactivationpre-
+servedforthebackwardpassandthetransientactivationrecomputedin 𝐿 𝑟 consecutivelayers.
+Layer𝑙 0 representsthefirstlayerin 𝐿 𝑟 layersandlayer𝑙 isin [𝑙 0 ,𝑙 0 +𝐿 𝑟 −1].
+Activations x𝑙 0 F(H 𝑙 pre x𝑙,W 𝑙 ) x𝑙 H 𝑙 pre x𝑙 RMSNorm(H 𝑙 pre x𝑙 )
+Size(Elements) 𝑛𝐶 𝐶 𝑛𝐶 𝐶 𝐶
+StoredMethod Every 𝐿 𝑟 layers Everylayer Transientinside 𝐿 𝑟 layers
+SincemHCkernelsrecomputationisperformedforblocksof 𝐿 𝑟 consecutivelayers,given
+atotalof 𝐿layers,wemustpersistentlystorethefirstlayerinputx𝑙
+0
+forall ⌈
+𝐿
+𝐿
+𝑟
+⌉ blocksforthe
+backwardpass. Inadditiontothisresidentmemory,therecomputationprocessintroducesa
+transientmemoryoverheadof (𝑛+2)𝐶×𝐿 𝑟 elementsfortheactiveblock,whichdeterminesthe
+peakmemoryusageduringbackpropagation. Consequently,wedeterminetheoptimalblock
+size 𝐿∗
+𝑟
+byminimizingthetotalmemoryfootprintcorrespondedto 𝐿 𝑟:
+(cid:20) (cid:24) 𝐿 (cid:25) (cid:21) √︂ 𝑛𝐿
+𝐿∗ 𝑟 =argm 𝐿 i 𝑟 n 𝑛𝐶× 𝐿 𝑟 +(𝑛+2)𝐶×𝐿 𝑟 ≈ 𝑛+2 . (20)
+Furthermore,pipelineparallelisminlarge-scaletrainingimposesaconstraint: recomputation
+blocks must not cross pipeline stage boundaries. Observing that the theoretical optimum 𝐿∗
+𝑟
+typically aligns with the number of layers per pipeline stage, we choose to synchronize the
+recomputationboundarieswiththepipelinestages.
+4.3.3. OverlappingCommunicationinDualPipe
+Inlarge-scaletraining,pipelineparallelismisthestandardpracticeformitigatingparameterand
+gradientmemoryfootprints. Specifically,weadopttheDualPipeschedule(Liuetal.,2024b),
+which effectively overlaps scale-out interconnected communication traffic, such as those in
+expertandpipelineparallelism. However,comparedtothesingle-streamdesign,theproposed
+𝑛-stream residual in mHC incurs substantial communication latency across pipeline stages.
+Furthermore,atstageboundaries,therecomputationofmHCkernelsforall 𝐿 𝑟 layersintroduces
+non-negligiblecomputationaloverhead. Toaddressthesebottlenecks,weextendtheDualPipe
+schedule(seeFig.4)tofacilitateimprovedoverlappingofcommunicationandcomputationat
+pipelinestageboundaries.
+Notably, to prevent blocking the communication stream, we execute the F kernels
+post,res
+of MLP (i.e. FFN) layers on a dedicated high-priority compute stream. We further refrain
+from employing persistent kernels for long-running operations in attention layers, thereby
+preventingextendedstalls. Thisdesignenablesthepreemptionofoverlappedattentioncom-
+putations,allowingforflexibleschedulingwhilemaintaininghighutilizationofthecompute
+device’sprocessingunits. Furthermore,therecomputationprocessisdecoupledfrompipeline
+communicationdependencies,astheinitialactivationofeachstagex𝑙 isalreadycachedlocally.
+0
+11
+ℱ! ) ’((B) ℱ! * "#$, ’(#(B) ℱ! * ’((B) ℱ! * ’((F) ℱ! * "#$, ’(#(F) ℱ! ) ’((F)
+Whole Stage
+Normal Compute Stream MLP (B) MLP (W) MLP (F) ATTN (B) ATTN (W) Recompute (B) ATTN (F)
+Communication Stream DISPATCH (F) DISPATCH (B) COMBINE (F) PP Send Recv (F) PP Send Recv(B) COMBINE (B)
+High Priority Compute Stream
+ℱ! ) "#$, ’(#(F) ℱ! ) "#$, ’(#(B)
+Figure 4 | Communication-Computation Overlapping for mHC. We extend the DualPipe
+scheduletohandletheoverheadintroducedbymHC.Lengthsofeachblockareillustrativeonly
+anddonotrepresentactualduration. (F),(B),(W)referstoforwardpass,backwardpass,weight
+gradientcomputation,respectively. FA and FM representskernelscorrespondedtoAttention
+andMLP,respectively.
+5. Experiments
+5.1. ExperimentalSetup
+Wevalidatetheproposedmethodvialanguagemodelpre-training,conductingacomparative
+analysisbetweenthebaseline,HC,andourproposedmHC.UtilizingMoEarchitecturesinspired
+by DeepSeek-V3 (Liu et al., 2024b), we train four distinct model variants to cover different
+evaluation regimes. Specifically, the expansion rate 𝑛 for both HC and mHC is set to 4. Our
+primaryfocusisa27Bmodeltrainedwithadatasetsizeproportionaltoitsparameters,which
+serves as the subject for our system-level main results. Expanding on this, we analyze the
+computescalingbehaviorbyincorporatingsmaller3Band9Bmodelstrainedwithproportional
+data, which allows us to observe performance trends across varying compute. Additionally,
+tospecificallyinvestigatethetokenscalingbehavior,wetrainaseparate3Bmodelonafixed
+corpusof1trilliontokens. Detailedmodelconfigurationsandtraininghyper-parametersare
+providedinAppendixA.1.
+5.2. MainResults
+0.00
+-0.02
+-0.04
+-0.06
+10000 20000 30000 40000 50000
+Steps
+paG
+ssoL
+etulosbA
+0.20
+0.15
+0.10
+Baseline 0.05
+HC
+mHC
+0.00
+10000 20000 30000 40000 50000
+Steps
+(a) Absolute Training Loss Gap vs. Training Steps
+mroN
+darG
+Baseline
+HC
+mHC
+(b) Gradient Norm vs. Training Steps
+Figure5 | TrainingStabilityofManifold-ConstrainedHyper-Connections(mHC).Thisfigure
+illustrates (a) the absolute training loss gap of mHC and HC relative to the baseline, and (b)
+the gradient norm of the three methods. All experiments utilize the 27B model. The results
+demonstratethatmHCexhibitsimprovedstabilityintermsofbothlossandgradientnorm.
+We begin by examining the training stability and convergence of the 27B models. As
+illustrated in Fig. 5 (a), mHC effectively mitigates the training instability observed in HC,
+achievingafinallossreductionof0.021comparedtothebaseline. Thisimprovedstabilityis
+furthercorroboratedbythegradientnormanalysisinFig.5(b),wheremHCexhibitssignificantly
+betterbehaviorthanHC,maintainingastableprofilecomparabletothebaseline.
+12
+Table 4 | System-level Benchmark Results for 27B Models. This table compares the zero-
+shot and few-shot performance of the Baseline, HC, and mHC across 8 diverse downstream
+benchmarks. mHCconsistentlyoutperformstheBaselineandsurpassesHConthemajorityof
+benchmarks,demonstratingitseffectivenessinlarge-scalepre-training.
+Benchmark BBH DROP GSM8K HellaSwag MATH MMLU PIQA TriviaQA
+(Metric) (EM) (F1) (EM) (Acc.) (EM) (Acc.) (Acc.) (EM)
+#Shots 3-shot 3-shot 8-shot 10-shot 4-shot 5-shot 0-shot 5-shot
+27BBaseline 43.8 47.0 46.7 73.7 22.0 59.0 78.5 54.3
+27Bw/HC 48.9 51.6 53.2 74.3 26.4 63.0 79.9 56.3
+27Bw/mHC 51.0 53.9 53.8 74.7 26.0 63.4 80.5 57.6
+Tab.4presentsthedownstreamperformanceacrossadiversesetofbenchmarks(Bisketal.,
+2020;Cobbeetal.,2021;Hendrycksetal.,2020,2021;Joshietal.,2017;Zellersetal.,2019). mHC
+yieldscomprehensiveimprovements,consistentlyoutperformingthebaselineandsurpassing
+HC on the majority of tasks. Notably, compared to HC, mHC further enhances the model’s
+reasoningcapabilities,deliveringperformancegainsof2.1%onBBH(Suzgunetal.,2022)and
+2.3%onDROP(Duaetal.,2019).
+5.3. ScalingExperiments
+0.02
+0.01
+0.00
+-0.01
+-0.02
+-0.03
+-0.04
+1021 1022
+FLOPs
+paG
+ssoL
+etulosbA
+101.0%
+Baseline
+mHC
+100.0%
+99.0%
+98.0%
+1021 1022
+FLOPs
+oitaR
+ssoL
+evitaleR
+Baseline 0.01
+mHC
+0.00
+-0.01
+-0.02
+-0.03
+2 4
+FLOPs ×1021
+paG
+ssoL
+etulosbA
+101.0%
+Baseline
+mHC
+100.0%
+99.0%
+98.0%
+2 4
+FLOPs ×1021
+oitaR
+ssoL
+evitaleR
+Baseline
+mHC
+(a) Compute Scaling Curve (b) Token Scaling Curve
+Figure6 | ScalingpropertiesofmHCcomparedtotheBaseline. (a)ComputeScalingCurve.
+Solidlinesdepicttheperformancegapacrossdifferentcomputebudgets. Eachpointrepresents
+aspecificcompute-optimalconfigurationofmodelsizeanddatasetsize,scalingfrom3Band9B
+to27Bparameters. (b)TokenScalingCurve. Trajectoryofthe3Bmodelduringtraining. Each
+pointrepresentsthemodel’sperformanceatdifferenttrainingtokens. Detailedarchitectures
+andtrainingconfigurationsareprovidedinAppendixA.1.
+Toassessthescalabilityofourapproach,wereporttherelativelossimprovementofmHC
+against the baseline across different scales. In Fig. 6 (a), we plot the compute scaling curve
+spanning3B,9B,and27Bparameters. Thetrajectoryindicatesthattheperformanceadvantageis
+robustlymaintainedevenathighercomputationalbudgets,showingonlymarginalattenuation.
+Furthermore, we examine the within-run dynamics in Fig. 6 (b), which presents the token
+scalingcurveforthe3Bmodel. Collectively,thesefindingsvalidatetheeffectivenessofmHC
+in large-scale scenarios. This conclusion is further corroborated by our in-house large-scale
+trainingexperiments.
+13
+2.0
+1.5
+1.0
+0.5
+0.0
+0 10 20 30 40 50 60
+Layer Index l
+edutingaM
+niaG
+xamA
+2.0
+1.5
+1.0
+0.5 PM res( Hl res) Forward Signal Gain
+PM res( Hl res) Backward Gradient Gain
+0.0
+0 10 20 30 40 50 60
+Layer Index l
+(a) Single-Layer Mapping
+edutingaM
+niaG
+xamA
+l i=1PM res( Hl re + s 1 − i ) Forward Signal Gain
+Y6 i 1 =−1 l PM res( H6 re 1 s − i ) Backward Gradient Gain
+Y
+(b) Composite Mapping
+Figure7 | PropagationStabilityofManifold-ConstrainedHyper-Connections(mHC).This
+figureillustratesthepropagationdynamicsof(a)thesingle-layermapping P Mres (H 𝑙 res) and(b)
+thecompositemapping (cid:206) 𝑖 𝐿 = − 1 𝑙P Mres (H 𝐿 r − es 𝑖 ) withinthe27Bmodel. Theresultsdemonstratethat
+mHCsignificantlyenhancespropagationstabilitycomparedtoHC.
+res res res 30 res 30 res 60 res
+H1 H30 H60 i=1H31 − i i=1H61 − i i=1H61 − i
+18.735.43 4.43 4.43 4.43 0.840.94-0.07-0.050.02 -21.64-5.58-3.74-5.71-6.60 -1.35-0.3Y8-0.33-0.34-0.31 -251.4-69Y.9-68.3-255.3142.1 -475.3-132Y.8-112.2-117.0-113.3
+-15.29-4.07-3.07-4.07-4.07 0.67-0.080.89-0.07-0.07 -20.22-6.06-2.27-5.33-6.57 6.471.81 1.56 1.58 1.51 -243.0-69.1-66.1-247.4139.6 -462.8-129.3-109.3-113.9-110.3
+HC
+-14.79-3.95-3.95-2.95-3.95 0.49-0.10-0.140.81-0.07 22.506.08 3.12 6.53 6.77 0.030.01-0.000.01 0.01 264.674.8 72.7268.9-151.8 509.1142.3120.2125.3121.3
+-15.88-4.22-4.22-4.22-3.22 0.960.06 0.05-0.030.87 -21.59-6.41-3.97-5.72-5.49 -0.81-0.23-0.19-0.20-0.19 -254.8-71.2-71.8-255.2143.3 -498.5-139.3-117.8-122.6-118.7
+-6.81-6.81-6.81-6.81 0.83 0.73 0.66 0.75 -11.97-6.86-10.23-11.89 1.22 1.04 1.06 1.02 -135.4-133.4-489.0273.3 -259.2-219.1-228.2-221.0
+PM res( H r 1 es) PM res( H r 3 e 0 s) PM res( H r 6 e 0 s) 3 i 0 =1PM res( H r 3 e 1 s − i ) 3 i 0 =1PM res( H r 6 e 1 s − i ) 6 i 0 =1PM res( H r 6 e 1 s − i )
+1.000.67 0.09 0.03 0.22 1.000.96 0.01 0.00 0.04 1.000.92 0.06 0.01 0.01 1.00Y0.30 0.25 0.22 0.24 1.00Y0.35 0.28 0.17 0.20 1.00Y0.24 0.26 0.23 0.27
+1.000.26 0.48 0.26 0.00 1.000.00 0.97 0.03 0.00 1.000.05 0.81 0.01 0.13 1.000.24 0.25 0.25 0.26 1.000.03 0.62 0.29 0.07 1.010.23 0.25 0.26 0.27
+mHC
+1.000.03 0.24 0.00 0.73 1.000.00 0.00 1.00 0.00 1.000.00 0.01 0.97 0.02 1.000.20 0.24 0.28 0.28 1.000.01 0.17 0.80 0.02 1.010.21 0.25 0.27 0.28
+1.000.03 0.20 0.69 0.09 1.000.00 0.04 0.01 0.95 1.000.03 0.13 0.00 0.84 1.000.17 0.32 0.18 0.34 1.000.02 0.42 0.25 0.31 1.000.21 0.27 0.24 0.29
+0.98 1.00 0.98 1.04 0.96 1.02 1.04 0.99 1.00 1.01 0.99 1.00 0.90 1.06 0.93 1.11 0.41 1.50 1.50 0.60 0.88 1.03 1.00 1.11
+Figure8 | VisualizationsofLearnableMappings. Thisfiguredisplaysrepresentativesingle-
+layer and composite mappings for HC (first row) and mHC (second row). Each matrix is
+computedbyaveragingoveralltokenswithinaselectedsequence. Thelabelsannotatedalong
+they-axisandx-axisindicatetheforwardsignalgain(rowsum)andthebackwardgradientgain
+(columnsum),respectively.
+5.4. StabilityAnalysis
+Similar to Fig. 3, Fig. 7 illustrates the propagation stability of mHC. Ideally, the single-layer
+mappingsatisfiesthedoublystochasticconstraint,implyingthatboththeforwardsignalgain
+andthebackwardgradientgainshouldequalto1. However,practiceimplementationsutilizing
+theSinkhorn-Knoppalgorithmmustlimitthenumberofiterationstoachievecomputational
+efficiency. Inoursettings,weuse20iterationstoobtainanapproximatesolution. Consequently,
+asshowninFig.7(a),thebackwardgradientgaindeviatesslightlyfrom1. Inthecompositecase
+showninFig.7(b),thedeviationincreasesbutremainsbounded,reachingamaximumvalue
+ofapproximately1.6. Notably, comparedtothemaximumgainmagnitudeofnearly3000in
+HC,mHCsignificantlyreducesitbythreeordersofmagnitude. Theseresultsdemonstratethat
+mHC significantly enhances propagation stability compared to HC, ensuring stable forward
+signalandbackwardgradientflows. Additionally,Fig.8displaysrepresentativemappings. We
+observethatforHC,whenthemaximumgainislarge,othervaluesalsotendtobesignificant,
+whichindicatesgeneralinstabilityacrossallpropagationpaths. Incontrast,mHCconsistently
+yieldsstableresults.
+14
+6. Conclusion and Outlook
+Inthispaper,weidentifythatwhileexpandingthewidthofresidualstreamanddiversifying
+connections yields performance gains as proposed in Hyper-Connections (HC), the uncon-
+strainednatureoftheseconnectionsleadstosignaldivergence. Thisdisruptioncompromises
+theconservationofsignalenergyacrosslayers,inducingtraininginstabilityandhinderingthe
+scalabilityofdeepnetworks. Toaddressthesechallenges,weintroduceManifold-Constrained
+Hyper-Connections(mHC),ageneralizedframeworkthatprojectstheresidualconnectionspace
+onto a specific manifold. By employing the Sinkhorn-Knopp algorithm to enforce a doubly
+stochasticconstraintonresidualmappings,mHCtransformssignalpropagationintoaconvex
+combinationoffeatures. EmpiricalresultsconfirmthatmHCeffectivelyrestorestheidentity
+mappingproperty,enablingstablelarge-scaletrainingwithsuperiorscalabilitycomparedto
+conventionalHC.Crucially,throughefficientinfrastructure-leveloptimizations,mHCdelivers
+theseimprovementswithnegligiblecomputationaloverhead.
+AsageneralizedextensionoftheHCparadigm,mHCopensseveralpromisingavenuesfor
+futureresearch. Althoughthisworkutilizesdoublystochasticmatricestoensurestability,the
+frameworkaccommodatestheexplorationofdiversemanifoldconstraintstailoredtospecific
+learningobjectives. Weanticipatethatfurtherinvestigationintodistinctgeometricconstraints
+could yield novel methods that better optimize the trade-off between plasticity and stability.
+Furthermore, we hope mHC rejuvenates community interest in macro-architecture design.
+By deepening the understanding of how topological structures influence optimization and
+representationlearning,mHCwillhelpaddresscurrentlimitationsandpotentiallyilluminate
+newpathwaysfortheevolutionofnext-generationfoundationalarchitectures.
+References
+J.Ainslie,J.Lee-Thorp,M.DeJong,Y.Zemlyanskiy,F.Lebrón,andS.Sanghai. Gqa: Training
+generalizedmulti-querytransformermodelsfrommulti-headcheckpoints. arXivpreprint
+arXiv:2305.13245,2023.
+Y.Bisk,R.Zellers,R.L.Bras,J.Gao,andY.Choi. PIQA:reasoningaboutphysicalcommonsense
+innaturallanguage. InTheThirty-FourthAAAIConferenceonArtificialIntelligence,AAAI
+2020, The Thirty-Second Innovative Applications of Artificial Intelligence Conference, IAAI
+2020,TheTenthAAAISymposiumonEducationalAdvancesinArtificialIntelligence,EAAI
+2020, New York, NY, USA, February 7-12, 2020, pages 7432–7439. AAAI Press, 2020. doi:
+10.1609/aaai.v34i05.6239. URLhttps://doi.org/10.1609/aaai.v34i05.6239.
+T.Brown,B.Mann,N.Ryder,M.Subbiah,J.D.Kaplan,P.Dhariwal,A.Neelakantan,P.Shyam,
+G. Sastry, A. Askell, et al. Language models are few-shot learners. Advances in neural
+informationprocessingsystems,33:1877–1901,2020.
+Y.Chai,S.Jin,andX.Hou. Highwaytransformer: Self-gatingenhancedself-attentivenetworks.
+InD.Jurafsky,J.Chai,N.Schluter,andJ.Tetreault,editors,Proceedingsofthe58thAnnual
+Meeting of the Association for Computational Linguistics, pages 6887–6900, Online, July
+2020.AssociationforComputationalLinguistics. doi: 10.18653/v1/2020.acl-main.616. URL
+https://aclanthology.org/2020.acl-main.616/.
+F.Chollet. Xception: Deeplearningwithdepthwiseseparableconvolutions. InProceedingsof
+theIEEEconferenceoncomputervisionandpatternrecognition,pages1251–1258,2017.
+15
+K. Cobbe, V. Kosaraju, M. Bavarian, M. Chen, H. Jun, L. Kaiser, M. Plappert, J. Tworek,
+J.Hilton, R.Nakano, etal. Trainingverifierstosolvemathwordproblems. arXivpreprint
+arXiv:2110.14168,2021.
+T. Dao, D. Y. Fu, S. Ermon, A. Rudra, and C. Ré. FlashAttention: Fast and memory-efficient
+exactattentionwithIO-awareness. InAdvancesinNeuralInformationProcessingSystems
+(NeurIPS),2022.
+D.Dua,Y.Wang,P.Dasigi,G.Stanovsky,S.Singh,andM.Gardner. DROP:Areadingcompre-
+hensionbenchmarkrequiringdiscretereasoningoverparagraphs.InJ.Burstein,C.Doran,and
+T.Solorio,editors,Proceedingsofthe2019ConferenceoftheNorthAmericanChapterofthe
+Association for Computational Linguistics: Human Language Technologies, NAACL-HLT
+2019,Minneapolis,MN,USA,June2-7,2019,Volume1(LongandShortPapers),pages2368–
+2378.AssociationforComputationalLinguistics, 2019. doi: 10.18653/V1/N19-1246. URL
+https://doi.org/10.18653/v1/n19-1246.
+Y.Fang,Y.CAI,J.Chen,J.Zhao,G.Tian,andG.Li. Cross-layerretrospectiveretrievingvialayer
+attention. InTheEleventhInternationalConferenceonLearningRepresentations,2023. URL
+https://openreview.net/forum?id=pvgEL1yS3Ql.
+W.Fedus,B.Zoph,andN.Shazeer. Switchtransformers: Scalingtotrillionparametermodels
+withsimpleandefficientsparsity. JournalofMachineLearningResearch,23(120):1–39,2022.
+K.He,X.Zhang,S.Ren,andJ.Sun.Deepresiduallearningforimagerecognition.InProceedings
+oftheIEEEconferenceoncomputervisionandpatternrecognition,pages770–778,2016a.
+K.He,X.Zhang,S.Ren,andJ.Sun. Identitymappingsindeepresidualnetworks. InEuropean
+conferenceoncomputervision,pages630–645.Springer,2016b.
+M.Heddes,A.Javanmard,K.Axiotis,G.Fu,M.Bateni,andV.Mirrokni. Deepcrossattention:
+Superchargingtransformerresidualconnections. InForty-secondInternationalConference
+onMachineLearning,2025. URLhttps://openreview.net/forum?id=j3JBfFnGYh.
+D.Hendrycks,C.Burns,S.Basart,A.Zou,M.Mazeika,D.Song,andJ.Steinhardt. Measuring
+massivemultitasklanguageunderstanding. arXivpreprintarXiv:2009.03300,2020.
+D.Hendrycks,C.Burns,S.Kadavath,A.Arora,S.Basart,E.Tang,D.Song,andJ.Steinhardt.Mea-
+suringmathematicalproblemsolvingwiththemathdataset. arXivpreprintarXiv:2103.03874,
+2021.
+J.Hoffmann,S.Borgeaud,A.Mensch,E.Buchatskaya,T.Cai,E.Rutherford,D.deLasCasas,
+L.A.Hendricks,J.Welbl,A.Clark,T.Hennigan,E.Noland,K.Millican,G.vandenDriessche,
+B. Damoc, A. Guy, S. Osindero, K. Simonyan, E. Elsen, O. Vinyals, J. Rae, and L. Sifre.
+An empirical analysis of compute-optimal large language model training. In S. Koyejo,
+S. Mohamed, A. Agarwal, D. Belgrave, K. Cho, and A. Oh, editors, Advances in Neural
+InformationProcessingSystems,volume35,pages30016–30030.CurranAssociates,Inc.,2022.
+URLhttps://proceedings.neurips.cc/paper_files/paper/2022/file/c1e2faf
+f6f588870935f114ebe04a3e5-Paper-Conference.pdf.
+G.Huang,Z.Liu,L.VanDerMaaten,andK.Q.Weinberger. Denselyconnectedconvolutional
+networks. InProceedingsoftheIEEEconferenceoncomputervisionandpatternrecognition,
+pages4700–4708,2017.
+16
+M.Joshi,E.Choi,D.Weld,andL.Zettlemoyer. TriviaQA:Alargescaledistantlysupervisedchal-
+lengedatasetforreadingcomprehension.InR.BarzilayandM.-Y.Kan,editors,Proceedingsof
+the55thAnnualMeetingoftheAssociationforComputationalLinguistics(Volume1: Long
+Papers), pages 1601–1611, Vancouver, Canada, July 2017. Association for Computational
+Linguistics. doi: 10.18653/v1/P17-1147. URLhttps://aclanthology.org/P17-1147.
+G.Larsson,M.Maire,andG.Shakhnarovich. Fractalnet: Ultra-deepneuralnetworkswithout
+residuals. arXivpreprintarXiv:1605.07648,2016.
+D.Lepikhin,H.Lee,Y.Xu,D.Chen,O.Firat,Y.Huang,M.Krikun,N.Shazeer,andZ.Chen.
+Gshard: Scalinggiantmodelswithconditionalcomputationandautomaticsharding. arXiv
+preprintarXiv:2006.16668,2020.
+A. Liu, B. Feng, B. Wang, B. Wang, B. Liu, C. Zhao, C. Dengr, C. Ruan, D. Dai, D. Guo, et al.
+Deepseek-v2: Astrong,economical,andefficientmixture-of-expertslanguagemodel. arXiv
+preprintarXiv:2405.04434,2024a.
+A. Liu, B. Feng, B. Xue, B. Wang, B. Wu, C. Lu, C. Zhao, C. Deng, C. Zhang, C. Ruan, et al.
+Deepseek-v3technicalreport. arXivpreprintarXiv:2412.19437,2024b.
+I. Loshchilov and F. Hutter. Decoupled weight decay regularization. arXiv preprint
+arXiv:1711.05101,2017.
+B.MakandJ.Flanigan. Residualmatrixtransformers: Scalingthesizeoftheresidualstream.
+arXivpreprintarXiv:2506.22696,2025.
+G. Menghani, R. Kumar, and S. Kumar. LAurel: Learned augmented residual layer. In
+Forty-second International Conference on Machine Learning, 2025. URL https://open
+review.net/forum?id=rUDRWP9WvZ.
+M.Pagliardini,A.Mohtashami,F.Fleuret,andM.Jaggi. Denseformer: Enhancinginformation
+flowintransformersviadepthweightedaveraging. InTheThirty-eighthAnnualConference
+onNeuralInformationProcessingSystems,2024. URLhttps://openreview.net/forum
+?id=kMnoh7CXrq.
+P.Qi,X.Wan,G.Huang,andM.Lin. Zerobubble(almost)pipelineparallelism. InTheTwelfth
+International Conference on Learning Representations, 2024. URL https://openreview
+.net/forum?id=tuzTN0eIO5.
+N. Shazeer. Fast transformer decoding: One write-head is all you need. arXiv preprint
+arXiv:1911.02150,2019.
+N. Shazeer, A. Mirhoseini, K. Maziarz, A. Davis, Q. Le, G. Hinton, and J. Dean. Outra-
+geouslylargeneuralnetworks: Thesparsely-gatedmixture-of-expertslayer. arXivpreprint
+arXiv:1701.06538,2017.
+R.SinkhornandP.Knopp. Concerningnonnegativematricesanddoublystochasticmatrices.
+PacificJournalofMathematics,21(2):343–348,1967.
+R. K. Srivastava, K. Greff, and J. Schmidhuber. Training very deep networks. In C. Cortes,
+N.Lawrence,D.Lee,M.Sugiyama,andR.Garnett,editors,AdvancesinNeuralInformation
+ProcessingSystems,volume28.CurranAssociates,Inc.,2015. URLhttps://proceedings.
+neurips.cc/paper_files/paper/2015/file/215a71a12769b056c3c32e7299f1c5e
+d-Paper.pdf.
+17
+J.Su,M.Ahmed,Y.Lu,S.Pan,W.Bo,andY.Liu. Roformer: Enhancedtransformerwithrotary
+positionembedding. Neurocomputing,568:127063,2024.
+M.Suzgun,N.Scales,N.Schärli,S.Gehrmann,Y.Tay,H.W.Chung,A.Chowdhery,Q.V.Le,
+E.H.Chi,D.Zhou,etal. Challengingbig-benchtasksandwhetherchain-of-thoughtcansolve
+them. arXivpreprintarXiv:2210.09261,2022.
+H.Touvron,T.Lavril,G.Izacard,X.Martinet,M.-A.Lachaux,T.Lacroix,B.Rozière,N.Goyal,
+E. Hambro, F. Azhar, et al. Llama: Open and efficient foundation language models. arXiv
+preprintarXiv:2302.13971,2023.
+A.Vaswani,N.Shazeer,N.Parmar,J.Uszkoreit,L.Jones,A.N.Gomez,Ł.Kaiser,andI.Polo-
+sukhin. Attention is all you need. Advances in neural information processing systems, 30,
+2017.
+L.Wang,H.Gao,C.Zhao,X.Sun,andD.Dai. Auxiliary-loss-freeloadbalancingstrategyfor
+mixture-of-experts. arXivpreprintarXiv:2408.15664,2024.
+L.Wang,Y.Cheng,Y.Shi,Z.Tang,Z.Mo,W.Xie,L.Ma,Y.Xia,J.Xue,F.Yang,etal. Tilelang: A
+composabletiledprogrammingmodelforaisystems. arXivpreprintarXiv:2504.17577,2025.
+D.Xiao,Q.Meng,S.Li,andX.Yuan.Muddformer: Breakingresidualbottlenecksintransformers
+viamultiwaydynamicdenseconnections. arXivpreprintarXiv:2502.12170,2025.
+S.Xie,R.Girshick,P.Dollár,Z.Tu,andK.He. Aggregatedresidualtransformationsfordeep
+neural networks. In Proceedings of the IEEE conference on computer vision and pattern
+recognition,pages1492–1500,2017.
+S.Xie,H.Zhang,J.Guo,X.Tan,J.Bian,H.H.Awadalla,A.Menezes,T.Qin,andR.Yan.Residual:
+Transformerwithdualresidualconnections,2023. URLhttps://arxiv.org/abs/2304.1
+4802.
+F. Yu, D. Wang, E. Shelhamer, and T. Darrell. Deep layer aggregation. In Proceedings of the
+IEEEconferenceoncomputervisionandpatternrecognition,pages2403–2412,2018.
+R.Zellers,A.Holtzman,Y.Bisk,A.Farhadi,andY.Choi. HellaSwag: Canamachinereallyfinish
+yoursentence? InA.Korhonen,D.R.Traum,andL.Màrquez,editors,Proceedingsofthe57th
+ConferenceoftheAssociationforComputationalLinguistics,ACL2019,Florence,Italy,July
+28-August2,2019,Volume1: LongPapers,pages4791–4800.AssociationforComputational
+Linguistics,2019. doi: 10.18653/v1/p19-1472. URLhttps://doi.org/10.18653/v1/p1
+9-1472.
+B. Zhang and R. Sennrich. Root mean square layer normalization. Advances in neural
+informationprocessingsystems,32,2019.
+D.Zhu,H.Huang,Z.Huang,Y.Zeng,Y.Mao,B.Wu,Q.Min,andX.Zhou. Hyper-connections.
+arXivpreprintarXiv:2409.19606,2024.
+18
+A. Appendix
+A.1. DetailedModelSpecificationsandHyper-parameters.
+Table5 | DetailedModelSpecificationsandHyper-parameters. Thistablepresentsthearchitec-
+turalconfigurationsforthe3B,9B,and27BmodelsbasedontheDeepSeek-V3(Liuetal.,2024b)
+architecture. Itoutlinesthespecifichyper-parametersformHCandHC,includingtheresidual
+streamexpansionandSinkhorn-Knoppsettings,alongsidetheoptimizationandtrainingproto-
+colsusedintheexperiments.
+3B
+Attribute 3B 9B 27B
+1TTokens
+VocabParams 331M 496M 662M 331M
+ActiveParams 612M 1.66B 4.14B 612M
+TotalParams 2.97B 9.18B 27.0B 2.97B
+Layers 12 18 30 12
+LeadingDenseLayers 1 1
+RoutedExperts 64 64 72 64
+ActiveExperts 6 6
+SharedExperts 2 2
+Dimension 1280 1920 2560 1280
+FFNDimension 896 1280 1536 896
+LoadBalancingMethod Loss-Free(Wangetal.,2024) Loss-Free
+AttentionHeads 16 24 32 16
+AttentionDimension 128 128
+AttentionVariant MLA(Liuetal.,2024a) MLA
+KVRank 512 512
+PositionEmbedding RoPE(Suetal.,2024) RoPE
+RoPEDimension 64 64
+RoPE𝜃 10000 10000
+LayerNormType RMSNorm(ZhangandSennrich,2019) RMSNorm
+LayerNorm𝜀 1e-20 1e-20
+mHC/HCExpansionRate𝑛 4 4
+mHC/HCGatingFactorInit𝛼 0.01 0.01
+mHCSinkhorn-Knopp𝑡 20 20
+max
+SequenceLength 4096 4096
+VocabSize 129280 129280
+BatchSize 320 512 1280 2560
+TrainingSteps 30000 50000 50000 100000
+TrainingTokens 39.3B 105B 262B 1.05T
+WarmupSteps 2000 2000
+Optimizer AdamW(LoshchilovandHutter,2017) AdamW
+AdamWBetas (0.9,0.95) (0.9,0.95)
+AdamW𝜀 1e-20 1e-20
+BaseLearningRate 8.6e-4 5.9e-4 4.0e-4 9.0e-4
+LrScheduler Step Step
+LrDecayStepRatio [0.8×,0.9×] [0.8×,0.9×]
+LrDecayRate [0.316,0.1] [0.316,0.1]
+WeightDecay 0.1 0.1
+19
