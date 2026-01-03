@@ -14,6 +14,11 @@ def create_app() -> FastAPI:
 
     app.include_router(router)
 
+    # Optional root endpoint
+    @app.get("/")
+    def root():
+        return {"service": "Agent Circle", "status": "running"}
+
     return app
 
 app = create_app()
