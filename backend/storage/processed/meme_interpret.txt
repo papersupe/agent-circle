@@ -1,0 +1,1056 @@
+MemeInterpret: Towards an All-in-One Dataset for Meme Understanding
+JeongsikPark1*,KhoiP.N.Nguyen2*,JihyungPark3,MinseokKim2,JaeheonLee2,
+JaeWonChoi1,KalyaniGanta4,PhalgunAshritKasu2,RohanSarakinti3,
+SanjanaVipperla2,SaiSathanapalli2,NishanVaghani2,andVincentNg2
+1UniversityofSouthernCalifornia 2UniversityofTexasatDallas
+3UniversityofTexasatAustin 4VirginiaTech
+jeongsik@usc.edu khoi.nguyen6@utdallas.edu vince@hlt.utdallas.edu
+Abstract
+Memecaptioning,thetaskofgeneratingasen-
+tencethatdescribesthemeaningofameme,is
+both challenging and important in advancing
+ComputationalMemeUnderstanding(CMU).
+However, existing research has not explored
+itsdecompositionintosubtasksoritsconnec- (a) (b)
+tions to other CMU tasks. To address this
+Figure1: ExamplememesfromKielaetal.(2020)(a)
+gap, we introduce MemeInterpret, a meme
+andSharmaetal.(2020)(b).
+corpuscontainingmemecaptionstogetherwith
+correspondingsurfacemessagesandrelevant
+adopted the same methodology for tackling each
+background knowledge. Strategically built
+newly-proposed task: (1) annotate a corpus of
+upon the Facebook Hateful Memes dataset,
+MemeInterpretisthelastpieceinasetofcor- memeswithtask-specificlabelsand(2)fine-tune
+porathatunifiesthreemajorcategoriesofCMU aVision-LanguageModel(VLM)ontheresulting
+tasksforthefirsttime. Extensiveexperiments corpus. While there is nothing inherently wrong
+onMemeInterpretandconnecteddatasetssug-
+withthismethodology,itisnotnecessarilyhealthy
+gest strong relationships between meme cap-
+forthelong-termdevelopmentofCMUresearch:
+tioning, its two proposed subtasks, and the
+asafield,existingCMUtasksarebeingtackledas
+othertwokeycategoriesofCMUtasks:classifi-
+iftheyhavenothingtodowitheachother.
+cationandexplanation. Tostimulatefurtherre-
+searchonCMU,wemakeourdatasetpublicly In light of this concern, we believe we should
+available at https://github.com/npnkhoi/ startthinkingaboutdevelopingtask-agnosticrather
+MemeInterpret.1 thantask-specificrepresentationsofmemes. The
+question, then, is: what task-agnostic representa-
+1 Introduction
+tioncanbesharedbyandthereforebenefitarange
+Memes, which are user-created combinations of ofCMUtasks? Asmanymeme-basedNLPtasks
+imagesoverlaidwithtext,havebecomeaprevalent requireanunderstandingofthemeaningofameme
+meansofonlinecommunication(Joshietal.,2024). (i.e.,whatthememeauthortriestoconvey)rather
+Theyarecreatedwithavarietyofpurposes: while than its form (i.e., how the meaning is conveyed
+somememesaresimplyusedtoexpresspersonal throughthevisualsandtext),agoodstartingpoint
+opinions, othermemescanbemalicious, such as wouldbetoexperimentwithusingthemeaningof
+inciting hatred or spreading manipulative propa-
+amemeasitstask-agnosticrepresentation.2
+ganda. Assuch,recentyearshaveseenincreasing For this reason, we believe that it is important
+interestwithinNLPintheemergingareaofCompu- to examine an under-studied but important cate-
+tationalMemeUnderstanding(CMU),atermthat gory of CMU tasks, meme interpretation, which
+we coined to refer to research on the automated is referred to as meme captioning by Hwang and
+comprehensionofmemes(NguyenandNg,2024).
+2We are by no means claiming that this representation
+WhilenumerousCMUtaskshavebeenproposed
+wouldbeusefulforallCMUtasks. Forinstance,ifthegoal
+inthepastfewyears,researchershaveessentially istoidentifythepersuasionstrategiesusedinameme,then
+theformofthememewouldmatter. Notealsothatthisis
+*Theseauthorscontributedequallytothiswork. anunstructuredrepresentation,asweexpressmeaninginthe
+1Forillustrationpurposes,weshowinthispapermemes form of natural language. We leave the development of a
+fromMemeInterpret,someofwhichcouldbeoffensive. structuredmeaningrepresentationtofuturework.
+16073
+FindingsoftheAssociationforComputationalLinguistics:EMNLP2025,pages16073–16087
+November4-9,2025©2025AssociationforComputationalLinguistics
+Shwartz(2023)andintentdescriptiongeneration Caucasianmansittinginfrontofawindowwitha
+by Park et al. (2024). Both tasks concern gener- stunnedface,wearingahatthatsays‘VIETNAM
+atingadescriptionthatcapturesthemeaningofa VETERAN’.Theauthordescribestheimageas‘me:
+meme. Given the meme in Figure 1a, the meme putsbagofpopcornintothemicrowave. everyone
+caption would be "this meme maliciously makes else at the senior center’." This SM captures the
+funofthetraumaoftheVietnamWarveterans". informationontheimagethatenablesthecorrectin-
+MemecaptioningcouldbenefitarangeofCMU terpretationofthememe(e.g.,thetext"VIETNAM
+tasks. For example, given the aforementioned VETERAN"couldhavebeeneasilyignoredbya
+memecaption,aHatefulMemeDetection(HMD) typical image captioner). Furthermore, it merges
+systemcaneasilydeterminethatthismemeishate- the information from the text and the image in a
+ful. Weemphasize,however,thatthesignificance coherentmannerbyresolving"me"totheauthor.3
+ofmemecaptionsliesinthefactthatmemesthat To advance research in meme captioning, we
+havedifferentformsbutconveythesamemeaning proposeMemeInterpret,amemecorpusinwhich
+arebeingmappedtothesamememecaption. This each meme is manually annotated with its meme
+helpsreducedatasparsityandremoveinformation captionand,giventheaforementionedchallenges
+irrelevanttothemeaning. Therefore,whentraining associatedwithmemecaptioning,itssurfacemes-
+task-specificmodelsfordownstreamCMUtasks, sage and the relevant background knowledge. In
+amodelthattakesmemecaptions(ratherthanthe previous work, each meme in MemeInterpret is
+original memes) as input can potentially be fine- already labeled with whether they are hateful or
+tunedonasmalleramountoftask-specificdatato not(acategorizationtask),andasubsetofthehate-
+achieveagivenlevelofperformance. ful memes is additionally labeled with an expla-
+Meme captioning, however, is challenging for nation of why it is hateful (an explanation task).
+atleastthreereasons. First, formanymemes, es- Therefore, MemeInterpret is the first meme cor-
+peciallythosethataremalicious(e.g.,theauthor’s pus that bridges together three major categories
+intentistomanipulatepublicopinion),themean- of CMU tasks, namely categorization, explana-
+ing of the meme is typically not explicitly stated tion, and interpretation (see Section 2). Our em-
+andthereforecanonlybeinferred. pirical studies showed that surface message and
+Second,memecaptioningreliesonbackground background knowledge annotations significantly
+knowledge(BK),whichbydefinitionisnotexplic- improved the performance on meme captioning.
+itlystatedinthememeeither. TakeFigure1aasan Moreover,strongermemecaptioningsystemscan
+example. Toproperlyunderstandtheterms"pop- advance the performance in meme classification
+corn", "senior", and "Vietnam veteran" and their andexplanation. Giventheseresults,weenvision
+relationships in the meme, one needs to possess that MemeInterpret can spark a new avenue of
+the BK that (1) "the Vietnam war was a highly researchinCMUthatinvolvesstudyinghowdiffer-
+traumaticperiodforUSsoldierswhoarenowold ent categories of tasks interact with and possibly
+veterans mostly living in senior centers", and (2) benefitfromeachother.
+"thesoundofpopcornpoppinginthemicrowave
+2 RelatedWork
+can remind them of the gunfire sound during the
+war", but (3) "generally, that sound is not to be Inthissection,wereviewthreecategoriesoftasks
+scared of because there is no apparent danger".
+in CMU. For a more comprehensive overview of
+Whilelargelanguagemodels(LLMs)possesslots CMUresearch,seeNguyenandNg(2024).
+ofknowledge,whatischallengingisthegeneration
+Interpretation Interpretation,whichiswhatwe
+oftheBKrelevanttoagivenmeme.
+focus on, involves generating a description that
+Third,evenifamodelcanidentifyrelevantBK,
+3A surface message is different from an image caption.
+asuccessfulmemecaptionerneedstoaddressan-
+TheimagecaptionforthememeinFigure1acouldbe"It
+other challenging task that we refer to as surface isanimageofamanwithalongbeardsittinginfrontofa
+message (SM) generation, which involves gener- window. Heiswearingadark-colorhatwithajacket. The
+scene outside the window is blurry." This description fails
+ating a sentence to (1) capture the details of the
+toidentifycrucialinformationontheimagethatenablesthe
+memethatarecrucialforitsinterpretationby(2) correctunderstandingofthememe,suchasthetextsaying
+combiningthememe’simageandtextinacoher- "VIETNAMVETERAN",whichsuggeststhatthemanwasa
+veteranoftheVietnamWar,aswellastheemotionalexpres-
+ent manner. Returning to Figure 1a, a good SM
+sionofthemanviahisfaceandhands,whichsuggestsfear
+for this meme is "It is an image of a 70-year-old andtrauma.Also,thecaptionignoresthetextinthememe.
+16074
+Dataset Size AnnotationType AnnotationQuality Topics
+HatRed 3228 Hatefulnessexplanation Two-stage Collect-And- HatefulmemesfromtheFace-
+Judgeprocedure bookHatefulMemesdataset.
+ExHVV 4680 Roleofentitiesexplanation Two-stage Collect-And- COVID-19 and US Politics.
+Judgeprocedure Allmemesareharmful.
+MemeCap 6387 Memecaption No explicit quality control, Only non-offensive memes
+reliedonpriorperformance fromReddit.
+ofMTurkers
+MemeIntent 950 Intentdescription Two-stageCollect-and-Edit Politics, healthcare, and gen-
+procedure derequalityonFacebook
+MemeInterpret 6810 Surface message, background Three-stage Collect-Edit- Both hateful and non-hateful
+knowledge,memecaption Judgeprocedure memesfromFacebookHateful
+Memesdataset
+Table1: ComparisonbetweenMemeInterpretandotherfree-textannotationdatasetsonmemes.
+captures the meaning of a meme. Research on boththehatefulandnon-hatefulmemesoccurring
+memeinterpretationisinitsinfancy: sofarithas in the wild, covering a wider variety of memes
+onlybeenstudiedbyHwangandShwartz(2023) than existing corpora. As such, MemeInterpret
+and Park et al. (2024). As noted above, Hwang contributes to the set of much-needed corpora re-
+and Shwartz proposed the meme captioning task gardingfree-textannotationsforCMUresearch.
+andcreatedMemeCap,adatasetwhereeachmeme
+Caregorization Categorization tasks involve
+is annotated with its meme caption. Park et al.
+classifying memes along various dimensions.
+proposed the intent description generation task,
+Thesetaskscanbebroadlydividedintotwocate-
+whichisessentiallythememecaptioningtask,and
+gories. The first group is composed of tasks that
+created MemeIntent. Nevertheless, these authors
+involve detecting malignity in memes, including
+failed to realize the potential of meme captions
+offensiveness (Suryawanshi et al., 2020a), trolls
+as a task-agnostic representation that can benefit
+(Suryawanshi et al., 2020b), hate (Kiela et al.,
+a range of CMU tasks. While MemeIntent, like
+2020),antisemistism(Chandraetal.,2021),harm
+MemeInterpret,iscomposedofbothhatefuland
+(Pramanicketal.,2021a,b),andmisogyny(Fersini
+non-hateful memes, MemeCap excludes hateful
+etal.,2022). Thesecondgroupcontainstasksthat
+memes,whichisakeyweaknessgiventheimpor-
+categorizememesalongotherdimensionssuchas
+tantroleplayedbyhatefulmemesinCMU(Kiela
+types of persuasion techniques (Dimitrov et al.,
+et al., 2020), and does not annotate surface mes-
+2021),typesoffigurativelanguage(e.g.,irony,al-
+sagesandbackgroundknowledge.
+lusion, irony, sarcasm, and contrast) (Liu et al.,
+Explanation Explanationtasksinvolvegenerat- 2022), entities’ roles (e.g., hero, villain, or vic-
+ingadescriptionofwhyamemeshouldbeassigned tim)(Sharmaetal.,2022),emotions(e.g.,humor)
+a particular label (e.g., sarcastic). For instance, (Sharma et al., 2020), and attacked target groups
+if our task involves explaining why the meme in (e.g.,religion,race,sex,nationality,anddisability)
+Figure 1b is sarcastic, the explanation would be (Mathiasetal.,2021).
+"languages used for people who fear long words
+aresupposedtobeshort,butthemedicalnamefor 3 TheMemeInterpretDataset
+thefearisactuallylong."Sofar,onlytwomeme
+3.1 MemeSource
+corporahavebeenproducedforexplanationtasks,
+namely, HatRed (Hee et al., 2023) and ExHVV To assemble MemeInterpret, we sample the
+(Sharmaetal.,2023). memesfromtheFacebookHatefulMemedataset
+Table 1 compares MemeInterpret with the (FHM) (Kiela et al., 2020). Specifically, when
+abovecorpora,whicharetheonlymemecorpora assemblingMemeInterpret,weinherittheentire
+withfree-textannotations,alongfourdimensions. training set and the test "seen" set from FHM,
+Ascanbeseen,MemeInterpret(1)isthelargest which has 8500 and 1000 memes, respectively.
+memecorpuscontainingfree-textannotations;(2) 42%ofthememesinMemeInterpretarehateful.
+supportsmultipleannotationtypesratherthanjust WechoseFHMfortworeasons. First,andper-
+onetypeofannotations;(3)employsastricteranno- haps most importantly, each meme in FHM was
+tationprotocol,namelyathree-stageCollect-Edit- alreadylabeledashateful(Kielaetal.,2020)anda
+Judgeprocedure(seeSection3.2);and(4)contains subsetofthehatefulmemeswereannotatedwith
+16075
+explanationsofwhythememeswerehateful(Hee Stage2: Edit Toincreaselinguisticdiversityand
+etal.,2023). Therefore,ouradditionalannotations reduce annotator bias, we implemented an "edit"
+onthememessampledfromFHMwillenableus stage. Given the annotation results from Stage 1,
+tostudyhowthethreecategoriesofCMUtasks— five new annotators conducted edits on the three
+namelyinterpretation(memecaptioning),explana- fieldsandindicatedwhethertheyagreedwiththe
+tion(hatefulnessexplanation),andcategorization Stage1annotations. Theseeditorscouldselectone
+(hatefulmemedetection)—interactwithandpos- offouroptionsduringtheireditingprocess: Agree
+siblybenefitfromeachother. Second,thememes (theeditorsemanticallyagreeswiththeannotation;
+coveravarietyoftopicsencounteredineveryday onlyeditsfortoneorgrammarerrorsareneeded),
+life,includingpolitics,raceandethnicity,sexand Disagree(theeditorsemanticallydisagreeswiththe
+relationships,foodandeatinghabits,animalsand annotation;editsarenecessary),Add (theannota-
+pets, historical events, social issues, religion and tionisinsufficient;mustaddmoreinformation),or
+beliefs,lifestyleanddailylife,stereotypesandprej- Cut(theannotationistooverbose;mustshorten).
+udices,aswellashobbiesandinterests. Editorswereallowedtoskipmemestheydidnot
+understand. Additionally,iftheStage-1annotator
+3.2 AnnotationProcedure indicatedalackofconfidenceandtheeditoralso
+chosetoskip,thememewouldbediscardeddueto
+Recallthatinadditiontothememecaption(MC),
+alackofclearmeaningandintent.
+we annotate each meme in MemeInterpret with
+Stage3: Judge Foureditorsthemselvesserved
+twokindsofsupportingannotations,surfacemes-
+as judges, with each instance assigned to two
+sage(SM)andbackgroundknowledge(BK)(Fig-
+judges. Toavoidbias,nooneevaluatedtheirown
+ure 2). Below we describe our annotation proce-
+annotation. Arandom10%-subsetofthetraining
+dure.
+setand100%ofthetestsetwerejudged.
+AccordingtoWiegreffeandMarasovic(2021),
+Consistentwithrelatedworkinfree-textanno-
+the currently most advanced procedures for the
+tation on memes (Hee et al., 2023; Sharma et al.,
+form of our annotations — the free-text form —
+2023;Parketal.,2024),SMsandMCswereeval-
+are Collect-And-Judge and Collect-And-Edit. In
+uatedontwometrics: TextualCompleteness(i.e.,
+bothapproaches,"collect"meanstheinitialround
+whetherthetexthascompleteEnglishwritingwith
+offree-textannotation. Afterthat,onemay"judge"
+goodgrammar)andCorrectness(i.e.,whetherthe
+theannotationsbygivingratingsor"edit"theanno-
+textissemanticallycorrect). Meanwhile,BKwas
+tationstomakecorrectionsandimprovetheanno-
+evaluatedonfourmetrics: TextualCompleteness,
+tations. Judgingallowsdetectingpoorlyannotated
+Factuality(i.e.,whetheritisfactuallycorrect),Rel-
+instancesandshowingmeasurementsofannotation
+evance(i.e.,whetheritisrelevanttoinferringthe
+qualitywhileeditingincreaseslinguisticdiversity
+memecaption),andSufficiency(i.e.,takentogether,
+byallowingmultipleannotatorsperinstance.
+whetheritcoversalltheknowledgeneededtoprop-
+To combine the strengths of both approaches,
+erlyinferthememecaption). Allmetricsareevalu-
+we employed a three-stage "Collect-Edit-Judge"
+atedonthe5-pointLikertscale(Likert,1932).
+procedureasfollows:
+Stage1: Collect Weaskedfourannotatorswho 3.3 FinalDataset
+arenativeEnglishspeakers4 toannotatethethree After filtering (to ensure high annotator confi-
+fields (i.e., SM, BK, and MC) according to our dence),wehad5,810examplesinthetrainingset
+annotationguidelines(seeAppendixB),andindi- and 1,000 examples in the test set. In addition,
+cateiftheyareconfidentwiththeirunderstanding. 1,927,509,and447memesinthetraining,devel-
+Annotators have access to the entire Web for ref- opment,andtestsetscontainmorethantwoBKs,
+erence and were encouraged to provide multiple and 31, 7, and 11 contain more than two MCs,
+BKentriesandMCsforameme. Ifanannotator respectively.
+didnotunderstandamemeorbelievedtheyhada As we used the Collect-Edit-Judge approach,
+bias(e.g.,politicalorreligiousbias),theywerein- inter-rateragreementisnolongerapplicable. How-
+structedtoskipthememe,andthisinstancewould ever, to provide a rough idea of ‘agreement’, we
+bereassignedtoanotherannotator. measuredthemodificationratesduringtheediting
+process(Table2). SMshavethelowestmodifica-
+4Detailsonannotatorrecruitmentandtrainingcanbefound
+inAppdendixA. tionratesof24%,whileBKandMCshavehigher
+16076
+Figure2: Annotationexamples.
+Field Agree Disagree Add Cut Wordcount annotations,and(2)empiricallyverifyourhypothe-
+sesaboutmemecaptioninganditsrelationshipwith
+SM 76% 6% 12% 6% 17.45
+BK 62% 19% 11% 8% 21.61 downstreamCMUtasks.
+MC 55% 31% 4% 10% 9.93
+4.1 ImplementationDetails
+Table 2: Statistics of the fields in MemeInterpret.
+Model WeconductedexperimentswithLLaVA
+Types of edits include "Disagree" (serious disagree-
+ment),"Add"(annotationcontainsinadequate/missing
+1.5-7b6(Liuetal.,2024),oneofthetop-performing
+information;changesinvolveaddinginformation)and open-sourcevision-languagemodels. ItusesCLIP-
+"Cut"(descriptionistooverbose;changesinvolvedelet- ViT-L-336pxasthevisionencoderandVicunav1.5
+ing information). "Word Count" shows the average 13BastheLLM.Thetwomodalitiesare"bridged"
+numberofwords.
+usingamulti-layerperceptron. Theconnectorwas
+pre-trained with a subset of the CC3M dataset
+rates of 38% and 45%, respectively. These num- (Sharma et al., 2018), and the whole model was
+bers indicate the increasing annotation difficulty fine-tunedinanend-to-endfashionusingacademic-
+fromSMstoBKtoMCsandofferaroughideaof task-orientedVisualQuestionAnsweringdata.7
+howoftendisagreementshaveoccurred.5
+Trainingandhyperparametertuning Weused
+Thejudgingresultsindicateahighlevelofqual-
+Parameter Efficient Fine Tuning (PEFT) by at-
+ity in all the annotation fields. On Textual Com-
+taching and training a LoRA adapter (Hu et al.,
+pleteness,SM,BK,andMCgotscoresof5,4.97,
+2022) to all linear modules in the base model.
+and 4.98 respectively. On Correctness, SM, and
+We reserved 20% of our training set as de-
+MCgotscoresof4.91and4.79,respectively. BK
+velopment data. Across all PEFT runs, we
+furthergotRelevance,Sufficiency,andFactuality setlr=1e-5,lora_alpha=8,lora_dropout=0.1,
+scoresof4.91,4.77,and4.94,respectively. num_epochs=3, batch_size=2, and r=8, and se-
+lected the best checkpoint based on the perfor-
+4 EmpiricalStudies
+manceonthedevelopmentset. Forevaluationon
+We conducted a broad range of experiments on
+6https://huggingface.co/llava-hf/llava-1.
+MemeInterpretto(1)gaugetheusefulnessofour 5-7b-hf
+7Inourexperiments,wealwaysfedboththetextextracted
+5ThemajorsourcesofdisagreementarediscussedinAp- fromamemeandtheimagetoLLaVA,leveragingitsvisual
+pendixC. understandingcapability.
+16077
+generationtasks,wesetmax_new_tokens=100and
+Human Automatic
+TaskSetup
+usedgreedygeneration.
+Cor. Flu. Rel. Suf. BLE ROUBER NLI
+Prompttemplates Weprovidetheprompttem- Z 2.38 3.87 - - .001 .051 .804 .162
+MC
+platesusedintheexperimentsinAppendixD. FT 2.37 4.60 - - .015 .189 .889 .265
+Evaluationmetrics Weconductedbothhuman BK Z 3.10 3.83 2.13 2.08 .006 .152 .845 .234
+FT 3.88 3.88 3.57 3.46 .017 .142 .830 .336
+andautomaticevaluations. Forhumanevaluation,
+Z 2.45 3.66 - - .018 .230 .897 .281
+wehadannotatorsmanuallyreviewthegenerated SM
+FT 3.38 3.81 - - .172 .370 .877 .385
+outputsofallmodelson250randomtestsamples,
+which is 25% of the test set. The outputs were Table3: LLaVA’sresultsonmemecaptioning(MC),
+scoredonthe5-pointLikertscalew.r.t.Correctness backgroundknowledgegeneration(BK),andsurface
+(i.e.,howclosethegeneratedcaptionsemantically messagegeneration(SM)."Z"and"FT"refertothe
+isfromthegroundtruth)andFluency(i.e.,whether zero-shotandfine-tunedsettings,respectively. Thebest
+resultforeachtaskandeachsettingisboldfaced.
+theoutputisingoodEnglishlanguage). ForBK,
+owingtoitsnatureasalisting,weaddedtwomore
+Results AscanbeseeninTable3,fine-tuningthe
+metrics,Relevance(i.e.,whethertheBKisrelevant
+modelonSM,BK,andMCannotationsyielded
+tothememe)andSufficiency(i.e.,whethertheBK
+betterresultsacrossallmetrics. Thereareafew
+is sufficient for someone from a different culture
+cases where the fine-tuned models scored lower
+to make sense of the meme). Each model output
+thanthezero-shotmodels,butthedifferenceisneg-
+was rated by two independent annotators and the
+ligiblecomparedtothesignificantoutperformance
+model’snameswerenotshowntothem.
+onmostofthemetrics. Whilethefine-tunedresults
+For automatic evaluation, we evaluated each
+arebetterthanthezero-shotresults,wecanseethat
+model variant on the entire test setusing popular
+theyarestillfarfromperfect.
+metrics: BLEU-4(Papinenietal.,2002),ROUGE-
+L(Lin,2004),BERTScore(Zhangetal.,2020),and
+4.3 UsingBKandSMforMemeCaptioning
+theentailmentscorefromanNLImodel8(Manakul
+SinceBKandSMaremeanttosupportmemecap-
+etal.,2023). Whilethefirsttwometricsarebased
+tioning,ournextexperimentinvolvesdetermining
+onn-gramoverlaps,whichtendtomeasuretextual
+theusefulnessofthesetwotypesofannotations.
+fluency,thelasttwomeasurethesemanticsimilar-
+ityofthegeneratedandground-truthtexts. 4.3.1 UsingGoldBKandSMAnnotations
+WefirstevaluatetheusefulnessofgoldBKandSM
+4.2 SanityChecks
+annotationsformemecaptioning,withthegoalof
+Thegoalsofourfirstexperimentaretwo-fold. First, obtainingupper-boundperformanceonMCgener-
+we check whether our annotations are useful by ationgivenperfectSMandBKinformation.
+comparingresultsofmodelsfine-tunedonouran- Setup We trained three models. First, to deter-
+notationswiththecorrespondingzero-shotresults.9
+mine whether BK and SM are useful for meme
+Second,wegaugethedifficultyofgeneratinggood captioningwhenappliedincombination,wefine-
+MCs,BK,andSMs. tunedLLaVAusingbothSMandBKintheprompt.
+Setup LLaVA was evaluated on three tasks — Next,todeterminewhetherBKandSMareuseful
+SM generation, BK generation and meme cap- whenappliedinisolation,weconductedablation
+tioning — under two settings: the zero-shot set- experimentsinwhichwefine-tunedLLaVAusing
+ting, where no data from MemeInterpret was exactlyoneofthetwoknowledgesources. Inthese
+used to train LLaVA, and the fine-tuned setting, experiments, gold BK and SM annotations were
+wherewefine-tunedLLaVAonthetrainingsplitof used.
+MemeInterpret with the hyperparameters tuned Results Rows 1-2 of Table 4 show the results.
+onthedevelopmentset. The fine-tuned LLaVA with both inputs achieves
+better performance across all metrics except Flu-
+8https://huggingface.co/potsawee/
+ency. ThissuggeststhatBKandSM,whenapplied
+deberta-v3-large-mnli
+9Thischeckismotivatedbytheexperimentsconductedon incombination,canimproveMCgenerationexcept
+MemeCapbyHwangandShwartz(2023),whoshowedthat thattheoutputsareslightlylessfluent.
+theirfine-tunedresultsonmemecaptioningwereworsethan
+Aninterestingquestionis: isitmorechallenging
+theirzero-shotresultsbutdidnotprovideanyexplanationsfor
+theirunexpectedresults. togenerateMCsforhatefulmemesornon-hateful
+16078
+Human Automatic modelshowninrow2ofTable4wasusedtogen-
+# Inputs
+eratememecaptionsbyreplacingthegoldBKand
+Cor. Flu. BLE ROU BER NLI
+SM annotations with the automatic BK and SM
+MCpredictionwithoutBKandSM
+annotations. Forthejointmodel,wefine-tunedit
+1 Memeonly 2.37 4.60 .015 .189 .889 .265
+togeneratetheconcatenationofSM,BK,andMC.
+PipelineMCpredictionwithgoldannotations
+Results Results of MC generation using these
+2 Meme+BK+SM 3.54 4.49 .041 .280 .898 .507
+twomodelsareshowninrows5and6ofTable4. A
+3 Meme+SM 2.68 3.61 .004 .090 .824 .382
+4 Meme+BK 2.92 3.41 .007 .102 .824 .462 fewpointsdeservemention. First,thejointmodel
+(row6)outperformsthepipelinemodelw.r.t.allof
+PipelineMCpredictionwithpredictedinputs
+themetricsusedinbothhumanandautomaticeval-
+5 Meme+AutoBK&SM1.95 2.37 .002 .054 .778 .213
+uations. Thisisperhapsnotsurprising,aspipeline
+JointMC,SM,andBKprediction
+models are known to suffer from error propaga-
+6 Memeonly 2.90 4.65 .013 .186 .877 .364
+tion. Second,thejointmodeloutperformsthebasic
+model(row1)onbothhumanevaluationmetrics,
+Table4: Fine-tunedLLaVA’sresultsonmemecap-
+with a wide margin on Correctness (0.53). This
+tioningwithvaryinginputs. Forcomparisonpurposes,
+row1showsthefine-tunedresultsformemecaptioning shows that even noisily computed SMs and BKs
+thatweretakenverbatimfromTable3. Thebestresult canbenefitMCprediction. Perhapsimpressively,
+foreachmetricisboldfaced. thejointmodelachievedahigherCorrectnessscore
+thanoneofthemodelsthathasaccesstogoldSM
+memes? Toanswerthisquestion,weexaminedthe duringtesttime(row3)whileachievingthehighest
+MCgenerationperformanceofthebest-performing Fluency score overall. This result shows that the
+model (row 2) separately on the hateful and non- ideaoftrainingMCgeneratorswithSMandBKis
+hateful memes. While the model scored slightly verypromising.
+loweronthehatefulmemesacrossallmetrics,the
+differencesarestatisticallyindistinguishable.10 4.4 EvaluationonHatefulMemeDetection
+Ablationresultsareshowninrows3and4. Com- Wehypothesizethatmemecaptions,beingthecore
+paringthemwiththeresultsinrow2,weseethat taskinCMU,togetherwiththesurfacemessages
+removingeitherknowledgesourcecausesconsid- and background knowledge, could be profitably
+erableprecipitationinMCgenerationperformance. exploitedfordownstreamCMUtasks. Inournext
+These results suggest that both BK and SM con- experiment,wetestedthishypothesisonHMD,the
+tributepositivelytoMCgenerationperformance. task of classifying whether a meme is hateful or
+not, using the hatefulness labels provided by the
+4.3.2 UsingAutomaticallyGeneratedBKand
+FHMdataset(SeeSection3.1fordetails).
+SMAnnotations
+Stateoftheart ThetophalfofTable5summa-
+Whenapplyingmemecaptioningmodels,itisnot
+rizesthestate-of-the-art(SOTA)resultsonHMD,
+practical to assume that gold BK and SM anno-
+which are expressed in terms of AUROC and ac-
+tations exist. Hence, we examined the impact of
+curacy.11 The current best systems are PaLI-X-
+automatically generated BK and SM annotations
+VPD (Hu et al., 2024), which has an AUROC of
+on MC generation. Note that our goal is not to
+0.892,andRGCLHateCLIPper(Meietal.,2024),
+designnewBKandSMgenerationmodels. Rather,
+whichhasanaccuracyof0.788. Theyarefollowed
+we seek to understand whether the BK and SM
+byFlamingo80B(Alayracetal.,2022)andHate-
+annotationsgeneratedbyexistingmodelscanbene-
+CLIPer(KumarandNandakumar,2022). Among
+fitMCgeneration,thusestablishinglower-bound
+these top-performing HMD systems, only Hate-
+performanceonMCgeneration.
+CLIPerhaspubliclyavailablesourcecode.
+Setup WeexperimentedwithtwoMCgeneration
+Oursystems Todeterminetheusefulnessofour
+modelsthatexploitBKandSM,apipelinemodel
+annotationsforHMD,weusedthemtoconstruct
+andajointmodel. Thepipelinemodeloperatesas
+five HMD systems. The first four are fine-tuned
+follows. Wefirstusedthefine-tunedBKandSM
+LLaVA models, which differ in terms of what is
+generationmodelsinTable3toproduceautomatic
+BKandSMannotations. ThentheMCgeneration 11https://paperswithcode.com/sota/
+meme-classification-on-hateful-memes (retrieved
+10FurtherdetailsareshowninAppendixE. inOctober2024)
+16079
+Performances Human Automatic
+Model Model
+AUROC Acc. Cor. Flu. BLE ROU BER NLI
+1 PaLI-X-VPD(55B) 0.892 - T5Large 2.44 3.80 .033 .135 .420 .401
+2 RGCLHateCLIPper 0.870 0.788 LLaVA-FT-GoldAll 2.53 3.75 .024 .161 .800 .435
+3 Flamingo80B 0.866 - LLaVA-FT-AutoAll 2.30 3.90 .036 .200 .827 .364
+4 Hate-CLIPper 0.858 0.740
+5 LLaVA-AutoMC 0.724 0.668 Table6: Systemperformancesonhatefulmemeex-
+6 LLaVA-AutoAll 0.739 0.662 planation. Thebestperformancesareboldfaced.
+7 LLaVA-GoldMC 0.856 0.771
+8 LLaVA-GoldAll 0.876 0.786
+9 LLaVA-GoldAll Hate-CLIPper 0.890 0.800 theircounterparts. Thisperformancedropshould
+×
+notbesurprisingsince(1)themodelsweusedto
+Table5: Resultsofthestate-of-the-artmodels(top) generatethesepredictedoutputsareverysimplistic
+andoursystems(bottom)onHatefulMemeDetec-
+and (2) errors from the MC/SM/BK predictions
+tion. The symbolindicatesajointinferencesystem.
+× propagatetoHMDastheseHMDmodelsareeffec-
+For each metric, the best result is boldfaced and the
+tivelypipelinemodels.
+second-bestresultisunderlined.
+4.5 EvaluationonExplainingHatefulMemes
+fed to the model beside the meme — "MC" only
+Finally, to complete the study of CMU task in-
+or"All"(SM+BK+MC),aswellaswhetherthose
+teraction,wealsodemonstratedtheusefulnessof
+inputsaregold("Gold")orpredicted("Auto")an-
+MemeInterpret’sannotationsinhatefulmemeex-
+notations. Next, to determine if our annotations
+planation. ProposedbyHeeetal.(2023),thistask
+can be used to improve a SOTA HMD system,
+askssystemstogenerateatextualexplanationfor
+we employa modelthat performsjoint inference
+whyagivenmemeishateful. Theyalsoreleased
+overLLaVA-GoldAllandHateCLIPper(theonly
+HatReD,asetofhatefulmemeexplanationanno-
+open-sourced SOTA HMD model shown above).
+tations for the images in the FHM dataset. This
+Indoingso,wefirstreplicatedthefine-tuningpro-
+allowsustoagainexaminetheeffectsofouranno-
+cedureofHateCLIPperonourtrainingset. During
+tationsonthisdownstreamtask.
+inference, let p and p be the probabilities that
+1 2 Compared to MemeInterpret, HatReD covers
+HateCLIPper and LLaVA-GoldAll predict as the
+a different subset of the FHM dataset. As a re-
+hatefulnessprobabilityoftheinputmemerespec-
+sult,MemeInterpretandHatReDoverlapononly
+tively. Thecombined predictionfrombothmodels
+2,359 images. Thus, in this experiment, we split
+is then p = tp + (1 t)p , where the weight
+1 2
+− their intersection into 60% for training, 20% for
+t [0;1]ischosenusingthedevelopmentset.12
+∈ development,and20%fortesting. Inthatway,all
+Results Table5showstheresultsoffourSOTA imagesinvolvedhaveSM,BK,MC,andexplana-
+models (rows 1–4) and our five HMD systems
+tionannotations. Tomakethetestsetchallenging,
+(rows 5–9). As can be seen, LLaVA-GoldAll
+all memes with multiple social targets (based on
+× Hate-CLIPper, our strongest model, provision-
+HatReD’sannotations)wereputintothatsplit.
+ally achieved SOTA performance in terms of ac-
+Setup Similar to previous generative tasks, we
+curacy and was competitive with the strongest
+fine-tuned two LLaVA-based models to generate
+modelinAUROC(only0.0025pointless). Note
+theexplanationgivenallthreeannotationtypesas
+that this system has only 7.5 billion parameters,
+input. Thefirstoneusedgoldinputsandthesecond
+while PaLI-X-VPD is roughly seven times larger
+oneusedpredictedinputs. Theprompttemplatefor
+in size. Furthermore, LLaVA-GoldAll alone has
+thistaskcanbefoundinAppendixD.5.
+higher performance than all but the best model
+Results ResultsareshowninTable6. Forcom-
+ontheleaderboardintermsofAUROC.Thesere-
+parison purposes, we replicated the best system
+sults showcase the effectiveness of our annota-
+in Hee et al. (2023) on our dataset split, which
+tions in HMD, predicting that improvements in
+is T5 Large. We see that the system using the
+modeling SM, BK, and MC can enhance HMD
+goldinputs(row2)outperformedtheSOTAmodel
+systems. Asofnow, theresultsofthemodelsus-
+(row1),whilethesimplepipelinesystem(row3)
+ingpredictedinputs,LLaVA-AutoMCandLLaVA-
+establishedastronglowerbound. Thisfurtherun-
+AutoAll(rows5and6),areabout11%awayfrom
+derlinesthattheannotationsinMemeInterpretare
+12Thefinalmixingweightwas0.2452. agoodrepresentationofthememes’meaning.
+16080
+Figure3: Errorsmadebythetopmodelvariants.
+5 ErrorAnalysis forthemodeltoexhibitmoreadvancedreasoning
+capabilities.
+Togainfurtherinsightsintothechallengesinmod-
+elingmemeinterpretations,weanalyzedtheerrors
+6 ConclusionandFutureWork
+madebyourbestperformingmodels,whicharethe
+fine-tunedBKgenerationmodel(row4,Table3),
+In light of the fact that existing CMU tasks are
+thefine-tunedSMgenerationmodel(row6,Table
+largely tackled independently of each other, we
+3),andthefine-tunedMCgenerationmodelwith
+tookthefirststeptowardssuggestingthatthiscur-
+goldSMandBKinputs(row5,Table4). Figure3
+rentresearchpracticecanpossiblybereshapedby
+showsexamplesoftheirfailuremodes.
+proposingatask-agnosticrepresentationofmemes
+SM Weobservedthatthemodelfrequentlyomits basedonmeaningratherthanform. Subsequently,
+specificdetailsinitsdescriptions,suchastheover- we(1)advocatedtheimportanceofadvancingre-
+laid text, group names, race, celebrities, age, or search on the under-studied task of meme cap-
+disabilities. Forexample,inFigure3a,themodel tioning,(2)identifiedtwochallengingsubtasksof
+failedtoidentifytheentity"KKKgroup"andthe memecaptioning,backgroundknowledgegenera-
+overlaidtext. Inthiscase,themodelfailedtopick tionandsurfacemessagegeneration,and(3)pro-
+upthehintsfromthetext,whichreferstotheactiv- posedMemeInterpret,whichcouldsparkresearch
+itiesoftheKKKgroup. Subsequently,itproduced onstudyingtheinteractionsofdifferentcategories
+agenericimagecaptionthatexcludesmeaningful of CMU tasks. Extensive experiments showed
+details of the meme. This selective vision issue that(1)theMemeInterpretannotationsareuseful,
+remainsanopenquestionforimageunderstanding as the fine-tuned results are better than the zero-
+ingeneral(Chungetal.,2024). shot results; (2) meme captioning could benefit
+BK Thefine-tunedBKgenerationmodelsome- othercategoriesofCMUtasks,includingclassifica-
+timesproducedknowledgethatisirrelevanttothe tionandexplanationtasks;and(3)MemeInterpret
+meme. InFigure3b,themodelincorrectlyincluded couldfacilitatethedevelopmentofaunifiedframe-
+FreyDammer,acharacterunrelatedtothememe, workthatcansimultaneouslyaddressallthreecat-
+and failed to capture the significance of "Jeffrey egoriesofCMUtasks.
+Dahmer". This error perhaps stemmed from the Asthefine-tunedmodelsstillhavealotofroom
+limitedtextrecognitioncapabilityofLLaVA1.5. forimprovement,webelievefutureworkshouldin-
+MC A common error in MC generation is the clude(1)thedevelopmentofnovelmodelsthatcan
+mererepetitionofBKorSMfromtheinput. For betterexploitourannotations,especiallyjointmod-
+instance,inFigure3c,theMCmerelyregurgitates els that allow interaction of multiple CMU tasks
+theBKwithoutattemptingtounpacktheimplica- and(2)anexplorationofwhetherourannotations
+tionbehindthememe. Thisunderscorestheneed canbenefitadditionaldownstreamCMUtasks.
+16081
+Limitations own judgement. They also gave consent for the
+collecteddatatobeusedforresearchpurposes.
+GiventhatMemeInterpretcoverstopicsonUSso-
+Termsofuse Thisdatasetisconsistentwiththe
+cialmedia,itisnotexpectedtogeneralizetoother
+termsofuseandtheintellectualpropertyandpri-
+cultures. Outside of the American context, there
+vacy right of people with the Facebook Hateful
+hasbeenworkinBengali(Ahsanetal.,2024)and
+Meme dataset. The dataset was licensed from
+Tamil (Suryawanshi et al., 2020b). Future work
+©GettyImages. Thereisnothingaboutthecompo-
+shouldconsiderconstructingmulticulturalmeme
+sitionofthedatasetorthewayitwascollectedand
+datasetbycombiningexistingdatasetsandcollect-
+preprocessed/cleaned/labeledthatmightimpactfu-
+ingnewmemesforunderrepresentedcultures.
+tureuses.
+Besides, our findings are based on an open-
+sourced model. Future work should extend the Datadistribution Weopen-sourcedthedatapro-
+investigationtoclose-sourcedmodelstodeepenour duced from this work at https://github.com/
+understanding of CMU task interactions in these
+npnkhoi/MemeInterpret.
+typesofsystems.
+EthicsStatement References
+ShawlyAhsan,EftekharHossain,OmarSharif,Avishek
+Broaderimplications Asmentionedbefore,the
+Das, Mohammed Moshiul Hoque, and M. Dewan.
+solutiontothememecaptioningtaskisofpractical
+2024. A multimodal framework to detect target
+significance. Fromapracticalperspective,knowl- awareaggressioninmemes. InProceedingsofthe
+edge of the meaning being conveyed in a meme 18thConferenceoftheEuropeanChapteroftheAs-
+(and its caption) could be useful for other meme- sociationforComputationalLinguistics(Volume1:
+LongPapers),pages2487–2500,St.Julian’s,Malta.
+related processing tasks. For instance, knowing
+AssociationforComputationalLinguistics.
+whatthemeaningiscouldfacilitatethedetermina-
+tionofwhetheramemecontainsharmfulcontent. Jean-Baptiste Alayrac, Jeff Donahue, Pauline Luc,
+Antoine Miech, Iain Barr, Yana Hasson, Karel
+Theoreticallyspeaking,beingabletogeneratemes-
+Lenc,ArthurMensch,KatherineMillican,Malcolm
+sages like humans requires that a machine read
+Reynolds, Roman Ring, Eliza Rutherford, Serkan
+between the lines and achieve a deeper level of Cabi,TengdaHan,ZhitaoGong,SinaSamangooei,
+understanding of perceptual input, enabling ma- Marianne Monteiro, Jacob L. Menick, Sebastian
+chine perception to get one step closer to human Borgeaud,AndyBrock,AidaNematzadeh,Sahand
+Sharifzadeh,MikołajBin´kowski,RicardoBarreira,
+perception.
+Oriol Vinyals, Andrew Zisserman, and Karén Si-
+Ethicalconsiderations Havingsaidthat,weare monyan.2022. Flamingo: Avisuallanguagemodel
+allawarethatsomememescontainharmfulcontent, forfew-shotlearning. InAdvancesinNeuralInfor-
+mationProcessingSystems,volume35,pages23716–
+so when our models are applied to these harmful
+23736,NewOrlanes,LA,USA.
+memes, they will generate harmful captions that
+couldhaveanegativepsychologicalimpactonthe Mohit Chandra, Dheeraj Pailla, Himanshu Bhatia,
+users,especiallyiftheyarethetargetoftheharm- AadilmehdiSanchawala,ManishGupta,ManishShri-
+vastava,andPonnurangamKumaraguru.2021. “Sub-
+fulcontent. Therefore,aswithmanyotherAI/NLP
+vertingtheJewtocracy”: Onlineantisemitismdetec-
+technologies,ourmodelsshouldbeusedwithcare.
+tion using multimodal deep learning. In Proceed-
+We should emphasize that our intent is to build ingsofthe13thACMWebScienceConference2021,
+models for interpreting memes, hoping that read- WebSci’21, pages148–157, NewYork, NY,USA.
+ersofmemeswilllesslikelybemanipulatedafter AssociationforComputingMachinery.
+understandingtheintentionofthememeauthors.
+JiwanChung,SungjaeLee,MinseoKim,SeungjuHan,
+Steps taken to protect annotators from harm- AshkanYousefpour,JackHessel,andYoungjaeYu.
+ful content All annotators were provided with 2024. Selective vision is the challenge for visual
+reasoning: Abenchmarkforvisualargumentunder-
+athoroughinstructionaltrainingsessioninwhich
+standing. InProceedingsofthe2024Conferenceon
+they were instructed on how to annotate the data
+EmpiricalMethodsinNaturalLanguageProcessing,
+andhowtogoaboutthewholetask. Duringtrain- pages2423–2451,Miami,Florida,USA.Association
+ing, annotators were shown the types of memes forComputationalLinguistics.
+thattheywillworkwithsothattheyhaveanidea
+DimitarDimitrov,BishrBinAli,ShadenShaar,Firoj
+of the dataset’s nature. The annotators have full
+Alam, Fabrizio Silvestri, Hamed Firooz, Preslav
+autonomy to withdraw from the project at their Nakov, and Giovanni Da San Martino. 2021.
+16082
+SemEval-2021task6: Detectionofpersuasiontech- RensisLikert.1932. Atechniqueforthemeasurement
+niques in texts and images. In Proceedings of the ofattitudes. ArchivesofPsychology,140:1–55.
+15thInternationalWorkshoponSemanticEvaluation
+(SemEval-2021),pages70–98,Online.Association Chin-Yew Lin. 2004. ROUGE: A package for auto-
+forComputationalLinguistics. maticevaluationofsummaries. InTextSummariza-
+tionBranchesOut,pages74–81,Barcelona,Spain.
+Elisabetta Fersini, Francesca Gasparini, Giulia Rizzi, AssociationforComputationalLinguistics.
+AuroraSaibene,BertaChulvi,PaoloRosso,Alyssa
+Lees, and Jeffrey Sorensen. 2022. SemEval-2022 Chen Liu, Gregor Geigle, Robin Krebs, and Iryna
+task 5: Multimedia automatic misogyny identifi- Gurevych. 2022. FigMemes: A dataset for figura-
+cation. In Proceedings of the 16th International tivelanguageidentificationinpolitically-opinionated
+WorkshoponSemanticEvaluation(SemEval-2022), memes. InProceedingsofthe2022Conferenceon
+pages533–549,Seattle,UnitedStates.Association EmpiricalMethodsinNaturalLanguageProcessing,
+forComputationalLinguistics. pages7069–7086,AbuDhabi,UnitedArabEmirates.
+AssociationforComputationalLinguistics.
+Ming Shan Hee, Wen-Haw Chong, and Roy Ka-Wei
+Lee. 2023. Decoding the underlying meaning of
+Haotian Liu, Chunyuan Li, Yuheng Li, and Yong Jae
+multimodal hateful memes. In Proceedings of the
+Lee.2024. Improvedbaselineswithvisualinstruc-
+Thirty-SecondInternationalJointConferenceonAr-
+tiontuning. InProceedingsoftheIEEE/CVFCon-
+tificialIntelligence,pages5995–6003,Macau,SAR
+ferenceonComputerVisionandPatternRecognition,
+China.InternationalJointConferencesonArtificial
+pages26286–26296,Seattle,WA,USA.
+IntelligenceOrganization.
+Edward J. Hu, Yelong Shen, Phillip Wallis, Zeyuan PotsaweeManakul,AdianLiusie,andMarkGales.2023.
+Allen-Zhu,YuanzhiLi,SheanWang,LuWang,and SelfCheckGPT:Zero-resourceblack-boxhallucina-
+WeizhuChen.2022. LoRA:Low-rankadaptationof tiondetectionforgenerativelargelanguagemodels.
+largelanguagemodels. InProceedingsoftheTenth In Proceedings of the 2023 Conference on Empiri-
+International Conference on Learning Representa- calMethodsinNaturalLanguageProcessing,pages
+tions,Virtual. 9004–9017, Singapore. Association for Computa-
+tionalLinguistics.
+YushiHu,OtiliaStretcu,Chun-TaLu,Krishnamurthy
+Viswanathan,KenjiHata,EnmingLuo,RanjayKr- Lambert Mathias, Shaoliang Nie, Aida
+ishna,andArielFuxman.2024. Visualprogramdis- Mostafazadeh Davani, Douwe Kiela, Vinodku-
+tillation: Distillingtoolsandprogrammaticreason- mar Prabhakaran, Bertie Vidgen, and Zeerak
+ingintovision-languagemodels. InProceedingsof Waseem. 2021. Findings of the WOAH 5 shared
+theIEEE/CVFConferenceonComputerVisionand task on fine grained hateful memes detection. In
+PatternRecognition,pages9590–9601,Seattle,WA, Proceedings of the 5th Workshop on Online Abuse
+USA. andHarms(WOAH2021),pages201–206,Online.
+AssociationforComputationalLinguistics.
+EunJeongHwangandVeredShwartz.2023. MemeCap:
+A dataset for captioning and interpreting memes. JingbiaoMei,JinghongChen,WeizheLin,BillByrne,
+In Proceedings of the 2023 Conference on Empir- andMarcusTomalin.2024. Improvinghatefulmeme
+icalMethodsinNaturalLanguageProcessing,pages detectionthroughretrieval-guidedcontrastivelearn-
+1433–1445, Singapore. Association for Computa- ing. InProceedingsofthe62ndAnnualMeetingof
+tionalLinguistics. theAssociationforComputationalLinguistics(Vol-
+ume1: LongPapers),pages5333–5347,Bangkok,
+SauravJoshi,FilipIlievski,andLucaLuceri.2024. Con-
+Thailand.AssociationforComputationalLinguistics.
+textualizinginternetmemesacrosssocialmediaplat-
+forms. InCompanionProceedingsoftheACMWeb
+KhoiP.N.NguyenandVincentNg.2024. Computa-
+Conference2024,pages1831–1840,Singapore.
+tionalmemeunderstanding: Asurvey. InProceed-
+DouweKiela,HamedFirooz,AravindMohan,Vedanuj ingsofthe2024ConferenceonEmpiricalMethodsin
+Goswami, Amanpreet Singh, Pratik Ringshia, and NaturalLanguageProcessing,pages21251–21267,
+DavideTestuggine.2020. TheHatefulMemesChal- Miami,Florida,USA.AssociationforComputational
+lenge: Detectinghatespeechinmultimodalmemes. Linguistics.
+InAdvancesinNeuralInformationProcessingSys-
+tems,volume33,pages2611–2624,Virtual.Curran KishorePapineni,SalimRoukos,ToddWard,andWei-
+Associates,Inc. JingZhu.2002. Bleu: amethodforautomaticevalu-
+ationofmachinetranslation. InProceedingsofthe
+GokulKarthikKumarandKarthikNandakumar.2022. 40thAnnualMeetingoftheAssociationforCompu-
+Hate-CLIPper: Multimodalhatefulmemeclassifica- tational Linguistics, pages 311–318, Philadelphia,
+tionbasedoncross-modalinteractionofCLIPfea- Pennsylvania,USA.AssociationforComputational
+tures. In Proceedings of the Second Workshop on Linguistics.
+NLPforPositiveImpact(NLP4PI),pages171–183,
+AbuDhabi,UnitedArabEmirates(Hybrid).Associa- JeongsikPark,KhoiP.N.Nguyen,TerrenceLi,Suyesh
+tionforComputationalLinguistics. Shrestha, MeganKimVu, JerryYiningWang, and
+16083
+VincentNg.2024. MemeIntent: Benchmarkingin- Shardul Suryawanshi, Bharathi Raja Chakravarthi,
+tentdescriptiongenerationformemes. InProceed- PranavVerma,MihaelArcan,JohnPhilipMcCrae,
+ings of the 25th Annual Meeting of the Special In- andPaulBuitelaar.2020b. Adatasetfortrollclas-
+terestGrouponDiscourseandDialogue,pages631– sification of TamilMemes. In Proceedings of the
+643, Kyoto, Japan. Association for Computational WILDRE5–5thWorkshoponIndianLanguageData:
+Linguistics. Resources and Evaluation, pages 7–13, Marseille,
+France.EuropeanLanguageResourcesAssociation
+Shraman Pramanick, Dimitar Dimitrov, Rituparna
+(ELRA).
+Mukherjee, Shivam Sharma, Md. Shad Akhtar,
+PreslavNakov,andTanmoyChakraborty.2021a. De-
+SarahWiegreffeandAnaMarasovic.2021. Teachmeto
+tecting harmful memes and their targets. In Find-
+explain: Areviewofdatasetsforexplainablenatural
+ingsoftheAssociationforComputationalLinguis-
+languageprocessing. InProceedingsoftheNeural
+tics: ACL-IJCNLP2021,pages2783–2796,Online.
+InformationProcessingSystemsTrackonDatasets
+AssociationforComputationalLinguistics.
+andBenchmarks,volume1,Virtual.
+Shraman Pramanick, Shivam Sharma, Dimitar Dim-
+itrov,Md.ShadAkhtar,PreslavNakov,andTanmoy
+Tianyi Zhang, Varsha Kishore, Felix Wu, Kilian Q.
+Chakraborty. 2021b. MOMENTA: A multimodal
+Weinberger, and Yoav Artzi. 2020. BERTScore:
+framework for detecting harmful memes and their
+Evaluating text generation with BERT. In Inter-
+targets. InFindingsoftheAssociationforComputa-
+national Conference on Learning Representations,
+tionalLinguistics: EMNLP2021,pages4439–4455,
+AddisAbaba,Ethiopia.
+Punta Cana, Dominican Republic. Association for
+ComputationalLinguistics.
+A AnnotatorRecruitmentandTraining
+Chhavi Sharma, Deepesh Bhageria, William Scott,
+SrinivasPYKL,AmitavaDas,TanmoyChakraborty,
+We started with 15 annotator candidates who are
+Viswanath Pulabaigari, and Björn Gambäck. 2020.
+SemEval-2020task8: Memotionanalysis-thevisuo- all undergraduate students in computer science13
+lingual metaphor! In Proceedings of the Four- atourinstitutionandprovidedthemwithonehour
+teenthWorkshoponSemanticEvaluation,pages759–
+of training before assigning them a sample task
+773,Barcelona(online).InternationalCommitteefor
+involving30annotations. Theninecandidateswho
+ComputationalLinguistics.
+mettherequiredstandards(regardingTextualCom-
+Piyush Sharma, Nan Ding, Sebastian Goodman, and
+pleteness and Correctness) were recruited. They
+RaduSoricut.2018. Conceptualcaptions: Acleaned,
+participated in this project as part of the "Under-
+hypernymed,imagealt-textdatasetforautomaticim-
+agecaptioning. InProceedingsofthe56thAnnual graduate Research in Computer Science" course
+Meeting of the Association for Computational Lin- theysignedupfor,duringwhichtheyacquiredex-
+guistics(Volume1: LongPapers),pages2556–2565, perience and skills involved in a research project
+Melbourne,Australia.AssociationforComputational
+involvingdataannotationandmodeltraining. No
+Linguistics.
+additionalcompensationwasthusprovidedtothese
+Shivam Sharma, Siddhant Agarwal, Tharun Suresh, students. Amongthenineparticipants,therewere
+Preslav Nakov, Md. Shad Akhtar, and Tanmoy
+fourAmericans,fourKoreans,andoneIndian. As
+Chakraborty. 2023. What do you MEME? Gener-
+forthegenderdistribution,twoparticipantswere
+atingexplanationsforvisualsemanticrolelabelling
+inmemes. ProceedingsoftheAAAIConferenceon femalesandsevenweremales. Fourofthemserved
+ArtificialIntelligence,37(8):9763–9771. asannotators(duringtheCollectstage)whilefive
+acted as editors and judges. These participants
+ShivamSharma,TharunSuresh,AtharvaKulkarni,Hi-
+manshi Mathur, Preslav Nakov, Md. Shad Akhtar, providedfullconsenttotheannotationprocess.
+and Tanmoy Chakraborty. 2022. Findings of the
+When the participants first started annotating,
+CONSTRAINT 2022 shared task on detecting the
+the two first authors discussed the results of the
+hero, thevillain, andthevictiminmemes. InPro-
+ceedingsoftheWorkshoponCombatingOnlineHos- first100instanceswithboththeannotatorsandthe
+tilePostsinRegionalLanguagesduringEmergency editors. Throughouttheprocess,wealsoconducted
+Situations,pages1–11,Dublin,Ireland.Association bi-weeklyone-hourmeetingswhereallparticipants
+forComputationalLinguistics.
+annotated the same five instances and reviewed
+ShardulSuryawanshi,BharathiRajaChakravarthi,Mi- themtogethertobetterunderstandtheguidelines.
+haelArcan,andPaulBuitelaar.2020a. Multimodal
+memedataset(MultiOFF)foridentifyingoffensive
+13Whileweagreethatitwouldbeidealforsocialscience
+content in image and text. In Proceedings of the
+studentstoconductthisannotationtask,wenotedthatmemes
+SecondWorkshoponTrolling,AggressionandCyber- arecommonlyencounteredbyusersineverydaysocialmedia,
+bullying,pages32–41,Marseille,France.European andtheirinterpretationsareperformedbypeoplewhodonot
+LanguageResourcesAssociation(ELRA). necessarilyhavetraininginsocialsciences.
+16084
+opinionsonthememe’smeaning(e.g.,duetothe
+differences in cultural backgrounds and personal
+beliefs),allannotationswereconsideredreasonable
+andaddedtothedataset. Thisfinalcaseisveryrare
+— outof nearly7K memes, only 49memes have
+morethanonememecaption(lessthan1%).
+D PromptTemplatesandImplementation
+Details
+D.1 PromptsfortheSanityCheck
+Experiments
+(a) (b)
+Thepromptformemecaptioningis:
+Figure4: Twoexamplememes.
+You will be provided with a meme. Your task is
+to infer the message that the author is trying
+B AnnotationGuidelines to convey through the meme. The message must
+be in one single short sentence. The final
+message of this meme is:
+Theannotationguidelinesthatweprovidedtothe
+annotatorsareshowninTable7. Thepromptforsurfacemessagegenerationis:
+You will be provided with a meme. Your task
+C SourcesofAnnotatorDisagreement
+is to identify the explicit or surface-level
+message conveyed by the meme. The surface
+Togaininsightsintothesourcesofdisagreement, message is what the meme is saying directly,
+we further inspected the typical edits our editors including any text, images, or symbols
+present. Describe this surface-level message
+made. For SM, edits mostly involved adding or
+as simply and clearly as possible without
+correcting information about celebrities and the interpretation of deeper meaning. Surface
+message must be in one single short sentence.
+context of the image (e.g., the first annotator did
+### Surface message:
+not know or misrecognized the character in the
+image, which was later corrected by the editor). Thepromptforbackgroundknowledgegenera-
+ForBK,editsmostlyinvolvedaddingnewpieces tionis:
+of information that the second annotator deemed You will be provided with a meme. Your task
+necessary to interpret the meme, with occasional is to infer the background knowledge that a
+reader of the meme needs to possess before
+disagreementsaboutthefactualaccuracyofthepre-
+they can understand the ultimate intent
+viousBK.ForMC,editsvariedandcouldsimply behind the creation or sharing of a meme,
+be about the specificity of the caption, or as seri- as perceived by its audience. Background
+knowledge is the minimum amount of knowledge
+ousasdisagreementsaboutthetargetofthememe
+that is missing from the meme. It is the
+and the sentiment of the meme toward the target. knowledge that needs to be combined with
+visual and textual cues from the meme in order
+Figure4andTable8illustratetwoexamplememes
+to understand its meaning. Give me background
+andtheirannotationsbeforeandafterediting.
+knowledge in the form of a list. For example:
+WeobservedthatthedisagreementsintheMCs ’1. Soccer is the sports that children likes a
+lot. 2. There are two main political parties
+weretypicallyaccompaniedbyalackofknowledge
+in the US: Democratic and Republican.’ Each
+or an overlook by the annotators. In such cases, background knowledge must be in one single
+SM and BK annotations came in handy as they short sentence.
+### Background knowledge:
+helpedtheeditorsunderstandtheviewpointofthe
+annotator and conduct fact-checking on the BK
+D.2 PromptforMemeCaptioningwith
+whenappropriate. Onoccasionswhentheeditors
+varyinginputs
+wereunsureabouthowtoedittheannotations,they
+raised the meme instance in the annotator group Belowisthepromptformatformemecaptioning
+fordiscussion. Whenaconsensuswasreachedin withSMandBKintheinputs. Notethat[SM]and
+thegroup,theeditorwentaheadandmadetheedit. [BK]weresubstitutedwiththeactualSMandBK
+Otherwise,ifthegroupasawholedidnothavea ground truth annotations. Whenever an input is
+goodideaofthememe’smeaning,thememewould absent,thecorrespondingline(startingwith###)
+bediscarded. Finally,iftherearemultiplestrong wasremoved.
+16085
+Guideline
+Thememeoriginallyhastwocomponents:theImageandtheText.
+Asurfacemessageisacompleteandstandalonerepresentation(1-3sentences)ofthewholememe,describingboththe
+ImageandtheText. Itincludesanyidentifiableinformationaboutraces,religions,genders,sexualorientations,specific
+celebrities,andanyothercharacteristicsofpeopleinthememe. Itmuststartwith"It is an image about ...","In
+the image, ..."orasimilarstructure. Ifamemehasmultipleimages,youcanwrite"It is two images. The top
+image is ..., and the bottom is ..."Finally,dependingonhowthetextfitsintotheimage,itcanbewrittenas
+(1)"{Description of the image}. The author describes the image as {Text}.",(2)"{Description of the
+image}. The character in the meme says that {Text}.",or(3)someotherstructurethatappropriatelycombines
+theTextwiththeimagecaption.
+ForFigure1a:Itisanimageofa70-year-oldCaucasianmansittinginfrontofawindowwithastunnedface,wearingahat
+thatsays"VIETNAMVETERAN".Theauthordescribestheimageas"me:putsbagofpopcornintothemicrowave.every
+oneelseattheseniorcenter:"
+Backgroundknowledgeisadditionalknowledgeyouneededtousetoderivethememecaptionbeyondthesurfacemessage.
+Youcanwritemultiplesentences,representingmultiplepiecesofknowledge.
+ForFigure1a:(1)TheVietnamWar,alsoknownastheSecondIndochinaWar,wasaprotractedandhighlycontroversial
+conflictthattookplaceinVietnam,Laos,andCambodiafromNovember1,1955,toApril30,1975.(2)Thesoundofpopcorn
+poppinginthemicrowavecanremindveteransofthegunfiresoundduringthewar. (3)Thepopcornpoppingsoundisa
+satisfyingsoundthatisnottobescaredof.
+Amemecaptionisamessagetheauthorintendstoconveythroughthememe.Therecanbemultiplememecaptions.
+Table7: Annotationguidelines.
+Field Agree. Before After Reason
+Figure4a
+SM Cut Thetextontopisalistspokenbytheau- It is an image of a Caucasian man with a changed the
+thorandthebottomtextisspokenbythe beard and mustache. The text on top is a format and
+characterintheimage. listnarratedbytheauthor,reading,"BrettKa- madeitmore
+vanaugh,17.ChristinaFord,15."Thebottom detailed.
+textisspokenbythecharacterintheimage,
+reading,"I’lltakeshitthatneverhappened
+for1000."
+BK Agree ThisrequiresunderstandingtheChristine 1.ThisrequiresunderstandingtheChristine changed the
+FordandBrettKavanaughcase,whichin- Ford and Brett Kavanaugh case, which in- formatbyin-
+volvedsexualassaultallegationsagainstKa- volvedsexualassaultallegationsagainstKa- dexingBKs.
+vanaughduringhisSupremeCourtnomina- vanaughduringhisSupremeCourtnomina-
+tionprocessandanunderstandingthatJeop- tionprocessandanunderstandingthatJeop-
+ardyisagameshowwherepeoplechoose ardy is a game show where people choose
+categoriesandpointamounts. categoriesandpointamounts.
+MC Cut Kavanaugh and Ford had no sexual rela- TheauthorimpliesthattheChristineBlasey madeitmore
+tions. FordandBrettKavanaughcasewasafarce, detailed.
+meantonlytoattackKavanaugh’scharacter
+duringhisSupremeCourtnomination. The
+messagebrushesoffFord’sallegationsofsex-
+ualassaultagainstKavanaugh,andinsultsher
+abilitytoprovidetruthfultestimony.
+Figure4b
+SM Agree 2picturessidebysideofPopeFrancisand 2picturessidebysideofPopeFrancisanda NaN
+aMuslimmanwithabeard.Thecharacter Muslimmanwithabeard..Thecharacterin
+inthememesaysthat‘i’llhave72virgins thememesaysthat‘i’llhave72virginswhen
+whenidiei’llhave72virginsbeforeidie.’ idiei’llhave72virginsbeforeidie.’
+BK Cut 1. Knowledge of Pope Francis and his 1.KnowledgeofPopeFrancisandhisroleas madeitmore
+role as the head of the Catholic Church. theheadoftheCatholicChurch.2.Thereis detailed.
+2. KnowledgeoftheIslamicbeliefin72 anIslamicbeliefthatthereare72virginsin
+virginsinparadise. 3. Knowledgeofthe paradise. 3. TheCatholicChurchhasbeen
+misconductoftheCatholicChurchwithmo- associatedwithmolestingchildren. 4. The
+lestation. samestatementmeanscompletelydifferent
+thingsdependingonwhoissayingit.
+MC Agree Thepopewillmolestvirginsbeforehedies. ThePopewillmolestvirginsbeforehedies. NaN
+Table8: TheannotationsofthetwomemesshowninFigure4beforeandafterediting.
+16086
+You will be provided with a meme, a
+Cor. Flu. BLE ROU BER NLI
+description of its text and image, and
+the background knowledge that a reader of Non-Hate 3.51 4.47 .035 .274 .897 .496
+the meme needs to possess before they can Hate 3.58 4.51 .046 .286 .898 .518
+understand the message. Your task is to
+p-value 0.65 0.69 0.27 0.44 0.76 0.41
+infer the message that the author is trying
+to convey through the meme. The message must
+be in one single sentence. Table9: Comparisonofnon-hatefulandhatefulmemes
+### Description of its text and image: [SM]. in performance of the fine-tuned meme captioning
+### Background knowledge: [BK]. model. Unpairedt-testswereconductedtodetermine
+### Message:
+whethertheperformancedifferencesarestatisticallysig-
+nificant,withthep-valuesshowninthelastrow.
+D.5 PromptforHatefulMemeExplanation
+D.3 PromptforJointModelingofSM,BK,
+andMC Below is the prompt used to instruct LLaVA to
+performthehatefulmemeexplanationtask.
+Weusedthefollowingprompttofine-tuneLLaVA
+You will be provided with a meme, a
+togeneratetheconcatenationofSM,BK,andMC: description of its text and image, the
+background knowledge that a reader of the meme
+You will be provided with a meme. Generate a needs to possess before they can understand
+surface message (SM), background knowledge the message, and the message conveyed by
+(BK), and a meme caption (MC) for the the meme. Your task is to explain why the
+meme. A surface message is defined as meme is hateful. The explanation must be
+"what the meme is saying directly, including in one of the form (i) ’<verb> <target>
+any text, images, or symbols present, and <predicate>’ or (ii) ’use of derogatory
+excluding interpretation of deeper meaning." terms against <target> <predicate>’, where
+A background knowledge list is defined as <target> represents the attacked social
+"the minimum list of factual statements target and <predicate> highlights the hateful
+that is missing from the meme. It is the implication.
+knowledge that needs to be combined with ### Description of its text and image: [SM].
+visual and textual cues from the meme in order ### Background knowledge: [BK].
+to understand the meme’s meaning." A meme ### Message: [MC]
+caption is defined as "the message that the ### Explanation:
+author is trying to convey through the meme,
+written in one single short sentence." Format
+your answers as "<SM_start> Your SM <SM_end> E PerformanceDifferencesonHatefulvs.
+<BK_start> Your BK <BK_end> <MC_start> Your Non-HatefulMemes
+MC <MC_end>"
+We investigated the difference in effects of hate-
+ful and non-hateful memes on meme captioning
+D.4 DetailsofHatefulMemeDetection performance. Amongthe250manuallyevaluated
+Experiments examples, we selected the output from the best
+setupbasedonhumanandautomaticevaluation—
+Below is the prompt used to instruct LLaVA to thefine-tunedMCgenerationmodelwithgoldSM
+performHMDdetectiongivenSM,BK,andMC andBKinputs(row5,Table4). Then,wedivided
+asinputs. Duringevaluation,onlyonenewtoken them into two groups — 120 hateful memes and
+was generated and evaluated against a "0" or "1" 130non-hatefulmemes,andcalculatedthemetrics
+label. for each (Table 9). We can see that non-hateful
+memeshaveslightlylowerscoresthantheirhateful
+You will be provided with a meme, a
+description of its text and image, and the counterparts,thoughthedifferencesarenotstatisti-
+background knowledge that a reader of the meme callysignificant(unpairedt-testswithp < 0.05).
+needs to possess before they can understand
+the message. Your task is to determine
+whether the meme is hateful or not. Format
+your answer as a binary classification, where
+1 indicates that the meme is hateful and 0
+indicates that the meme is not hateful. Only
+return the number.
+### Description of its text and image: [SM].
+### Background knowledge: [BK].
+### Message: [MC]
+Is this meme hateful? (0/1)
+16087

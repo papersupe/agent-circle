@@ -1,0 +1,1370 @@
+Large Language Models for
+Automated Open-domain Scientific Hypotheses Discovery
+ZonglinYang1,XinyaDu2,JunxianLi1,JieZheng3,SoujanyaPoria4,ErikCambria1
+1 2
+NanyangTechnologicalUniversity UniversityofTexasatDallas
+3 4
+HuazhongUniversityofScienceandTechnology SingaporeUniversityofTechnologyandDesign
+{zonglin001,junxian001,cambria}@ntu.edu.sg, xinya.du@utdallas.edu
+jie.jay.zheng@gmail.com, sporia@sutd.edu.sg
+Abstract
+Obtain
+information and
+Hypothetical induction is recognized as the Raw Web propose
+Corpus hypotheses
+mainreasoningtypewhenscientistsmakeob-
+from scratch
+servationsabouttheworldandtrytopropose Input Social science
+researcher
+hypothesestoexplainthoseobservations. Past
+(a) Current paradigm to propose research hypotheses
+researchonhypotheticalinductionisundera
+Ranked
+constrainedsetting: (1)theobservationannota- Pick for
+mostly valid,
+tionsinthedatasetarecarefullymanuallyhand- Raw Web probably novel further
+pickedsentences(resultinginaclose-domain Corpus social science de r v e e s l e o a p r m ch ent
+hypotheses
+setting);and(2)thegroundtruthhypothesesare Input MOOSE Output Social science
+mostlycommonsenseknowledge,makingthe framework researcher
+(b) New paradigm to propose research hypotheses with copilot for scientists
+tasklesschallenging. Inthiswork,wetackle
+these problems by proposing the first dataset Figure1: Comparisonofthetwoparadigmsforscien-
+forsocialscienceacademichypothesesdiscov- tifichypothesesformulation. Thenewparadigmshows
+ery, withthefinalgoaltocreatesystemsthat theroleoftheMOOSEframework(scientist’scopilot)
+automaticallygeneratevalid,novel,andhelp- andthenewtasksettingofhypotheticalinduction.
+fulscientifichypotheses,givenonlyapileof
+rawwebcorpus. Unlikeprevioussettings,the
+new dataset requires (1) using open-domain
+data(rawwebcorpus)asobservations;and(2) Forexample,theproposalofGeocentrism,He-
+proposinghypothesesevennewtohumanity. A liocentrism,andNewton’slawofuniversalgravi-
+multi-moduleframeworkisdevelopedforthe
+tationbasedontheobservationsofthemotionof
+task,includingthreedifferentfeedbackmech-
+(celestial) objects can be seen as a result of hy-
+anisms to boost performance, which exhibits
+pothetical induction. Hypothetical induction is a
+superiorperformanceintermsofbothGPT-4
+process of knowledge exploration from observa-
+basedandexpert-basedevaluation. Tothebest
+ofourknowledge,thisisthefirstworkshow- tions to hypotheses: it is challenging because it
+ingthatLLMsareabletogeneratenovel(“not involvestheexplorationofknowledgethatiseven
+existing in literature”) and valid (“reflecting newtohumanity. Recentresearchonthishastwo
+reality”)scientifichypotheses1.
+main limitations (Yang et al., 2024). Firstly, the
+observationsintheirdatasethavealreadybeenman-
+1 Introduction
+uallyselectedfromtherawwebcorpus,resulting
+Logical reasoning is central to human cogni- inaclose-domainsetting. Asaresult,adeveloped
+tion (Goel et al., 2017). It is widely recognized systemforthisdatasetreliesonalreadymanually
+as consisting of three components, which are de- selected observations, and cannot utilize the vast
+ductive,inductive,andabductivereasoning(Yang rawwebcorpustoproposehypotheses. Secondly,
+etal.,2023b). Hypotheticalinductionisconsidered the groundtruth hypotheses are mostlycommon-
+to be an important sub-type of inductive reason- senseknowledge(e.g.,Newton’slaw),makingthe
+ing (Norton, 2003). It is recognized as the main task less challenging since LLMs might have al-
+reasoningtypewhenscientistsmakeobservations readyseenthemduringpretraining. Tothisend,we
+abouttheworldandtrytoproposehypothesesto propose a new task setting of hypothetical induc-
+explaintheobservations. tion,whichistogeneratenovelandvalidresearch
+hypothesestargetingbeinghelpfultoresearchers
+1Dataset,code,andgeneratedhypothesesareavailableat
+https://github.com/SenticNet/MOOSE. whileonlygiven(vast)rawwebcorpus(Figure1).
+13545
+FindingsoftheAssociationforComputationalLinguistics:ACL2024,pages13545–13565
+August11-16,2024©2024AssociationforComputationalLinguistics
+This hypothesis formation process is seen as module’s generation, or can provide some initial
+thefirststepforscientificdiscovery(Wangetal., suggestionswhichafuturemodulecanbuildupon
+2023a). We call this task as “auTOmated open- tofurtherprovidemorein-depthgeneration.
+doMAinhypoTheticalinductiOn(TOMATO)”.It BothGPT-4(OpenAI,2023)evaluationandex-
+is“automated”sinceamethodforthistaskshould pertevaluationindicatethatMOOSEperformsbet-
+automaticallyproposehypotheseswithfewhuman terthananLLM(Ouyangetal.,2022)basedbase-
+efforts;Itisopen-domainsinceitisnotrestricted line, and each of the three feedback mechanisms
+byanymanuallycollecteddata. can progressively improve the base framework.
+During expert evaluation, many hypotheses gen-
+FortheTOMATOtask,weconstructedadataset
+eratedbyMOOSEarerecognizedbysocialscience
+consistingof50recentsocialsciencepaperspub-
+researchers to be both novel (“not existing in the
+lishedafterJanuary2023intopsocialsciencejour-
+literature”)andvalid(“reflectingreality”). Tothe
+nals. Foreachpaper,socialscienceexpertscollect
+bestofourknowledge,thisisthefirstworkshow-
+itsmainhypothesis,identifyitsbackgroundandin-
+ingthatLLMscanbeleveragedtogeneratenovel
+spirations,findsemanticallysimilarcontentsforits
+andvalidresearchhypotheses,indicatingthepoten-
+backgroundandinspirationsfromthewebcorpus,
+tialforLLMstoserveasa“copilot”forscientists.
+collectthefullpassageforeachmatchedcontent,
+and use all collected web passages as raw web
+2 RelatedWork
+corpus. Although the new dataset involves many
+manualselectionprocesses,themanuallyselected 2.1 NLPMethodsforScientificDiscovery
+contents are used more as benchmarking human
+Zhongetal.(2023)proposeadatasetwhereeach
+performanceforcomparison. IntheTOMATOtask,
+dataconsistsofaresearchgoal,acorpuspair,and
+a method is required to only utilize the raw web
+adiscovery. However,(1)theirtaskneedsahuman-
+corpus in the dataset to propose hypotheses. In
+provided research goal and a pairwise corpus for
+addition,therawwebcorpusismostlyfromcom-
+discovery, which is not an automated setting and
+monnews,Wikipedia,andbusinessreviews,which
+has a limited application scope; (2) the discov-
+meansitcaneasilyexpandinscalewithoutmuch
+ery is not from recent publications. Wang et al.
+humaninvolvement.
+(2023b) is a concurrent work of ours. Compared
+TotackletheTOMATOtask,wedevelopamulti- the first version of two papers, they do not have
+moduleframeworkcalledMOOSEbasedonlarge aniterativefeedbackfornovelty,reality,andclar-
+languagemodel(LLM)prompting(Figure4). To ity. Later they add for novelty, but still lack the
+further improve the quality of the generated hy- other two. These aspects are required by induc-
+potheses,wealsoproposethreedifferentfeedback tive reasoning, and there’s an implicit trade-off
+mechanisms(present-feedback,past-feedback,and betweenrealityandnovelty. Onlystressingonnov-
+future-feedback) to use LLMs to retrospect and eltymightleadtoincorrectandvaguegeneration.
+improvetheLLM-generatedhypothesesforbetter Bran et al. (2023) focuses on integrating compu-
+quality. Forpresent-feedback,theintuitionisthat, tationaltoolsinthechemistrydomain,butnoton
+for some modules, their generation can be evalu- providingnovelchemistryfindingsorhypotheses.
+atedbyotherLLMsandbeprovidedwithfeedback, Boikoetal.(2023)focusesonusingLLMstode-
+whichcanbeutilizedbythemodulestorefinetheir sign,plan,andexecutionofscientificexperiments,
+generation by taking the feedback and previous butnotonfindingnovelhypotheses.
+generation as input and generating again. Some
+2.2 LLM-basedSelfFeedback
+modules can have feedback instantly after their
+generation to improve themselves. But just like Self-refine(Madaanetal.,2023)investigatesfeed-
+therewardmechanisminreinforcementlearning, backbutitonlyfocusesonpresent-feedback(our
+somerewards(feedback)mightbehardtoobtain frameworkalsoproposespast-feedbackandfuture-
+instantly, but need to wait for feedback for a fu- feedback), and it is not specially designed for in-
+turemodule. Similarly,wedeveloppast-feedback ductive reasoning tasks. Other similar works to
+whereamodulecanbenefitfromthefeedbackfor self-refine (Press et al., 2022; Peng et al., 2023;
+a future module. The last one is future-feedback, Yangetal.,2022;Shinnetal.,2023)alsoonlyfo-
+whereacurrentmodulecanprovidejustifications cusonpresent-feedback,andtheirfeedbackisnot
+forthecurrentmodule’sgenerationtohelpafuture multi-aspectnoriterativecomparedtoours.
+13546
+Yao et al.: Facial Recognition Payment Technology in Retail
+4 Information Systems Research, Articles in Advance, pp. 1–12, © 2023 INFORMS
+ease of use (Venkatesh et al. 2003) and the adoption auctions (Simonsohn and Ariely 2008). In particular,
+and use of technology (Venkatesh 2000). That is, social Sun (2013) proposes a conceptual model of herding
+presence may cause privacy concerns and then nega- behavior in the adoption and continued use of technol-
+tively affect an individual’s adoption and use of tech- ogy. Duan et al. (2009) investigate software adoption
+nology. For example, using in-store surveillance data, using the information cascades framework and find that
+Zhang et al. (2014) show that consumer density around decision makers ignore private information when fol-
+the target consumer reduces their probability of touch- lowing the crowd for popular products but not when
+ing and purchasing a product, especially when the they adopt less popular products.
+product in question is an accessory, suggesting that cus- In our setting, when a customer watches his or her
+tomers may require more privacy, particularly when preceding customers use FR payment technology to
+buying accessories. check out, his or her own belief regarding the quality of In our setting, when customers step up to a self- FR and QR payment technologies may be discounted.
+checkout POS machine in surroundings in which stran- When a customer steps up to the self-checkout POS
+gers may be watching, they are impacted by this social machine next, he or she is more likely to follow the pre-
+presence. When they only need to scan a QR code on ceding customers and choose FR payment technology.
+their mobile phones, they do not need to perform in Hence, we develop the following hypothesis.
+front of a webcam as they would need to do when Hypothesis 2.Customers whose preceding customers use
+using FR payment technology, thereby experiencing FR payment technology are more likely to use FR payment
+less technology anxiety caused by social presence when technology than those whose preceding customers do not strangers are around. Consumers may also be con- use FR payment technology.
+cerned about their privacy when their actions of taking a photo and, sometimes, doing additional body move- 2.3. The Moderating Effect of Experience on the ment for a liveness test, are recorded and shared by Social Presence Effect
+those strangers around them. The effect of social pres- The social presence effect, as we hypothesized in ence on the user’s technology anxiety and privacy con- Hypothesis 1, may be moderated by an individual’s
+cerns should increase with the number of customers experience. When an individual’s experience in using
+waiting in line behind the focal customer and watching. the technology grows, that individual has more confi-
+Therefore, we expect that customers would experience dence and less anxiety when using the technology.
+greater technology anxiety and privacy concerns caused The evidence for such moderation has been documen- by social presence using FR payment technology than ted in the performing arts (e.g., Steptoe and Fidler using QR payment technology when more people are 1987) and education (e.g., Meijer and Oostdam 2007).
+waiting in line behind them. Hence, we develop the fol- In the retail setting, Dahl et al. (2001) find that famil-
+lowing hypothesis. iarity with purchasing embarrassing products reduces
+Hypothesis 1. Customers are less likely to use FR payment the embarrassment caused by the social presence in both the selection and commitment stages of the purchase technology than QR payment technology for their transac- process. The literature suggests that experience in using tions when they have more people in line behind them.
+a technology can also increase self-efficacy (Crossler and
+2.2. Herding Effect Be´langer 2019) and thus increase perceived control over the technology (Hui and Bateson 1991), which then A customer’s decision on payment technology use may
+reduces users’ privacy concerns over using the technol- be affected by the preceding customers before him or ogy. In our case, by accumulating more experience in her as well. Unlike the customers behind him or her, using FR in front of other customers, the focal customer’s the focal customer can observe the payment choice of
+technology anxiety and privacy concern caused by the the preceding customers. Such observation may influ- social presence effect is expected to decrease, which is
+ence the choice of payment technology for the focal similar to the findings of studies of music performers, customer.
+test takers, retail shoppers, mobile app users in the lit- Herding theory argues that people tend to herd be-
+erature, whose performance anxiety/privacy concern
+cause they believe the choice of the majority is the best, reduced as their experience increased. This means that thus reducing the uncertainty of their own choice (Bane-
+the experience of customers in using FR payment tech- rjee 1992, Sunder et al. 2019). In the process of herding, nology negatively moderates their social presence effects.
+an individual’s own belief regarding the quality of dif- Hence, we have the following hypothesis: ferent choices is discounted or even ignored (Banerjee
+1992). Herding behaviors have been widely documented Hypothesis 3. Customers with more experience in using
+in various settings in prior literature on information FR payment technology have less social presence effect
+systems (IS), for example, in crowdfunding (Zhang and when using this technology than those with less experience
+Liu 2012), crowdsourcing (Chen et al. 2020), and online in using FR payment technology.
+.devreser
+sthgir
+lla
+,ylno
+esu
+lanosrep
+roF
+. 11:20
+ta ,3202
+tsuguA
+21 no
+]741.022.0.3[
+yb
+gro.smrofni
+morf
+dedaolnwoD
+Yao et al.: Facial Recognition Payment Technology in Retail
+Information Systems Research, Articles in Advance, pp. 1–12, © 2023 INFORMS 3 payment technologies is that they must go through dif- as a violation of physical privacy (Laufer and Wolfe 1977),
+ferent steps during the payment process. and they may consider the videos recorded and shared For FR payments, customers do not need to use their by those strangers around them as a violation of informa- phones at all; instead, they stand in front of a bFuiilgt-iun ret2io:naAl prsiveaclye (cCtheodi eth aly. 2p01o5t).h Tehes fiisrsti pnrivaacsy ococnicaerln sciencepub- webcam on the self-checkout POS machine that verifies is common to both QR and FR, whereas the last two apply
+licationcollectedinourdataset. their identity. After the consumer chooses the FR option to FR only. We discuss how we deal with these privacy on the self-checkout POS machine, a frame located at the concerns in Online Appendix A3.
+center of the screen of the self-checkout machine will be prompted. The customer needs to position his or her 2.Hypothesis Development
+face in the frame for the built-in camera to scan. This pro- In this section, we develop hypotheses associated with
+cess is similar to taking a selfie that requires the custo- FR payment usage. A literature review is included in
+mers to position themselves so that their faces are within Online Appendix A1. the frame for the identification process to proceed. In addition, customers may need to perform certain live- 2.1.Social Presence Effect ness test gestures sometimes, such as slightly shaking Based on the social impact theory, an individual’s behav-
+their head or winking,3so that the FR payment technol- ior is impacted by real, implied, or even imagined social
+ogy can determine that it is a live person and not a presence, and the magnitude of the impact is determined photo. The alignment and liveness test gestures required
+by social size, immediacy, and social source strength. The for the customers can be a performance-like action. A amount of social presence is a multiplicative function of complex yet fast identification process runs in the back- the strength, immediacy, and number of people who eval- end using algorithms to match the person in front of the uate an individual’s performance as a member of an audi- machine with the photo on the ID card in the database. ence (Latane´ 1981). This theory is tested and supported by
+The transaction is authorized once there is a match.
+empirical evidence in the field of psychology (e.g., Jackson Both QR and FR require sensitive private information and Latane´ 1981) and is expanded in other fields. Along a from the user and need to be executed in public spaces similar line, when social impact exists, the social cognitive in our setting. According to the literature, privacy con-
+theory argues that an individual’s self-efficacy and emo- cerns arise from “access management,” including access to information (informational privacy) or access to inter- tions, such as technology affect and technology anxiety, action (physical privacy) (Laufer and Wolfe 1977). In play an important role in the individual’s decision on our context, privacy concerns may be related to both technology use.
+access to information and access to interaction. The enti- In retail, a public setting, social presence exists and can ties involved are the payment platform, the retail stores, create a feeling of embarrassment for customers (Dahl
+and other (not focal) customers. et al. 2001). Using several laboratory experiments, Dahl Based on the privacy literature and the specific con- et al. (2001) find that awareness of social presence during
+text of our research, we summarize the three sources purchase selection and commitment increases a subject’s
+from which privacy concerns for the focal customer self-reported sense of embarrassment in both labora-
+who uses self-checkout POS machines may emanate.4 tory settings and in field studies. Argo et al. (2005) inves- First, a customer may be concerned about his or her tigate the impact of two social forces—social size and
+personal information that is captured and stored in the proximity—on customer emotions and self-presentation account, as literature shows that users oftentimes do behaviors in two field experiments, finding that cus-
+not want to adopt a new technology because of the per- tomer emotion and behavior (e.g., brand choice) can be sonal information collected to set up the technology negatively affected by the presence of others in the sur-
+(Angst and Agarwal 2009, Tsai et al. 2011). Second, a roundings during a shopping session. Using a laboratory
+customer may be concerned about his or her digital experiment, Dabholkar and Bagozzi (2002) document
+facial data that are captured when the customer uses FR that social anxiety resulting from imagined social pres-
+to pay. Users’ privacy concerns may rise from their per- ence negatively affects customer attitudes toward and
+ception of how private information is collected, con- intention to use self-service technology.
+trolled, and protected (Malhotra et al. 2004) since how Customers may have privacy concerns because of
+the facial data collected will be used (or not used) is the social presence too. Some studies in the literature
+uncertain to the users. Third, a customer may be con- have found that social presence is a factor that could
+cerned about the customers behind him or her watching prevent individuals from using a certain technology.
+and even recording while he or she is using the FR pay- They show that social presence negatively affects cus-
+ment technology. Consumers may consider the actions tomers’ perceived control (Hui and Bateson 1991),
+of taking a photo and doing additional body movement which is a factor for privacy concerns (Schmidt and
+for a liveness test as private behaviors and view the dis- Keating 1979). The customer’s perceived control is
+play of such behaviors to other stranger shoppers around positively associated with the customer’s perceived
+.devreser
+sthgir
+lla ,ylno
+esu
+lanosrep
+roF . 11:20
+ta ,3202
+tsuguA 21
+no ]741.022.0.3[
+yb gro.smrofni
+morf
+dedaolnwoD
+Yao et al.: Facial Recognition Payment Technology in Retail
+4 Information Systems Research, Articles in Advance, pp. 1–12, © 2023 INFORMS
+ease of use (Venkatesh et al. 2003) and the adoption auctions (Simonsohn and Ariely 2008). In particular,
+and use of technology (Venkatesh 2000). That is, social Sun (2013) proposes a conceptual model of herding
+presence may cause privacy concerns and then nega- behavior in the adoption and continued use of technol-
+tively affect an individual’s adoption and use of tech- ogy. Duan et al. (2009) investigate software adoption
+nology. For example, using in-store surveillance data, using the information cascades framework and find that
+Zhang et al. (2014) show that consumer density around decision makers ignore private information when fol-
+the target consumer reduces their probability of touch- lowing the crowd for popular products but not when
+ing and purchasing a product, especially when the they adopt less popular products.
+product in question is an accessory, suggesting that cus- In our setting, when a customer watches his or her
+tomers may require more privacy, particularly when preceding customers use FR payment technology to
+buying accessories. check out, his or her own belief regarding the quality of
+In our setting, when customers step up to a self- FR and QR payment technologies may be discounted.
+checkout POS machine in surroundings in which stran- When a customer steps up to the self-checkout POS gers may be watching, they are impacted by this social machine next, he or she is more likely to follow the pre-
+presence. When they only need to scan a QR code on ceding customers and choose FR payment technology.
+their mobile phones, they do not need to perform in Hence, we develop the following hypothesis.
+front of a webcam as they would need to do when Hypothesis 2.Customers whose preceding customers use
+using FR payment technology, thereby experiencing FR payment technology are more likely to use FR payment
+less technology anxiety caused by social presence when technology than those whose preceding customers do not strangers are around. Consumers may also be con- use FR payment technology. cerned about their privacy when their actions of taking
+a photo and, sometimes, doing additional body move- 2.3. The Moderating Effect of Experience on the
+ment for a liveness test, are recorded and shared by Social Presence Effect
+those strangers around them. The effect of social pres- The social presence effect, as we hypothesized in
+ence on the user’s technology anxiety and privacy con- Hypothesis 1, may be moderated by an individual’s cerns should increase with the number of customers experience. When an individual’s experience in using
+waiting in line behind the focal customer and watching. the technology grows, that individual has more confi-
+Therefore, we expect that customers would experience dence and less anxiety when using the technology.
+greater technology anxiety and privacy concerns caused The evidence for such moderation has been documen- by social presence using FR payment technology than ted in the performing arts (e.g., Steptoe and Fidler using QR payment technology when more people are 1987) and education (e.g., Meijer and Oostdam 2007).
+waiting in line behind them. Hence, we develop the fol- In the retail setting, Dahl et al. (2001) find that famil- lowing hypothesis. iarity with purchasing embarrassing products reduces Hypothesis 1.Customers are less likely to use FR payment the embarrassment caused by the social presence in both
+technology than QR payment technology for their transac- the selection and commitment stages of the purchase tions when they have more people in line behind them. process. The literature suggests that experience in using
+a technology can also increase self-efficacy (Crossler and 2.2. Herding Effect Be´langer 2019) and thus increase perceived control over
+A customer’s decision on payment technology use may the technology (Hui and Bateson 1991), which then
+be affected by the preceding customers before him or reduces users’ privacy concerns over using the technol-
+her as well. Unlike the customers behind him or her, ogy. In our case, by accumulating more experience in the focal customer can observe the payment choice of using FR in front of other customers, the focal customer’s the preceding customers. Such observation may influ- technology anxiety and privacy concern caused by the social presence effect is expected to decrease, which is
+ence the choice of payment technology for the focal similar to the findings of studies of music performers,
+customer. test takers, retail shoppers, mobile app users in the lit- Herding theory argues that people tend to herd be-
+erature, whose performance anxiety/privacy concern cause they believe the choice of the majority is the best, reduced as their experience increased. This means that thus reducing the uncertainty of their own choice (Bane- the experience of customers in using FR payment tech- rjee 1992, Sunder et al. 2019). In the process of herding, nology negatively moderates their social presence effects. an individual’s own belief regarding the quality of dif-
+Hence, we have the following hypothesis:
+ferent choices is discounted or even ignored (Banerjee 1992). Herding behaviors have been widely documented Hypothesis 3.Customers with more experience in using in various settings in prior literature on information FR payment technology have less social presence effect
+systems (IS), for example, in crowdfunding (Zhang and when using this technology than those with less experience Liu 2012), crowdsourcing (Chen et al. 2020), and online in using FR payment technology.
+.devreser
+sthgir
+lla ,ylno
+esu
+lanosrep
+roF
+. 11:20
+ta
+,3202
+tsuguA
+21 no
+]741.022.0.3[
+yb
+gro.smrofni
+morf dedaolnwoD
+spirations,wherethebackgroundandinspirations
+togetherprovideenoughinformationtobepossible todevelopthehypothesis. Wealsoabstracttherea-
+soningprocessfrombackgroundandinspirations tohypothesisandnoteitdownforeachpublication
+in our dataset. In this selected example, the rea-
+soningprocessiseasy,butithasmediumdifficulty
+forresearcherstoassociatetheinspiration(herding
+effect) to the background. For each publication, Figure3: Hypotheticaldevelopmentsectionandapar- weincludeanexpert-evaluatedcomplexityforboth ticulartheorysubsectionfordevelopinghypotheses.
+the reasoning process and the association of the
+inspirationtothebackground(detailsin§A.3).
+Ourpresent-feedbackisdevelopeduponamulti- Insteadofdirectlycopyingthebackgroundand aspectover-generate-then-filtermechanism(Yang inspirationsfromthepapertoconstructthedataset,
+etal.,2024). However,theyonlyutilizeLLMsto we try to find semantically similar text contents “filter”butnottoprovidefeedback. fromthewebcorpusasasubstitutiontoavoiddata
+contaminationandfittherequirementofTOMATO 3 DatasetCollection taskthatasystemshouldproposenovelandvalid
+research hypotheses only given raw web corpus. Inthissection,wetakeonepublication(Gaoetal.,
+In the example paper, we find news sentences re- 2023) in our dataset as an example to illustrate
+portingtheusageoffacialrecognitionpaymentas
+the dataset collection process. In total, there are
+groundtruthbackgroundandaWikipediadescrip- 50 papers published after January 2023. Table 1
+tionoftheherdingeffectasgroundtruthinspiration. showsthestatisticsofthesubjectdistribution.
+Wealsocollecttheweblinkandthefulltextofthe Mostsocialsciencepublicationshighlighttheir
+manuallyselectedwebpassagesforbackgrounds hypotheses. Figure2showsourselectedmainhy-
+andinspirationstobeusedasrawwebcorpus. pothesisintheexamplepublication. Theresearch
+In addition, we collect the link and the publi- backgroundsaregivenintheintroductionsection.
+cation date for all fifty papers. We also collected
+In this example paper, the background is about
+fourteensurveypapersinrelatedfieldsthatmight
+facialrecognitionpaymenttechnology’susagein
+help check the novelty of the hypotheses. The
+society. Mostsocialsciencepublicationsalsohave
+datasetisfullyconstructedbyasocialsciencePhD
+a “Hypothesis Development” section (some may
+student. Weillustratewhythedatasetshouldn’tbe
+callitbyothernames,e.g.,“TheoreticalDevelop-
+collectedbyautomaticmethodsin§A.4.
+ment”). For example, the left part (“Hypothesis
+Development”)inFigure3showsthetitleofthis
+4 Methodology
+sectionintheexamplepaper. Inthissection,sev-
+eraltheoriesusedtodevelopthemainhypothesis
+In general, our method consists of a base multi-
+are separately introduced. Usually, each theory
+module framework and three feedback mecha-
+takesonesubsection. Forexample, therightpart
+nisms(past-feedback,present-feedback,andfuture-
+(“HerdingEffect”)inFigure3showsthetitleofa
+feedback). We call the full framework as Multi-
+subsection,whichisaparticulartheorybeingused
+mOdule framewOrk with paSt present future
+asaninspiration,whichwiththebackgroundcan
+feEdback (MOOSE). The base framework with-
+developthehypothesisinFigure2.
+outanyfeedbackiscalledMOOSE-base. MOOSE
+Foreachpublicationinourdataset,weidentify
+isdescribedinFigure4andAlgorithm1.
+itsmainhypothesis,researchbackground,andin-
+4.1 BaseFramework
+Communication 5 The base framework is developed based on the
+Psychology 7
+HumanResourceManagement 8 intuitive understanding of how social science re-
+SocialScience InformationSystem 8
+searchersproposeaninitialresearchhypothesis.
+InternationalBusiness 5
+Management 6 Firstly, a researcher needs to find a suitable re-
+Marketing 11
+search background, e.g., facial recognition pay-
+Table1: Statisticsofsubjectdistributionofthedataset. mentsystem’simpact. Thisbackgroundshouldbe
+13547
+Input Corpus
+Future-Feedback 1 Reason for B
+Reason for T
+B T B C
+Inspiration Inspiration Background Raw Web Related
+Finder Title Finder Finder Corpus Survey
+IF
+C C
+T Inspiration CF, RF, NF
+I I Past-Feedback
+Feedback BM25
+H
+B Hypothesis S Hypothesis H Clarity H Reality H Novelty
+Suggestor Proposer Checker Checker Checker
+Future-Feedback 2 B CF Iterative RF NF Present-Feedback
+Future- Input Corpus
+Reason for B
+Feedback 1 Reason for T C: Corpus
+B: Background
+B T B C
+Inspiration Inspiration Background Raw Web Related T: Title
+Finder Title Finder Finder Corpus Survey I S : : I n S s u p g ir g a e ti s o t n ion
+C C IF H: Hypothesis
+CF: Clarity Feedback
+T Inspiration CF, RF, NF RF: Reality Feedback
+I I Feedback Past-Feedback BM25 NF: Novelty Feedback
+IF: Inspiration Feedback
+H
+B Hypothesis S Hypothesis H Clarity H Reality H Novelty
+Suggestor Proposer Checker Checker Checker
+Future-Feedback 2 B CF Iterative RF NF Present-Feedback
+Figure4: MOOSE:Ourmulti-moduleframeworkforTOMATOtask. Theblackpartisthebaseframework;orange
+partrepresentspast-feedback.;greenpartrepresentspresent-feedback;bluepartrepresentsfuture-feedback. Each
+capitalizedletterrepresentsthegenerationofoneofthemodules. Thesamecapitalizedletterrepresentsthesame
+regardlessofitscolor. Ifamodulehasaninputarrowpointinginwithacapitalizedletter,itrepresentsthatthis
+moduleutilizesoneofitspreviousmodules’generation(whichhasthesameletterpointingout)asinput.
+proposed with a deep understanding of the soci- survey corpus). M ’s output is represented as o .
+i i
+etalworld. Accordingly,wedevelopabackground Feedbacktoo isrepresentedasf .
+i i
+findermodule,whichreadsthroughrawwebcor-
+4.2 Present-Feedback
+pustofindreasonableresearchbackgrounds.
+LLMsarenotperfectandcanleadtoflawsinthe
+Secondly,sincetheproposedhypothesisshould
+generation,especiallyforthosemodulesthatunder-
+be novel, directly copying from raw web corpus
+takeadifficulttask. Previousworkonhypothetical
+usually is not enough. A good social science hy-
+induction(Yangetal.,2024)tacklesthisproblem
+pothesis should contain an independent variable
+byleveragingLLMstoidentifyflawsinthegenera-
+and a dependent variable, and describe how the
+tionandfiltersthosewithhugeflaws. Herewetake
+independentvariablecaninfluencethedependent
+a step further that instead of filtering, LLMs are
+variable. Therefore,buildingconnectionsbetween
+leveragedtoprovidefeedback,sothatageneration
+twovariablesthathavenotbeenknownforestab-
+canbeimprovedratherthanjustfiltered.
+lishedconnectionscontributestoanovelhypothe-
+Accordingly, we define present-feedback as
+sis. Wehypothesizethatproperinspirationcanhelp
+when an output o can be directly evaluated and
+this connection-building process, since it might i
+provided feedback f (by LLMs or experts, here
+serve as one of the variables itself, or might help i
+weuseLLMs)intermsofsomeaspects,o andf
+tofindsuchvariables. However,itcouldconsume i i
+areusedasadditionalinputstoM ,sothatM can
+lots of computing resources and even be practi- i i
+regenerateo torefinethepreviousonewithf .
+cally impossible if the framework searches over i i
+Weimplementpresent-feedbackontheHypothe-
+the full web corpus for every found background.
+ses Proposer module, since it is a key module
+Nevertheless,itcouldbemuchmoreviableifonly
+that undertakes a very difficult task. In terms of
+searching over the titles of the corpus, and then
+whataspectsshouldthefeedbackfocuson,Yang
+onlyfindinginspirationalsentencesinthepassages
+etal.(2024)proposefouraspectsaccordingtothe
+which match the selected titles. Accordingly, we
+philosophicaldefinitionandrequirementforhypo-
+develop an inspiration title finder module and an
+theticalinduction(Norton,2003). Theaspectsare
+inspirationfindermodule,togethertofindproper
+whetherthehypothesis(1)isconsistentwithobser-
+inspirationsgivenabackground.
+vations;(2)reflectsreality;(3)generalizesoverthe
+Lastly,ahypothesisproposermodulecanutilize
+observations;(4)isclearandmeaningful.
+backgroundsandinspirationsforhypotheses.
+InMOOSE,webasicallyadoptthefouraspects
+In general, MOOSE-base consists of a list of but reframe them to better fit the current task.
+serializable generation modules M ,M ,...,M Specifically, aspect (2) contains aspect (1) most
+0 1 n
+thatfunctionsequentially. Theinputofamodule of the time (unless the observations are wrongly
+M isfromtheoutputofpreviousmodulesM described). To save computing power, we adopt
+i j,j<i
+andarawwebcorpusC (andoptionallyarelated aspect (2) but not aspect (1). In addition, we re-
+13548
+frameaspect(3)aswhetherthehypothesisisnovel, selectedandwhatpotentiallyhelpfulinspirations
+andreframeaspect(4)aswhetherthehypothesisis could be found from the passage with the corre-
+clearandprovidesenoughdetails. Accordingly,we spondingselectedtitles. ForFF2,weimplementit
+developarealitycheckermodule,anoveltychecker ontheHypothesisProposermodule,sincepropos-
+module,andaclaritycheckermoduleinFigure4. ing hypotheses is a very important and complex
+task. Accordingly, wedevelopaHypothesisSug-
+4.3 Past-Feedback
+gestormodule(asM )toprovidesomeinitial
+j 0.5
+−
+Just like the reward mechanism in reinforcement suggestionsonhowtoutilizetheinspirationsand
+learning, some modules’ generation can only be backgroundfirst,andthenHypothesisProposer(as
+evaluated at a future time point. For instance, it M ) can build upon the suggestions to generate
+j
+is hard to give feedback on the selected inspira- morenovelandmorecomplicatedhypotheses.
+tions unless we know what hypotheses these in-
+spirationscouldleadto. Accordingly,wedevelop 5 Experiments
+past-feedbackaswhenitishardtodirectlyevaluate
+5.1 EvaluationMetrics&Details
+o ,theframeworkcontinuestorununtilgenerating
+i
+o ,whereo ishighlyinfluencedbyo andcan Weconductbothautomaticevaluationandhuman
+j,j>i j i
+be directly evaluated to obtain present-feedback evaluationfortheexperiments.
+f . Then o , o , and f are utilized, possibly by For automatic evaluation, we adopt validness,
+j i j j
+anadditionalmoduleimplementedwithanLLM, novelty,andhelpfulnessasthreeaspectsforGPT-
+toprovidepast-feedbackf toM ,sothatM can 4 to evaluate. We choose validness and novelty
+i i i
+regenerateo withf torefinethepreviouso . because they are the two basic requirements for
+i i i
+Weimplementpast-feedbackontheInspiration hypotheticalinductionillustratedinphilosophical
+TitleFindermodule. Theintuitionisthatimproper literature(Norton,2003;Yangetal.,2024). Inad-
+inspirationscanleadtolow-qualityhypotheses,and dition, these two scores also highly resemble the
+itishardtodirectlyevaluateinspirations. currentACLreviewform,whichrequiresreviewers
+toscoresubmittedpapersonsoundnessandexcite-
+4.4 Future-Feedback mentaspects. Wechoosehelpfulnessbecausethe
+Wealsodevelopfuture-feedback,targetingatpro- finalgoaloftheTOMATOtaskistoprovidehelp
+viding additional useful information for a future andassistanceforhumanscientists.
+moduleM togenerateo inbetterquality. Specif- In§A.5weillustratewhywedon’tadoptevalua-
+j j
+ically, we develop future-feedback-1 (FF1) and tionmetricssuchas(1)relevanceandsignificance,
+future-feedback-2(FF2). FF1isthatinadditionto and(2)BLEU(Papinenietal.,2002),ROUGE(Lin,
+o ,justifications(reasons)ofo arealsoprovided 2004),orMETEOR(BanerjeeandLavie,2005).
+i i
+toM sothatM canbetterleverageo ;FF2is Forhuman(expert)evaluation,evaluationmet-
+j,j>i j i
+thatforakeymoduleM thathandlesaverycom- rics are the same. Three experts (social science
+j
+plex task, an additional module M is being PhDstudents)takechargeoftheexpertevaluation.
+j 0.5
+−
+placed before M , so that M can undertake Theyevaluateon400randomlyselectedhypothe-
+j j 0.5
+−
+someof thereasoning burdens ofM toimprove sesfromthebaselineandvariantsoftheMOOSE
+j
+thequalityofo . Forexample,inMOOSE,M framework. To avoid any bias, they are not told
+j j 0.5
+−
+istoprovidepreliminarysuggestionsforM . whichmethodswearecomparing;theorderofgen-
+j
+SpecificallyintheMOOSEframework,forFF1, eratedhypothesestocompareisalsorandomized.
+no additional modules are needed. Instead, we Weintroducehowthe400hypothesesareselected
+modifytheprompttorequireM tonotonlygen- in§A.6,andthehighexpertagreementin§A.7.
+i
+erateo butalsoprovidethejustificationofo . We Each metric is on a 5-point Likert scale. Both
+i i
+implement it on the Background Finder and the expertsandGPT-4aregiventhesamedescription
+Inspiration Title Finder modules. The intuition of the scale and evaluation standard of the three
+is that it could be helpful if the Inspiration Title aspects(listedin§A.9).
+Findermoduleknowsnotonlythebackgroundbut Outofthemetrics,weconsiderthenoveltymet-
+also what possible research topics could be con- rictoberelativelymoreimportantthanthevalid-
+ductedforthisbackgroundsoastoselectsuitable ness metric. Because the goal of the TOMATO
+titles; it could be also helpful for the Inspiration task is to assist human researchers, but not to di-
+Findermoduletoknowwhythisbackgroundwas rectlyaddthemachine-proposedhypothesestothe
+13549
+Validness Novelty Helpfulness Validness Novelty Helpfulness
+Baseline 3.954 2.483 3.489 Baseline 3.579 2.276 2.632
+MOOSE-base 3.907 3.081 3.859 MOOSE-base 3.500 2.855 3.026
+w/future-feedback 3.955 3.226 3.953 w/future-feedback 3.645 3.105 3.303
+w/future-andpast-feedback 3.916 3.390 3.931 w/future-andpast-feedback 3.750 3.197 3.368
+Table2: EffectofMOOSE-base,future-feedbackand Table4: EffectofMOOSE-base,future-feedbackand
+past-feedback(evaluatedbyGPT-4). MOOSE-related past-feedback(evaluatedbyexperts). MOOSEresults
+resultsareaveragedoveriterationsofpresent-feedback. areselectedfromthe5thiterationofpresent-feedback.
+BasemodelisGPT-3.5. BasemodelisGPT-3.5.
+Validness Novelty Helpfulness Validness Novelty Helpfulness
+MOOSE(w/opresent-feedback) 3.823 3.114 3.809 MOOSE-base(w/opresent-feedback) 3.342 2.382 2.500
+w/1iterationofpresent-feedback 3.918 3.199 3.900 w/2iterationsofpresent-feedback 3.539 2.803 2.934
+w/2iterationsofpresent-feedback 3.951 3.293 3.956 w/4iterationsofpresent-feedback 3.500 2.855 3.026
+w/3iterationsofpresent-feedback 3.969 3.270 3.962
+MOOSE(w/opresent-feedback) 3.224 2.737 2.855
+w/4iterationsofpresent-feedback 3.970 3.329 3.951
+w/2iterationsofpresent-feedback 3.579 3.250 3.342
+w/4iterationsofpresent-feedback 3.750 3.197 3.368
+Table 3: Effect of present-feedback (evaluated by
+GPT-4). BasemodelisGPT-3.5. Table 5: Effect of present-feedback (evaluated by ex-
+perts). BasemodelisGPT-3.5.
+literature. Ifthehypothesesarefullyvalidbutnot
+novel, then they are not helpful at all; but if the perimentsevaluatedwithGPT-4,fiftybackgrounds
+hypotheses are novel but not valid, then they can areselectedforeachmethod. ForMOOSE-related
+still be possible to inspire human researchers to methods,foreachbackground,onaveragearound
+developnovelandvalidhypotheses. Helpfulnessis 6inspirationsareextracted,resultingin4different
+alsoanimportantmetricsinceitcouldbeseenas hypotheses. Each hypothesis leads to another 4
+anoverallevaluationofahypothesis. more refined ones with present-feedback. There-
+In§A.8,weintroducethesurprisinglyhighcon- foreonaverageforeachMOOSE-relatedmethodin
+sistencybetweenexpertevaluationandGPT4eval- GPT-4evaluationtables,around50*4*5=1000hy-
+uation,indicatingthatGPT-4mightbeabletopro- pothesesareevaluated. Forexperimentsevaluated
+vide a relatively reliable evaluation for machine- with expert evaluation, in general, we randomly
+generatedsocialsciencehypotheses. selectonehypothesisforeachbackground,result-
+ingin50hypothesesevaluatedforeachlineofthe
+5.2 Baselines&BaseModelSelection methodinexpertevaluationtables.
+SincetheTOMATOtaskistoproposehypotheses Table 2 shows GPT-4’s evaluation targeting at
+givenonlycorpus,anaturalbaselineistouseacor- comparing MOOSE-base and the baseline and
+puschunkasinput,anddirectlyoutputhypotheses. shows the effect of future-feedback and past-
+Except for §6.3, we use gpt-3.5-turbo for feedback. In this table, MOOSE-related results
+eachmoduleinMOOSE.Tobefair,thebaselineis areaveragedoveriterationsofpresent-feedbackto
+alsoinstantiatedwithgpt-3.5-turbo. Thetrain- not be influenced by present-feedback. MOOSE-
+ingdataofthemodelcheckpointisuptoSeptember baselargelyoutperformsthebaselineintermsof
+2021,whileallpapersinourdatasetarepublished bothnoveltyandhelpfulness,butslightlylowerin
+afterJanuary2023,sothemodelhasnotseenany terms of validness. As illustrated in §5.1, since
+ofthecollectedpapersinthedataset. In§6.3,we the purpose of the TOMATO task is to inspire
+investigate the effect of base model selection by andhelphumanresearchers,noveltyandhelpful-
+using Claude3-Opus (Anthropic, 2024) for each ness metrics should be more important. In prac-
+moduleinMOOSE. tice, we find many hypotheses from baseline al-
+mostonlyrephrasingsomesentencesintheinput
+5.3 MainResults
+corpus, adding little novelty content. MOOSE-
+Inthissubsection,wecompareMOOSE-basewith base with future-feedback comprehensively out-
+thebaselineandexaminetheeffectofeachofthe performs MOOSE-base in terms of all three met-
+threefeedbackmechanismstoMOOSE-base. rics. MOOSE-base with both future and past-
+Wefirstintroducethenumberofgeneratedhy- feedbacklargelyoutperformsMOOSE-basewith
+potheses being evaluated in §5.3 and §6. For ex- future-feedback in novelty and performs slightly
+13550
+lower in validness and helpfulness metrics. One Validness Novelty Helpfulness
+ofthereasonsisthatthepast-feedbackmayfocus Randbackground 3.954 2.483 3.489
+Randbackgroundandrandinspirations 3.773 2.957 3.643
+more on the novelty aspect because the novelty RandbackgroundandBM25inspirations 3.585 3.364 3.670
+GPT-3.5pickedbackgroundandinspirations 3.812 2.818 3.733
+checker module provides more negative present-
+Groundtruthbackgroundandinspirations 3.876 3.000 3.806
+feedbackthantherealitycheckermodule. Groundtruthhypotheses 3.700 3.380 3.880
+Table 3 shows the effect of present-feedback
+Table6: Analysisofretrieval’seffectongeneratedhy-
+withGPT-4evaluation. Inthistable,theresultsare
+potheses(evaluatedbyGPT-4). Nomethodshereutilize
+averaged over three experiments: MOOSE-base, anyfeedbackmechanisms. BasemodelisGPT-3.5.
+MOOSE-basewithfuture-feedback,andMOOSE-
+basewithbothfutureandpast-feedbacktofocuson Validness Novelty Helpfulness
+present-feedback. Itshowsthatasmoreiterations MOOSE 3.916 3.390 3.931
+ofpresent-feedbackareconducted,validnessand w/ofuture-feedback-2 3.895 3.281 3.918
+w/ofuture-feedback-1 3.882 3.355 3.935
+novelty steadily go up; helpfulness also steadily
+w/oaccesstorelatedsurvey 3.889 3.431 3.886
+goes up but reaches the best performance with 3 w/randomizedcorpus 3.941 3.227 3.955
+iterationsofpresent-feedback.
+Table7: Moreablationstudy(evaluatedbyGPT-4). Re-
+Table 4 shows expert evaluation results on the
+sultsareaveragedoveriterationsofpresent-feedback.
+comparison between MOOSE-base and the base-
+BasemodelisGPT-3.5.
+line, and the effect of future-feedback and past-
+feedback. MOOSE-related results are selected
+from the 5th iteration of present-feedback. Sim- noveltytoChatGPT-pickedbackgroundandinspi-
+ilar to GPT-4 evaluation, MOOSE-base largely rations. Empirically we hypothesize the reason
+outperformsthebaselineintermsofNoveltyand is that randomly picked inspirations are mostly
+Helpfulness; MOOSE-base with future-feedback notrelatedtothebackground, resultinginahigh
+comprehensivelyoutperformsMOOSE-base. Dif- novelty (but less validness and helpfulness). In
+ferentfromGPT-4evaluation,MOOSE-basewith addition, BM25 (Robertson et al., 2009) picked
+futureandpast-feedbackalsocomprehensivelyout- backgroundandinspirationsreachamuchhigher
+performsMOOSE-basewithfuture-feedback. We noveltyscorecomparedtoChatGPT-pickedones.
+thinkoneofthereasonscouldbethatGPT-4might EmpiricallywedonotfindBM25retrievedinspi-
+gradevalidnessbasedonhowfrequentlyithasseen rations to be similar to the background, but they
+relevant texts, but not true understanding of the areusuallywithmoreconcretecontentscompared
+world. Therefore a more novel hypothesis might withrandominspirations. Notsurprisingly,Chat-
+tend to have a relatively lower score in validness GPTpickedbackgroundandinspirationsreachthe
+andhelpfulnessunderGPT-4evaluation. highesthelpfulnessscoreamongthosewithoutany
+Table5showstheexpertevaluationofpresent- ground-truthannotations. Lastly,ground-truthhy-
+feedback. MOOSE-base and MOOSE are both pothesesreachthehighestnoveltyandhelpfulness.
+evaluated. Overallperformancegenerallygoesup
+withmoreiterationsofpresent-feedback,butthere
+6.2 MoreAblationStudies
+mightbeanoptimalnumberofiterations.
+Table7showsablationstudiesonfuture-feedback,
+6 Analysis accesstosurveys,andtheselectionofcorpus.
+Firstly, for future-feedback, we separately test
+6.1 BackgroundandInspirations
+the effect of FF1 and FF2. Without FF2, perfor-
+Herewetrytoanswer“IsChatGPTnecessaryfor mance comprehensively drops; without FF1, per-
+backgroundandinspirationselection?”. formance drops on validness and novelty, with
+Table6showsvariousmethodsforbackground helpfulness remaining comparable. It seems that
+andinspiration selection. In general, there might FF2 is more significant than FF1. However, the
+be a validness-novelty trade-off that if a method factthatFF1worksoninspirationtitlefinderand
+reaches a high novelty score, then it is usually inspiration finer modules does not mean that it
+hard for it to reach a high validness score. It is works on all modules. Empirically we find that
+surprising that a randomly selected background addingthereasons(orprospects)forbackground
+andrandomlyselectedinspirationscanleadtohy- and inspirations to the hypothesis proposer mod-
+potheseswithrelativelycomparablevalidnessand ule will cause a more valid but much less novel
+13551
+Validness Novelty Helpfulness Validness Novelty Helpfulness
+Baseline 3.884 2.925 3.856 MOOSE(w/opresent-feedback) 3.793 3.683 3.870
+w/1iterationofpresent-feedback 3.896 3.804 3.937
+MOOSE-base 3.967 3.392 3.939 w/2iterationsofpresent-feedback 3.961 3.730 3.939
+w/future-feedback 3.926 3.694 3.966 w/3iterationsofpresent-feedback 3.983 3.809 3.946
+w/future-andpast-feedback 3.875 4.177 3.868 w/4iterationsofpresent-feedback 3.980 3.757 3.930
+Table8: EffectofMOOSE-base,future-feedbackand Table 9: Effect of present-feedback (evaluated by
+past-feedback(evaluatedbyGPT-4). MOOSE-related GPT-4). BasemodelisClaude3-Opus.
+resultsareaveragedoveriterationsofpresent-feedback.
+BasemodelisClaude3-Opus.
+in this setting, after selecting a background from
+an inspiration passage, MOOSE tends to retrieve
+generation of hypotheses. The reason is that the the same inspiration passage to find inspirations,
+hypothesis proposer module tends to simply fol- whichleadstolessnovelresults.
+lowtheprospects,whichdonothaveaglobalview
+6.3 EffectofBaseModelSelection
+of both background and all inspirations, but only
+focus on one background or one inspiration. In- In all previous experiments, we adopt GPT-3.5
+stead,FF2(thehypothesissuggestormodule)has as the base model. In this section, we investi-
+theglobalviewandonlyprovidessoftinitialsug- gate the effect of base model selection by using
+gestions on how to combine the background and Claude3-Opusasthebasemodelforeachmodule
+inspirations together. With the hypotheses sug- inMOOSE.
+gestormodule,thehypothesesproposermoduleis WithClaude3-Opusasthebasemodel,weagain
+promptedtofurthercombinetheinitialsuggestions analyzetheeffectofMOOSE-base,past-feedback,
+andotherinspirationstoproposehypotheses. Tobe and future-feedback in Table 8; and analyze the
+fair,MOOSE-base,whichisnotequippedwiththe effect of present-feedback in Table 9. The exper-
+hypothesissuggestormodule,hasthesameprompt iment settings of Table 8 and Table 9 are exactly
+tocombinetheinspirationstogether(justwithout thesameasinTable2andTable3correspondingly,
+suggestions)toproposehypotheses. butonlydifferinthebasemodelselection.
+Secondly,wecuttheaccessofnoveltydetector In general, there are two conclusions. Firstly,
+torelatedsurveystochecktheeffectofrelatedsur- MOOSE’scomponentsstayeffectiveregardlessof
+veys. As a result, novelty largely goes up (0.04), differentbasemodelselection. Itshowstherobust-
+andvalidnessgoesdowntoaround0.26. Empiri- nessoftheMOOSEframeworkintermsofdiffer-
+callyoneofthemainreasonsisthatBM25hardly entbasemodel. Secondly,theabsoluteevaluation
+retrievesenoughsimilarsurveychunks,sothatac- scoresonallthreemetricslargelyimprovedwith
+cess to the survey leads novelty detector to tend Claude3-Opus compared to GPT-3.5, indicating
+to reply the hypotheses are novel since it is not theevenlargerpotentialoftheMOOSEframework
+mentionedintherelatedsurvey. Withoutpresent- whenmorepowerfulLLMsareavailable.
+feedback,MOOSEandMOOSEw/oaccesstosur-
+6.4 QualitativeAnalysis
+veyperformquitecomparably.
+Lastly,therawcorpusinthedatasetisfromtwo The following box shows one generated counter-
+sources: passages that contain the ground truth intuitivehypothesis(expertevaluationappended).
+backgroundsandpassagesthatcontaintheground
+In collectivist cultures, individuals engage
+truth inspirations. In all of the previous experi-
+in more conspicuous consumption behaviors
+ments, backgrounds are extracted from the back-
+compared to individualistic cultures. (Valid-
+ground passages, and inspirations are extracted
+ness: 3.3; Novelty: 4.0; Helpfulness: 4.0)
+fromtheinspirationspassages. Toseewhetherthe
+passagesareonlyrestrictedtotheirdesignedrole,
+inMOOSEw/randomizedcorpusexperiment,we Hereistheassessmentfromoneoftheexperts:
+use inspiration corpus for background extraction The main reason I give a high mark for both
+and use both inspiration and background corpus threedimensionsofthishypothesisisbecause:
+for inspiration extraction. As a result, validness (1) For validness, this hypothesis is based on
+goesupbyabout0.025,whilenoveltygoesdown existingculturaltheoriesandempiricalevidence
+byabout0.16. Wethinkoneofthereasonsisthat, that suggests cultural values significantly impact
+13552
+consumerbehavior. Italignswithestablishedcon- ther improve over MOOSE-base. Surprisingly,
+ceptslikecollectivismandindividualismthathave evaluatedbyPhDstudents,MOOSEisabletopro-
+beenwidelystudiedincross-culturalpsychology. ducemanynovel(“notexistingintheliterature”)
+(2) For novelty, this hypothesis is counter- andvalid(“reflectingreality”)researchhypotheses.
+intuitivetosomeextent. Priorresearchhasshown Tothebestofourknowledge,thisisthefirstwork
+thatcollectivistculturesoftenprioritizegrouphar- showing that LLMs can be leveraged to generate
+mony,cooperation,andsocialcohesionoverindi- novel and valid scientific hypotheses, indicating
+vidual desires. This emphasis on collective well- the potential of LLMs to serve as a “copilot” for
+beingmightsuggestareducedinclinationtoward scientists.
+overtdisplaysofpersonalwealthorstatusthrough
+conspicuousconsumption. However,thishypothe- Limitations
+sissuggeststheoppositethatcollectivistculture’s
+Fromthefirstlook,itmightseemthattheproposed
+membersengageinmoreconspicuousconsumption,
+datasetconsistsofonly50recentpapers. However,
+whichismorecommonlylinkedtoindividualistic
+theyareallmanuallycollectedbyexperts(PhDstu-
+societiesinpopularperceptions. Thischallenges
+dents),andareannotatedwithlotsofdetails(e.g.,
+the notion that members of collectivist cultures
+identifying background and inspirations, finding
+avoidconspicuousconsumptionbehaviors.
+relevantrawwebpassagesforbackgroundandin-
+(3) For helpfulness, if this hypothesis is con-
+spirations,reasoningprocess,complexitylevel). In
+firmed, it could have significant practical impli-
+addition, each paper has been published in a top
+cations. Understandingtheimpactofculturalval-
+socialsciencejournal,representingthepinnacleof
+ues on conspicuous consumption can assist busi-
+humanintelligence. Thismeansitwouldbeincred-
+nesses and marketers in crafting more effective
+iblyexcitingifLLMscouldproposeahypothesis
+cross-culturalmarketingstrategies. Itcouldalso
+fromevenasingleoneoftheserecentpapers.
+aidpolicymakersinaddressingsocietalissuesre-
+It might also seem that it is not clear whether
+latedtoconsumerism.
+thedesignoftheframeworkcanapplytootherdis-
+In addition to the analysis of this counter-
+ciplines. However, to the best of our knowledge,
+intuitiveexample,wealsoprovidequalitativeanal-
+thisisthefirstpaperusingLLMsthatcanpropose
+ysis on the difference between hypotheses gener-
+novelscientifichypothesesthatarenewtohuman-
+ated from the baseline, MOOSE-base, MOOSE-
+ity. Wechoosesocialscienceasthebreakthrough
+basew/future-feedback,andMOOSE-basew/fu-
+pointsincethemaindataformatofsocialscience
+tureandpast-feedbackin§A.11. Morequalitative
+islanguage. Table1showsthatthedatasetcovers
+analysisonhighlyscoredgeneratedhypothesescan
+7differentdisciplines(e.g.,Psychology,Manage-
+befoundin§A.12. Additionally,§A.13illustrates
+ment, Marketing). It would be nearly impossible
+factorsforgoodhypothesesinsocialscience(par-
+forthefirstfewworkstodevelopageneralmethod
+ticularlyinBusiness). §A.14showshowMOOSE
+toproposenovelhypothesesforalldisciplines.
+formulates a hypothesis by giving the generation
+Thispaperconcentratesonanautomatedtaskset-
+ofeachofthemodulesinMOOSE.
+tinginwhichasystemisdesignedtoformulatesci-
+entifichypothesesindependently,withoutrequiring
+7 Conclusion
+humanintervention. Insomescenarios,scientists
+In this paper, we propose a new task, automated mayprefertousetheirownbackgroundandinspi-
+open-domainhypotheticalinduction(TOMATO), rationsasinputforcontrollablehypothesesgenera-
+whichisthefirsttaskinNLPtofocusonsocialsci- tion. Itmightseemthattheautomatedsettingand
+enceresearchhypothesesdiscovery. Alongwiththe the controllable setting are in conflict. However,
+task,weconstructadatasetconsistingof50recent wecontendthattheautomatedsettingmakeastep
+social science papers published in top academic furtherthanthecontrollablesetting,sinceasystem
+journals. Wealsodevelopedamulti-moduleframe- developed for an automated setting would inher-
+workMOOSEfortheTOMATOtask,whichcon- ently support controllable generation by simply
+tains a base framework and three novel feedback substitutingtheautomaticallysearchedinputs(e.g.,
+mechanisms. ExperimentsindicatethatMOOSE- background and inspirations) with those that are
+baseoutperformsanLLM-basedbaseline,andthe manuallycrafted.
+threefeedbackmechanismscanprogressivelyfur- SocietalImpact: Expertevaluationshowsthat
+13553
+MOOSE,anLLM-basedsystem,mightalreadybe RajarshiDas,ManzilZaheer,DungThai,AmeyaGod-
+able to serve as a copilot for researchers across bole,EthanPerez,JayYoonLee,LizhenTan,Lazaros
+Polymenakos,andAndrewMcCallum.2021. Case-
+varioussocialsciencedisciplines. Particularly,as
+based reasoning for natural language queries over
+depicted in Figure 1, it can assist researchers in
+knowledgebases. InProceedingsofthe2021Confer-
+thehypothesisformationprocess,whichisthefirst enceonEmpiricalMethodsinNaturalLanguagePro-
+step for scientific discovery (Wang et al., 2023a). cessing,pages9594–9611,OnlineandPuntaCana,
+DominicanRepublic.AssociationforComputational
+Thiscapabilitysignifiesasteptowardsenhancing
+Linguistics.
+theefficiencyofscientificexplorationbyacceler-
+atingtheformationanddevelopmentofinnovative JiaGao,YingRong,XinTian,andYuliangYao.2023.
+andcredibleresearchhypotheses,therebyboosting Improving convenience or saving face? an empiri-
+calanalysisoftheuseoffacialrecognitionpayment
+researchers’productivity. Tomaximizeitsimpact
+technologyinretail. InformationSystemsResearch.
+andensureequitableaccess,itisimperativetoadvo-
+catefortheopen-sourcingofsuchsystems,thereby Vinod Goel, Gorka Navarrete, Ira A Noveck, and
+democratizingaccessfortheglobalscientificcom- JérômePrado.2017. Thereasoningbrain: Theinter-
+munity. playbetweencognitiveneuroscienceandtheoriesof
+reasoning.
+Acknowledgement
+Chin-YewLin.2004. Rouge: Apackageforautomatic
+evaluation of summaries. In Text summarization
+Thisresearch/projectissupportedbytheMinistry
+branchesout,pages74–81.
+ofEducation,SingaporeunderitsMOEAcademic
+Research Fund Tier 2 (STEM RIE2025 Award Chia-WeiLiu,RyanLowe,IulianSerban,MikeNose-
+MOE-T2EP20123-0005). We thank Qingyun worthy, Laurent Charlin, and Joelle Pineau. 2016.
+How NOT to evaluate your dialogue system: An
+Wang,JinjieNi,XulangZhang,andQikaLinfor
+empiricalstudyofunsupervisedevaluationmetrics
+theirinsightfulcommentsonthefirstfinisheddraft fordialogueresponsegeneration. InProceedingsof
+ofthiswork. the2016ConferenceonEmpiricalMethodsinNatu-
+ralLanguageProcessing,pages2122–2132,Austin,
+Texas.AssociationforComputationalLinguistics.
+References
+AmanMadaan, NiketTandon,PrakharGupta,Skyler
+AIAnthropic.2024. Theclaude3modelfamily: Opus, Hallinan, Luyu Gao, Sarah Wiegreffe, Uri Alon,
+sonnet,haiku. Claude-3ModelCard. Nouha Dziri, Shrimai Prabhumoye, Yiming Yang,
+Sean Welleck, Bodhisattwa Prasad Majumder,
+SatanjeevBanerjeeandAlonLavie.2005. METEOR: Shashank Gupta, Amir Yazdanbakhsh, and Peter
+An automatic metric for MT evaluation with im- Clark. 2023. Self-refine: Iterative refinement with
+provedcorrelationwithhumanjudgments. InPro- self-feedback. CoRR,abs/2303.17651.
+ceedingsoftheACLWorkshoponIntrinsicandEx-
+trinsic Evaluation Measures for Machine Transla- JohnDNorton.2003. Alittlesurveyofinduction.
+tionand/orSummarization,pages65–72,AnnArbor,
+Michigan. Association for Computational Linguis- OpenAI. 2023. GPT-4 technical report. CoRR,
+tics. abs/2303.08774.
+DaniilA.Boiko,RobertMacKnight,andGabeGomes. LongOuyang,JeffreyWu,XuJiang,DiogoAlmeida,
+2023. Emergent autonomous scientific research Carroll L. Wainwright, Pamela Mishkin, Chong
+capabilities of large language models. CoRR, Zhang,SandhiniAgarwal,KatarinaSlama,AlexRay,
+abs/2304.05332. JohnSchulman,JacobHilton,FraserKelton,Luke
+Miller,MaddieSimens,AmandaAskell,PeterWelin-
+AntoineBosselut,HannahRashkin,MaartenSap,Chai- der,PaulF.Christiano,JanLeike,andRyanLowe.
+tanya Malaviya, Asli Celikyilmaz, and Yejin Choi. 2022. Training languagemodelsto followinstruc-
+2019. COMET:Commonsensetransformersforauto- tionswithhumanfeedback. InNeurIPS.
+maticknowledgegraphconstruction. InProceedings
+of the 57th Annual Meeting of the Association for Feng Pan, Rutu Mulkar-Mehta, and Jerry R. Hobbs.
+Computational Linguistics, pages 4762–4779, Flo- 2011. Annotating and learning event durations in
+rence,Italy.AssociationforComputationalLinguis- text. Comput.Linguistics,37(4):727–752.
+tics.
+KishorePapineni,SalimRoukos,ToddWard,andWei-
+Andres M Bran, Sam Cox, Andrew D White, and JingZhu.2002. Bleu: amethodforautomaticevalu-
+PhilippeSchwaller.2023. Chemcrow: Augmenting ationofmachinetranslation. InProceedingsofthe
+large-languagemodelswithchemistrytools. arXiv 40thannualmeetingoftheAssociationforComputa-
+preprintarXiv:2304.05376. tionalLinguistics,pages311–318.
+13554
+BaolinPeng,MichelGalley,PengchengHe,HaoCheng, ZonglinYang,XinyaDu,AlexanderRush,andClaire
+YujiaXie,YuHu,QiuyuanHuang,LarsLiden,Zhou Cardie.2020. Improvingeventdurationprediction
+Yu,WeizhuChen,andJianfengGao.2023. Check viatime-awarepre-training. InFindingsoftheAsso-
+yourfactsandtryagain: Improvinglargelanguage ciationforComputationalLinguistics:EMNLP2020,
+modelswithexternalknowledgeandautomatedfeed- pages3370–3378,Online.AssociationforComputa-
+back. CoRR,abs/2302.12813. tionalLinguistics.
+OfirPress,MuruZhang,SewonMin,LudwigSchmidt, RuiqiZhong,PeterZhang,SteveLi,JinwooAhn,Dan
+NoahA.Smith,andMikeLewis.2022. Measuring Klein,andJacobSteinhardt.2023. Goaldrivendis-
+andnarrowingthecompositionalitygapinlanguage coveryofdistributionaldifferencesvialanguagede-
+models. CoRR,abs/2210.03350. scriptions. CoRR,abs/2302.14233.
+BiqingQi,KaiyanZhang,HaoxiangLi,KaiTian,Si-
+hangZeng,Zhang-RenChen,andBowenZhou.2023.
+Largelanguagemodelsarezeroshothypothesispro-
+posers. CoRR,abs/2311.05965.
+StephenRobertson,HugoZaragoza,etal.2009. The
+probabilistic relevance framework: Bm25 and be-
+yond. FoundationsandTrends®inInformationRe-
+trieval,3(4):333–389.
+NoahShinn,BeckLabash,andAshwinGopinath.2023.
+Reflexion: anautonomousagentwithdynamicmem-
+oryandself-reflection. CoRR,abs/2303.11366.
+Hanchen Wang, Tianfan Fu, Yuanqi Du, Wenhao
+Gao, Kexin Huang, Ziming Liu, Payal Chandak,
+ShengchaoLiu, PeterVanKatwyk, AndreeaDeac,
+etal.2023a. Scientificdiscoveryintheageofartifi-
+cialintelligence. Nature,620(7972):47–60.
+QingyunWang,DougDowney,HengJi,andTomHope.
+2023b. Learningtogeneratenovelscientificdirec-
+tionswithcontextualizedliterature-baseddiscovery.
+CoRR,abs/2305.14259.
+Kevin Yang, Yuandong Tian, Nanyun Peng, and Dan
+Klein. 2022. Re3: Generating longer stories with
+recursiverepromptingandrevision. InProceedings
+of the 2022 Conference on Empirical Methods in
+Natural Language Processing, EMNLP 2022, Abu
+Dhabi,UnitedArabEmirates,December7-11,2022,
+pages 4393–4479. Association for Computational
+Linguistics.
+Zonglin Yang, Li Dong, Xinya Du, Hao Cheng, Erik
+Cambria,XiaodongLiu,JianfengGao,andFuruWei.
+2024. Languagemodelsasinductivereasoners. In
+Proceedingsofthe18thConferenceoftheEuropean
+Chapter of the Association for Computational Lin-
+guistics (Volume 1: Long Papers), pages 209–225,
+St. Julian’s, Malta. Association for Computational
+Linguistics.
+Zonglin Yang, Xinya Du, Erik Cambria, and Claire
+Cardie.2023a. End-to-endcase-basedreasoningfor
+commonsenseknowledgebasecompletion. InPro-
+ceedings of the 17th Conference of the European
+Chapter of the Association for Computational Lin-
+guistics,pages3509–3522,Dubrovnik,Croatia.As-
+sociationforComputationalLinguistics.
+ZonglinYang,XinyaDu,RuiMao,JinjieNi,andErik
+Cambria.2023b. Logicalreasoningovernaturallan-
+guageasknowledgerepresentation:Asurvey. CoRR,
+abs/2303.12023.
+13555
+A Appendix
+A.1 Hyper-parameters
+Experimentsin§6.3adoptsClaude3-Opus,allotherexperimentsareconductedwithgpt-3.5-turbo.
+BothClaude3-Opusandgpt-3.5-turbouse0.9temperatureand0.9top_p.
+ThehyperparametersforGPT-4evaluationare0.0temperaturetoensuretheevaluationscoresarestable,
+and0.9top_p.
+A.2 MoreRelatedWorksonReasoningandScientificDiscovery
+This paper is a successive work in inductive reasoning and is different from commonsense reason-
+ing(Bosselutetal.,2019;Yangetal.,2020)inthatthenovelsocialsciencehypothesesdonotbelongto
+commonsense.
+Case-based reasoning (Das et al., 2021; Yang et al., 2023a) also falls in the domain of inductive
+reasoning, but case-based reasoning is more about high-level guidance on methodology design (case
+retrieve,reuse,revise,andretain),whichisnotinvolvedinthispaper.
+Qietal.(2023)workonzero-shothypothesisproposing,whichisaconcurrentworktoourpaper. They
+don’tfocusonsocialscienceandbusinessdisciplines,andmostlyadoptasingleLLMasmethod(prompt-
+ing,finetuning).
+A.3 DatasetComplexityDistribution
+Table10illustratesthecomplexitydistributionoftheproposeddatasetfrombothreasoningandassociation
+perspectives. “Easy”inthetablemeansitisrelativelyeasycomparedtootherpublicationsinthedataset,
+butdoesnotmeanitisactuallyeasytoinducethehypotheses.
+A.4 WhytheTomatoDatasetShouldn’tBeCollectedbyAutomaticMethods
+Firstly,therearemanyhypothesesinasocialsciencepublication,whichmightneedanexperttoidentify
+whichhypothesisissuitableforthistask(e.g.,whetheritisamainhypothesis,whetherthebackground
+andinspirationsareproperlyintroduced).
+Secondly,thebackgroundandinspirationsscatterinapublication. Itneedsadeepdomainunderstanding
+ofthehypothesis,relatedbackground,andinspirationstoselectthebackgroundandinspirationsoutto
+formacompletereasoningchaintoconcludethehypothesis.
+Thirdly,itneedsenoughdomainknowledgetofindsemanticallysimilartexts(similartothegroundtruth
+selectedbackgroundandinspirations)fromtheweb,wherethetextsshouldcontainenoughdetailstohelp
+elicitthehypothesis.
+A.5 WhyNotUsingOtherEvaluationMetrics
+Other relevant aspects from related literature include relevance (Wang et al., 2023b) and signifi-
+cance(Zhongetal.,2023).
+We do not adopt relevance because our task setting is the automated and open domain, without a
+manuallygivenbackground;neitherforsignificancebecausesocialscienceisdifferentfromengineering
+subjects—(1)everyhypothesisistoreflecttherealityoftheworld,andaslongasitreflectstheworld,it
+issignificant. Thereforeitishardtotellwhichoneismoresignificantevenbyexperts;(2)theevaluation
+standardofsignificancevariesfromtimetotime. Forexample,inthe60s,conductingresearchonhow
+toimprovetheassemblyline’sefficiencyasmuchaspossiblewasseenasverysignificant. However,in
+ReasoningComplexity AssociationComplexity
+Easy 24 12
+Medium 17 25
+Hard 9 13
+Table10: Statisticsofthecomplexityofthedataset.
+13556
+Validness Novelty Helpfulness
+HardConsistency 0.298 0.337 0.361
+SoftConsistency 0.755 0.793 0.791
+Table11: HardandsoftconsistencyscoresbetweenevaluationfromdifferentexpertsintermsofValidness,Novelty,
+andHelpfulnessmetrics.
+recentdecades,howtoalleviatethepsychologicaldepressionofassemblylineworkersisseenasmore
+significant.
+WedonotadoptBLEU(Papinenietal.,2002),ROUGE(Lin,2004),orMETEOR(BanerjeeandLavie,
+2005) as evaluation metric to compare the proposed hypothesis and the ground truth hypothesis since
+(1)proposingnovelresearchhypothesesisanopenproblem,and(2)TOMATOhasanautomatedopen
+domainsetting,whichmeanstheautomaticallyselectedbackgroundandinspirationsarehardlythesame
+asafewgivengroundtruthones(ifbackgroundandinspirationsarenotthesame,thenitismeaningless
+to compare the hypothesis). Liu et al. (2016) have conducted a comprehensive analysis that they also
+reachedasimilarconclusionthatBLEU,METEOR,orROUGEisnotsuitableforanopen-endedtask
+(suchasadialoguesystem).
+A.6 HypothesesSelectionforExpertEvaluation
+Intotal,werandomlyselected400hypothesestobeevaluatedbyexperts. Specifically,foreachbackground
+passage in the dataset (out of 50), we use 4 methods (which are to be compared) to collect in total 8
+hypotheses.
+The 8 hypotheses are from (1) the baseline; (2) the MOOSE-base framework; (3) MOOSE-base +
+future-feedback;(4)MOOSE-base+future-feedback+past-feedback. For(2)and(4),wecollectthree
+hypotheses, whichare(a)withoutpresent-feedback; (b)after2iterationsofpresent-feedback; and(c)
+after4iterationsofpresent-feedback. For(1)and(3),weonlycollectonehypothesis,whichiswithout
+present-feedback.
+Withthesecollections,wecanevaluatetheeffectofboththeMOOSE-baseframeworkandthethree
+feedbackmethods,leadingtoresultsinTable4andTable5.
+Outofthethreeexperts,oneexpertevaluatesthefull400hypotheses,andtheothertwoeachevaluate
+104hypotheses(thefirstandsecond104hypothesesoutof400). Thereasonwechoosethenumber“104”
+is that (1) social science PhD students are quite busy and two of them can only have time to evaluate
+around100hypotheses;(2)thenumbershouldbedividableby8(sinceevery8hypothesesformagroup
+forcomparison).
+Theresultsoftheexpertevaluationareaveragedoverthethreeexperts. Specifically,expertevaluation
+essentiallycomparesthe8hypotheseswithinagroup. The400,104,and104hypothesesevaluationscores
+canbewrittenasarraysof[50,8],[13,8],and[13,8]. Weconcatenatethemto[76,8],andaveragethem
+acrossthefirstdimension.
+Thepaymentforexpertevaluationis$1perhypothesis.
+A.7 ExpertQualificationandExpertAgreement
+The constructed dataset covers many subjects, but every collected publication is somewhat related to
+Marketing,whichisabigtopicinBusinessresearch. Itiscommoninsocialsciencetoconductresearch
+thatconnectswithothersocialsciencedomains. TheexpertsforexpertevaluationarethreePhDstudents
+majoringinMarketing. Thereforetheexpertsarequalifiedenoughtoprovideassessmentformachine-
+generatedhypothesesinthedomain.
+TheconsistencyscoresbetweenexpertsareshowninTable11. Thesoftconsistencyandhardconsis-
+tencyaredefinedin§A.8. Allsoftconsistencyscoresareabove0.75means,andtheaveragedifference
+between experts in terms of each metric is less than 1 (out of a 5-point scale), exhibiting high expert
+evaluationagreement.
+13557
+Validness Novelty Helpfulness
+HardConsistency 0.485 0.392 0.321
+SoftConsistency 0.850 0.823 0.773
+Table12: HardandsoftconsistencyscoresbetweenexpertevaluationandGPT-4evaluationintermsofValidness,
+Novelty,andHelpfulnessmetrics.
+Aspect1: Validness
+5points Thehypothesiscompletelyreflectsthereality.
+Thehypothesisalmostcompletelyreflectsthereality,
+4points buthasonlyoneortwominorconflictionsthatcan
+beeasilymodified.
+Thehypothesishasatleastonemoderateconflictor
+3points
+severalminorconflicts.
+Thehypothesishasatleastonemajorconfliction
+withtherealityoronlyestablishesinveryrare
+2points
+circumstancesthatarenotmentionedinthis
+hypothesis.
+1point Thehypothesiscompletelyviolatesthereality.
+Table13: EvaluationstandardforValidness.
+A.8 ConsistencyBetweenExpertEvaluationandGPT-4Evaluation
+TochecktheconsistencybetweenexpertevaluationandGPT-4evaluation,weusetheexpertevaluation
+resultsandfindthecorrespondingGPT-4evaluationresults. Intotal,thereare400hypothesesevaluated
+byexperts,sothesampleweusetocalculatetheconsistencyscoreis400.
+Specifically,similarto Panetal.(2011),forsoftconsistency,iftheabsolutedifferencebetweenexpert
+evaluationandGPT-4evaluation(bothareona5-pointscale)is0/1/2/3/4,thenweassignaconsistency
+scoreof1.00/0.75/0.50/0.25/0.00;forhardconsistency,ifonlythedifferenceis0,cantheconsistency
+scorebe1.00,otherwiseconsistencyscoreis0.00. ThehardandsoftconsistencyscoresshowninTable12
+areaveragedforeachmetric.
+Theconsistencyscoresaresurprisinglyhigh. Allsoftconsistencyscoresareabove0.75means,andthe
+averagedifferencebetweenexpertandGPT-4evaluationintermsofeachmetricislessthan1(outofa
+5-pointscale). TheresultsindicatethatGPT-4mightbeabletoprovidearelativelyreliableevaluationfor
+machine-generatedhypotheses.
+Aspect1: Novelty
+Thehypothesisiscompletelynovelandhasnotbeen
+5points
+proposedbyanyexistingliterature.
+Themainargumentorseveralsub-argumentsofthe
+4points
+hypothesisarenovel.
+Themainargumentisnotnovel,onlyoneortwo
+3points
+sub-argumentsappeartobenovel.
+Thefullhypothesisisnotnovel,butthewayit
+2points combinesthetopicscanbeinspiringforhuman
+researchers.
+Thehypothesisisnotnovelatallandnotinspiring
+1point
+forhumanresearchers.
+Table14: EvaluationstandardforNovelty.
+13558
+Aspect1: Helpfulness
+Thehypothesisisnovel,valid,clear,andspecific
+enoughthatitisitselfamatureresearchhypothesis,
+5points
+andhumanresearcherscandirectlyadoptitfor
+publicationwithnomodificationsneeded.
+Thehypothesisisnovelenoughandcanbedirectly
+4points adoptedbyhumanresearchersforpublicationafter
+minormodifications.
+Thehypothesisshouldbelargelymodifiedor
+3points
+reconstructedbyhumanresearcherstoadoptit.
+Modifyingthishypothesismightnotdeservethe
+2points efforts,butasmallpartofthishypothesisisinspiring
+forhumanresearcherstodevelopanewhypothesis.
+1point Thehypothesisisnothelpfulandnotinspiringatall.
+Table15: EvaluationstandardforHelpfulness.
+A.9 EvaluationAspectsDescription
+TheevaluationstandardforValidness,Novelty,andHelpfulnessiscorrespondinglydisplayedinTable13,
+Table14,andTable15.
+A.10 MoreDetailsAboutPast-FeedbackDesign
+In practice, we find that ChatGPT is not capable enough to generate past-feedback with enough good
+quality for the Inspiration Feedback module. Instead, it tends to provide feedback as “the previous
+inspirationtitlesarenotveryrelevanttothehypothesesorthebackground”. Asaresult,theChatGPT
+InspirationTitleFindermoduletendstoselectinspirationtitlesthatareveryrelatedtothebackground,
+resultinginalessnovelhypothesesgeneration.
+ThereforeinsteadofinstantiatingwithChatGPTfortheInspirationFeedbackmodule,weexperiment
+with leveraging human heuristics. The heuristics are “if the inspiration titles are less related to the
+background, then more novel hypotheses are likely to be proposed.”. With this heuristics-based past-
+feedback,MOOSEdoesperformbetter(asshowninthetablesin§5and§6).
+Thisheuristics-basedfeedbackispossibletobeobtainedbyalanguagemodelsinceithasaccessto
+thenoveltyfeedbackofeachhypothesisaswellastheinspirationtitlesthehypothesisleveraged. Here
+our contribution is to propose a useful framework for the TOMATO task, which is not limited by any
+LLMsforanymoduleintheframework. Inthefuture,itispossibleformorepowerfulLLMstofindbetter
+inspirationfeedbackthanhumanheuristics.
+A.11 QualitativeAnalysisonHypothesesGeneratedFromDifferentMethods
+We analyze four hypotheses from the baseline, MOOSE-base, MOOSE-base w/ future-feedback, and
+MOOSE-basew/futureandpast-feedback(MOOSE),wherethefourmethodsusethesamepassageto
+extractbackground.
+• Hypothesisfromthebaseline: Companiesthatprioritizecustomerunderstandingwillhavehigher
+profitabilitythancompaniesthatdonotprioritizecustomerunderstanding.(Evaluatedbytheexpert,
+Validness: 4;Novelty: 1.5;Helpfulness: 2)
+• HypothesisfromMOOSE-base: Thelevelofempathydisplayedbyleadersinastartupenvironment
+influencesemployees’jobsatisfactionandorganizationalsuccessthroughthemediationofemployees’
+perceivedlikelihoodofnegativeoutcomesandexpectationofenjoyment,aswellastheirpropensity
+towardriskychoices.(Evaluatedbytheexpert,Validness: 3.5;Novelty: 3;Helpfulness: 3)
+13559
+• Hypothesis from MOOSE-base w/ future-feedback: Female CMOs in startups, leveraging their
+higherlevelsofempathy,aremorelikelytoprioritizecustomersatisfactionbyactivelylisteningto
+customerfeedback,incorporatingcustomerinsightsintodecision-makingprocesses,andproviding
+personalizedcustomerexperiences. Thisemployeeprioritizationofcustomersatisfactionispositively
+associatedwithhigherlevelsofcustomerengagement,increasedcustomerloyalty,andimproved
+brandrecall,asmeasuredbyobjectivemetricssuchassalesfigures,customerretentionrates,and
+brandrecognitioninthemarket. TheinfluenceoffemaleCMOsonemployeebehaviorismediated
+bytheirabilitytofosteracaringrelationshipwithcustomers,assupportedbyempiricaldataand
+statisticalanalysis.(Evaluatedbytheexpert,Validness: 3.5;Novelty: 3.5;Helpfulness: 3.5)
+• HypothesisfromMOOSE-basew/futureandpast-feedback(MOOSE):FemaleCMOs’empathy
+advantageinfluencestheirconsiderationofnegativeconsequencesofCSRinitiatives,specifically
+in terms of employee well-being and job security. This relationship is moderated by individual
+differencesinemotionalintelligence. Additionally,theorganizationalcultureandindustrycontext
+will furtherinfluence the relationship between empathy advantage andconsiderationof negative
+consequences. ThehypothesiswillinvestigatewhetherfemaleCMOswithhigherlevelsofempathy
+are more likely to prioritize employee well-being and job security in the implementation of CSR
+initiatives, and whether this relationship is stronger in industries with a stronger emphasis on
+employeewell-beingandjobsecurity. Itwillalsoexplorethemediatingroleoforganizationalculture
+and the moderating role of emotional intelligence in shaping the relationship between empathy
+advantageandconsiderationofnegativeconsequences.(Evaluatedbytheexpert,Validness: 4.5;
+Novelty: 4;Helpfulness: 4)
+Analysisfromtheexpert:
+• H1fallsshortofchallengingestablishedassumptionsorintroducinganovelperspectivebeyondthe
+widelyacceptedlinkbetweencustomerunderstandingandprofitability.
+• BothH2&H3centeraroundaspecificscenarioinvolvingfemaleCMOsinstartupsanddelveinto
+theirinfluenceoncustomersatisfaction,employeebehavior,andoverallbusinessresults. Froma
+researchstandpoint, thismorefocusedapproachpointstoapotentialgapintheexistingbodyof
+knowledge. Moreover,thesetwohypothesessurpassconventionalunderstandingbyconsideringhow
+theempathyoffemaleCMOsimpactsemployeebehaviorandbusinessoutcomes. Theyputfortha
+fresh viewpoint, suggesting that cultivating a compassionate rapport with customers, fostered by
+femaleCMOs,couldpositivelyaffectcustomerengagement,loyalty,andbrandrecognition. These
+twohypotheseszoominonamorespecificcontext,introduceaninnovativeperspective,andprobea
+potentialvoidincurrentresearch. Theyareanchoredinthedynamicworldofinnovativebusiness
+settingsandproposeamorenuancedandall-encompassingconnectionbetweenvariables.
+• H4 retains its relevance within a modern business landscape by scrutinizing the intersection of
+empathy,CSRinitiatives,andthedynamicsoforganizations. Thissyncsseamlesslywiththecriterion
+ofbeingrootedinaninnovativebusinessenvironment. Moreover,itshakesupestablishedassumptions
+by considering the potential adverse outcomes of CSR initiatives and the role empathy plays in
+shaping decision-making within this context. This hypothesis delves into a more intricate and
+thoroughexploration,examiningabroaderspectrumoffactorsandinteractionswithinaspecific
+context. Additionally,itimpartsadeepercomprehensionoftheinterplaybetweenempathy,business
+choices, and organizational results. It grapples with a more complex and distinctive scenario,
+unearthspossiblegapsintheexistingliterature,andintroducesanewangleontheroleofempathy
+intherealmofbusinessdecisions.
+A.12 QualitativeAnalysisonTwoMOOSE-GeneratedHypothesesWithHighExpertEvaluation
+Scores
+InthefollowingtwogreyboxesaretwogeneratedhypothesesfromMOOSEwithhighexpertevaluation
+scores(appendedtoeachhypothesis). Theexpert’sassessmentofthetwohypothesesis:
+13560
+Hypothesis 1: The level of personalization in crowdfunding campaign storytelling, the influence of
+social media influencers who align with the campaign, the presence of trust indicators, and the emo-
+tional appeal of the campaign will positively impact potential donors’ likelihood of making a do-
+nation. Additionally, the timing of donation requests and the type of social media influencers (e.g.,
+celebrities vs. micro-influencers) will moderate this relationship. The perceived risk associated with
+the crowdfunding campaign will negatively moderate the relationship between the emotional appeal
+and donation likelihood. (Validness: 4.5; Novelty: 4.5; Helpfulness: 4.5)
+Hypothesis 2: Limited financial resources and limited access to networks and markets of women
+entrepreneurs in the manufacturing sector in developing countries may negatively impact their in-
+vestment in corporate social responsibility (CSR) initiatives that promote gender equality in host
+countries. This relationship is further influenced by the intersectionality of gender and race, with
+women of color facing additional challenges. Additionally, the hypothesis considers the role of insti-
+tutional factors, such as legal frameworks and policies, and the influence of patriarchal structures
+on women entrepreneurs’ ability to invest in CSR initiatives. (Validness: 3.5; Novelty: 4.0; Helpful-
+ness: 4.0)
+Thesetwohypothesesbothpresentacomprehensiveviewoftheresearchnarrative. Itencompasses
+multiplehypotheses,includingtheprimaryone,aswellasthemediationeffect,whichservestoelucidate
+thecausalconnectionbetweentheindependentanddependentvariables. Concurrently,bothhypotheses
+outlinetherangeoftheeffect—namely,thecircumstancesinwhichthiseffectisapplicable,underwhich
+scenarioswhereitmightbeweakened,andunderwhichsituationitcouldpotentiallybeinverted.
+Intermsofnovelty: 1. Limitedpriorresearchoragapintheexistingliterature. Thismeansthatthere
+isadearthofstudiesorinformationavailableonthesubject,makingitanunexploredarea. 2. Based
+onanewbusinesssetting. Itisgroundedinaninnovativebusinessenvironment,characterizedbynovel
+technologies,contemporarythemes,andevolvingbusinessrequirements. 3. Thetopicoffersafreshand
+uniqueperspectivethatgoesbeyondconventionalunderstanding. Itmightchallengeexistingassumptions,
+proposenewtheories,orpresentanunconventionalapproach.
+A.13 EssentialFactorsforGoodSocialScience(andBusiness)Hypotheses
+AccordingtobusinessPhDstudents,counter-intuitiveandnovelhypothesesarethemostlyfavoured(by
+topbusinessjournals). Intuitiveandnovelhypothesesarealsogoodbutnotasgoodasthecounter-intuitive
+ones. Here“novel”refersto“notpointedoutbyexistingliteratures”.
+Empiricallytheythinkofallthehypothesesontopbusinessjournals,around20%arecounter-intuitive,
+leavingtheremaining80%intuitive.
+Counter-intuitivehypothesestendtoreceivealowervalidnessevaluationcomparedtointuitiveones.
+Forthisreason,wehighlightthecounter-intuitivehypothesisin§6.4,evenifitreceivesalowerscorein
+validnessthanhypothesesin§A.12.
+A.14 AnExampleofHypothesisFormulationviaMOOSE
+Here we show a complete flow of hypothesis discovery, by giving the output of relevant modules.
+Specifically, the found background, found inspirations, generated suggestions, generated hypothesis,
+realityfeedback,noveltyfeedback,andclarityfeedbackarecopiedinthissection.
+• Foundbackground:
+Blindboxes,intermsofhowtheyreachtheconsumers,areaninnovation. Diggingdeeperintothe
+issue,youwilllearntheverymarketingofblindboxesiscalledprobabilisticselling. Thatistosay,
+evenaftermakingthepaymentforablindbox,thebuyerstillhasnoideawhatwillbethecontents
+inside. Suspense. A sense of thrill amid an air of expectation ensue. The sheer anticipation of a
+surprisecanbeintoxicatingevenasitcankeeptheconsumerontenterhooks,inanicesortofway.
+• Foundinspirations:
+13561
+Inspiration0: "Surpriseislikecrackforyourbrain. ScientistsatEmoryandBaylorusedMRIsto
+measurechangesinhumanbrainactivityinresponsetoasequenceofpleasurablestimuli, using
+fruitjuiceandwater. Thepatternsofjuiceandwatersquirtswereeitherpredictableorcompletely
+unpredictable. Contrarytotheresearchers’expectations,therewardpathwaysinthebrainresponded
+moststronglytotheunpredictablesequenceofsquirts."
+Inspiration1: "AccordingtoTmall,China’slargestB2Conlinemarketplace,about200,000post-95
+consumersboughtblindboxesfromitsplatformin2019,witheachspendingCNY20,000peryearon
+average;somefanaticsevenshelledoutCNY1milliononthis"gameofchances"togetthecoveted
+limited-editiontoys."
+Inspiration 2: "Product differentiation is fundamentally a marketing strategy to encourage the
+consumertochooseonebrandorproductoveranotherinacrowdedfieldofcompetitors."
+Inspiration3: "Thepandemichasshownhowalackofsolidstatisticscanbedangerous. Buteven
+withthefirmestofevidence,weoftenendupignoringthefactswedon’tlike"
+Inspiration 4: "User-generated content (also known as UGC or consumer-generated content) is
+original, brand-specific content created by customers and published on social media or other
+channels."
+Inspiration5: "HigherStarRatingsLeadtoMoreOrders.Morestarsreallydoleadtomoresales.The
+datashowsthatproductswithhigherstarreviewshaveamuchhighervolumeofpurchases."
+• SuggestionsfromHypothesisSuggestorModule:
+Suggestion 1: Combining the background information on blind boxes and probabilistic selling
+with Inspiration 1 (surprise as a powerful reward stimulus) and Inspiration 2 (high spending on
+blindboxesbyyoungconsumers),anovelbusinessresearchhypothesiscouldbe: Theelementof
+surpriseandunpredictabilityinprobabilisticselling,suchasblindboxes,triggersstrongerreward
+responsesinthebrain,leadingtohigherconsumerspendingandloyalty,particularlyamongyounger
+demographics. Thishypothesissuggeststhatthepsychologicalimpactofsurprisecanbeasignificant
+driverofconsumerbehaviorandpurchasingdecisions,especiallyfornovelproductcategories.
+Suggestion2: IntegratingthebackgroundcontextwithInspiration3(productdifferentiationstrategy)
+andInspiration5(user-generatedcontent),anotherinnovativehypothesiscouldbe: Encouraging
+user-generatedcontentaroundthesurpriseandrevealaspectsofblindboxproductscanserveasa
+powerfulproductdifferentiationstrategy,settingbrandsapartinacompetitivemarket. Byleveraging
+theexcitementandsocialsharingaroundtheunboxingexperience,businessescancreateaunique
+brandidentityandfosterasenseofcommunityamongtheircustomers.
+Suggestion3: Drawingfromthebackgroundinformation,Inspiration4(theimportanceandchal-
+lengesofevidence-baseddecisionmaking),andInspiration6(theimpactofstarratingsonsales),
+a third hypothesis could be: Despite the proven effectiveness of probabilistic selling in driving
+consumerengagementandsales,businessesmaybereluctanttoadoptthisstrategyduetoalackof
+traditional,evidence-basedmetricsandtheperceivedrisksassociatedwithunpredictableoutcomes.
+Thishypothesishighlightsthepotentialtensionbetweendata-drivendecisionmakingandthebenefits
+ofinnovative,surprise-basedsellingstrategies.
+• HypothesisfromHypothesisProposerModule:
+User-generatedcontent,suchasunboxingvideosandreviews,cansignificantlyinfluencethepur-
+chasing decisions of potential blind box buyers, particularly among younger demographics. The
+excitementandsocialsharingaroundtheunboxingexperience,asdepictedinuser-generatedcontent,
+canamplifythepsychologicalrewardofsurpriseanddrivehighersales,makingitaneffectivetool
+forbusinessestodifferentiatetheirproductsandincreaseconsumerengagementintheblindbox
+market.
+• RealityFeedback:
+13562
+Thegivenhypothesisabouttheinfluenceofuser-generatedcontentonblindboxpurchasingdecisions
+amongyoungerdemographicsseemstoreflectrealitytoacertainextent. However,thereareafew
+pointstoconsiderthatmightsuggestthehypothesisdoesnotentirelycapturethereality:
+1. Generalization: Thehypothesisassumesthatuser-generatedcontentsignificantlyinfluencesall
+younger demographics. In reality, the impact may vary depending on factors such as personal
+preferences,culturalbackground,andsocio-economicstatus.
+2. Otherinfluentialfactors: Whileuser-generatedcontentcanbeanimportantfactorinpurchasing
+decisions,itmaynotbethesoleormostsignificantdriver. Otheraspectslikeproductquality,price,
+brandreputation,andpeerinfluencemightplayequallyimportantorevenmorecrucialroles.
+3. Limitedscope: Thehypothesisfocusesontheexcitementandsocialsharingaspectofunboxing
+experiences. However,itdoesnotconsiderthepotentialnegativeimpactofuser-generatedcontent,
+suchasdisappointingunboxingexperiencesornegativereviewsthatcoulddiscouragepurchases.
+4. Assumptionofpsychologicalreward: Thehypothesisassumesthatthesurpriseelementinblind
+boxpurchasesalwaysleadstoapositivepsychologicalreward. Inreality,someconsumersmight
+experiencedisappointmentorfrustrationiftheydonotreceivethedesireditem,whichcoulddeter
+futurepurchases.
+5. Lackofempiricalevidence: Thehypothesispresentsaplausibleexplanationbutdoesnotprovide
+concreteempiricalevidence
+• NoveltyFeedback:
+Based on the provided inspirations and the possibly related business literature paragraph, the
+researchhypothesisappearstobenovelandnotadirectsemanticcopyofanyofthegiveninformation.
+Thehypothesiscombinesinsightsfromvarioussources,suchasthepsychologicalimpactofsurprise,
+thepopularityofblindboxesamongyoungerdemographics,theroleofproductdifferentiation,and
+theinfluenceofuser-generatedcontentonpurchasingdecisions. Whilethehypothesisdrawsfrom
+these inspirations, it synthesizes them into a unique and specific context related to the blind box
+marketandtheimpactofuser-generatedcontentonconsumerengagementandsales. Theprovided
+literatureparagraphdiscusseslanguagemodelingandlargelanguagemodels,whichisnotdirectly
+relatedtothehypothesis.Tofurtherenhancethenoveltyofthehypothesis,youcouldconsiderthe
+followingsuggestions:
+1. Explorethepotentiallong-termeffectsofuser-generatedcontentonbrandloyaltyandcustomer
+retentionintheblindboxmarket.
+2. Investigatetheroleofsocialmediaplatformsandinfluencersinamplifyingtheimpactofuser-
+generatedcontentonblindboxsales.
+3. Examinethepotentialdifferencesintheeffectivenessofuser-generatedcontentacrossvarious
+productcategorieswithintheblindboxmarket(e.g.,collectibletoys,beautyproducts,orsnacks).
+4. Analyzetheimpactofuser-generatedcontentontheperceivedvalueandcollectibilityofblindbox
+itemsamongconsumers.
+• ClarityFeedback:
+Thegivenhypothesisisrelativelyclearandspecific,asitidentifiestherelationshipbetweenuser-
+generated content and purchasing decisions of potential blind box buyers. It also specifies the
+targetdemographic(youngerbuyers),thepsychologicalfactorsatplay(excitement,surprise,and
+social sharing), and the potential benefits for businesses (product differentiation and increased
+consumerengagement). However,thereisstillroomforimprovementintermsofspecificity.Tomake
+thehypothesismorespecific,considerthefollowing:
+1. Quantifytheextentoftheinfluenceofuser-generatedcontentonpurchasingdecisions(e.g.,"can
+increasethelikelihoodofpurchasebyX").
+13563
+2. Specify the age range of the "younger demographics" (e.g., "particularly among buyers aged
+18-34").
+3. Clarifywhichtypesofuser-generatedcontenthavethemostsignificantimpact(e.g.,"especially
+unboxingvideosthatshowcasetheexcitementandsurpriseoftheexperience").
+4. Indicatetheplatformsorchannelswhereuser-generatedcontentismosteffective(e.g.,"onsocial
+mediaplatformssuchasInstagramandTikTok").
+5. Provideamoredetailedexplanationofhowuser-generatedcontentamplifiesthepsychological
+reward(e.g.,"bycreatingasenseofanticipationandvicariousexperienceforpotentialbuyers").6.
+Quantifythepotential
+A.15 FutureDirections
+ThisworkdiscoveredthepossibilityofLLMstoproposenovelresearchhypotheses. Butitmainlyfocuses
+onthesocialscienceandbusinessdisciplines. ItwouldbeveryinterestingtoinvestigatehowLLMscan
+inducenovelhypothesesforotherdisciplines(especiallynaturesciencedomains).
+Inaddition,theMOOSEframeworkcouldbefurtherimprovedtoinducemorevalidandnovelhypothe-
+sesforsocialscienceandbusinessdomains.
+Fromtheaspectofhuman-AIinteraction,itwouldbealsointerestingtoseehowMOOSEcanactasan
+AICopilottoassistscientistsinhypothesisdiscovery.
+A.16 FullAlgorithmoftheMOOSEFramework
+Algorithm1showsthefullalgorithmoftheproposedframework.
+13564
+Algorithm1AlgorithmforMOOSE
+Input: RawwebcorpusC,relatedsurveysS
+Parameter: Totaliterationsforpast-feedbackM,totaliterationsforpresent-feedbackN
+Output: AlistofhypothesesH
+1: forcinC do
+2: b,b_reason=Background_Finder(c)
+3: ifb==Nonethen
+4: continue
+5: endif
+6: foriterationk 0...M do
+∈
+7: ifk ! =0then
+8: past_f =Inspiration_Feedback(t,h,present_f)
+9: else
+10: past_f =None
+11: endif
+12: t,t_reason=Inspiration_Title_Finder(C,b,b_reason,past_f)
+13: p=find_passage_by_title(t,C)
+14: i=Inspiration_Finder(b,b_reason,p,t_reason)
+15: s=Hypothesis_Suggestor(b,i)
+16: h=Hypothesis_Proposer(b,i,s)
+17: foriterationt 0...N do
+∈
+18: cf,rf,nf =Clarity_Checker(h),Reality_Checker(h),Novelty_Checker(h,S)
+19: present_f =[cf,rf,nf]
+20: h=Hypothesis_Proposer(b,i,s,h,present_f)
+21: endfor
+22: H.append(h)
+23: endfor
+24: endfor
+25: returnH
+13565

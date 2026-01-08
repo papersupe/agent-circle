@@ -1,0 +1,675 @@
+Predicting Difficulty and Discrimination of Natural Language Questions
+MatthewA.Byrd ShashankSrivastava
+UniversityofNorthCarolinaatChapelHill
+matthew_a_byrd@outlook.com,ssrivastava@cs.unc.edu
+Abstract theabilitiesofrespondents. WhileIRThasitsin-
+ceptioninpsychometricsandhastraditionallybeen
+Item Response Theory (IRT) has been exten-
+usedwithhumanrespondents,recently,ithasbeen
+sively used to numerically characterize ques-
+exploredforanalyzingpredictionsfroman‘artifi-
+tion difficulty and discrimination for human
+cialcrowd’ofMLmodels (Prudêncioetal.,2015;
+subjects in domains including cognitive psy-
+chology and education (Primi et al., 2014; Plumedetal.,2016;Martínez-Plumedetal.,2019;
+Downing,2003). Morerecently,IRThasbeen Lalor et al., 2019; Vania et al., 2021; Rodriguez
+used to similarly characterize item difficulty etal.,2021).
+and discrimination for natural language mod-
+While it can be helpful to know which ques-
+els across various datasets (Lalor et al., 2019;
+tionsaredifficult/discriminatory,itcanbeequally
+Vaniaetal.,2021;Rodriguezetal.,2021). In
+importanttobeabletodetermineaquestion’sdif-
+this work, we explore predictive models for
+directly estimating and explaining these traits ficulty/discrimination parameters without having
+for natural language questions in a question- touseitinatestingenvironment(asisrequiredto
+answering context. We use HotpotQA for il- estimateIRTparameters). Somerecentwork,such
+lustration. Ourexperimentsshowthatitispos- as Ha et al. (2019), has explored using features
+sibletopredictbothdifficultyanddiscrimina-
+derived from the text of a question to predict the
+tion parameters for new questions, and these
+difficulty in the context of multiple-choice medi-
+traitsarecorrelatedwithfeaturesofquestions,
+cal exams. While others (Benedetto et al., 2020)
+answers,andassociatedcontexts.Ourfindings
+have used tf-idf features to predict the difficulty
+can have significant implications for the cre-
+ationofnewdatasetsandtestsontheonehand of questions as measured by IRT. We differ from
+and strategies such as active learning and cur- these works in two ways: Firstly, while Ha et al.
+riculumlearningontheother. (2019);Benedettoetal.(2020)bothpredictthedif-
+ficultyofitemsforhumans,weareinterestedinpre-
+1 Introduction
+dictingthedifficulty(anddiscrimination)ofitems
+Theuseofquestionansweringfortestinglearning for QA models. Secondly, we choose a question-
+oftenreliesoncharacterizingquestionsonaspects answeringdataset,HotpotQA(Yangetal.,2018),
+such as difficulty and discrimination1. For exam- asourtestbed. Weutilizethisdatasettogeneratea
+ple, ordering questions by difficulty can enable richandvariedfeaturesetacrosseachitem’sques-
+curriculum learning (Bengio et al., 2009). Simi- tion,answer,andassociatedcontexts. Wecanthen
+larly,discriminationisusedinstandardizedexams employthesefeaturestoanalyzeourdifficultyand
+suchastheSATtoensurethatquestionsarevaried discriminationpredictions,givingusinsightsinto
+enough to discriminate between high-ability and bothourunderlyingQAmodelandfactorsthatcan
+low-ability respondents. Item Response Theory increasethedifficulty/discriminationofaquestion.
+(IRT) (Wright and Stone, 1979; Lord, 1980) has Ouranalysisshowssignificantvariationsamong
+been a widely applied framework to jointly esti- questionsandrevealssomesurprisingpatterns. We
+matesuchparametersforquestions(oritems)and show that it is possible to predict both difficulty
+anddiscriminationofnaturallanguagequestions,
+1Bydifficulty,werefertohowlikelyarespondentistoan-
+sweraquestioncorrectly,whereasbydiscriminationwerefer whichcanhavemultipleapplicationsineducation
+tothevalueofaquestioninidentifyingagivenlevelofability andpedagogy. Additionally,weseethatdifferent
+inrespondents.Aquestionlike‘2+2=?’haslowdifficulty
+surface-levelfeaturesareassociatedwithhighdis-
+butpotentiallyhighdiscrimination,sincearespondentwho
+answersincorrectlyislikelytohavenoarithmeticability. criminationandhighdifficulty,whichcaninform
+119
+Proceedingsofthe60thAnnualMeetingoftheAssociationforComputationalLinguistics
+Volume2:ShortPapers,pages119-130
+May22-27,2022(cid:13)c2022AssociationforComputationalLinguistics
+new evaluation methods and the creation of new of a crowd of human respondents. For this, we
+datasets. Further,weidentifyattributesforpredict- train 148 instances of DFGN (Qiu et al., 2019)
+ing difficulty and discrimination that are general modelsonHotpotQA’strainset.3 Toensurediver-
+enoughtobeadaptedtovariousQAdatasets.2 sity,weuniformlysamplethenumberoftraining
+epochsfrom1to15andsamplethefractionofthe
+2 IRTAnalysisofHotpotQA
+trainingdatausedformodeltrainingfromU(0,1).
+Otherwise,eachmodelwastrainedwiththehyper-
+IRTbackground: Webeginbysummarizingthe
+parametersdescribedinQiuetal.(2019). Next,we
+1PL and 2PL models from IRT, which form the
+generateanitem-responsematrixindicatingwhich
+basisofourlateranalysis. The1PL(1Parameter
+questionsfromtheHotpotQAdevseteachmodel
+Logistic)modeldescribestheprobabilityofrespon-
+answered correctly (i.e., the model’s answer ex-
+denticorrectlyansweringthej’thitem(question)
+actlymatchedthecorrectanswer). Weremoveany
+intermsofscalar-valuedparametersforquestion
+questions that received no correct answers or no
+difficulty (d ) and respondent ability (θ ). These
+j i
+incorrectanswers. Thisisdoneasduringtheesti-
+parameters are estimated from data y ∈ {0,1}
+ij
+mationprocess,thesequestionstendtowards(+/-)
+for a set of i, j pairs. Here, y = 1 indicates a
+ij
+infinityintheirdifficultyparameters,aswell,their
+correctanswer. The1PLmodelisdescribedby:
+discrimination parameter estimate tends towards
+1 zero(unabletodistinguishbetweenhighandlow
+p(y = 1|θ ,d ) =
+ij i j
+1+e−(θi−dj) performingmodels). Ourfinaldatasetisasubset
+of 4,000 questions (2,000 train, 1,000 dev, and
+The2PLmodelextendsthe1PLbyaddingascalar-
+1,000test). Finally,wefitthe1PLand2PLmod-
+valuedparameterα ,whichrepresentsthediscrim-
+j elsontheforesaiditem-responsematrixusingthe
+inationofthej’thitem. Intuitively,thisparameter
+variational IRT training procedure from Natesan
+denoteshowsharplytheprobabilityofanswering
+etal.(2016).
+a question correctly changes as the ability of the
+respondentincreases. The2PLmodelisdescribed 2.2 AnalysisofEstimatedParameters
+by:
+1
+p(y = 1|θ ,d ,α ) =
+ij i j j
+1+e−αj(θi−dj)
+Datasetdescription: WechoseHotpotQAforour
+analysissinceitissignificantlymorecomplexthan
+other datasets such as SQuAD (Rajpurkar et al.,
+2016)duetothequestionsrequiringmulti-hoprea-
+soning and having more complex language. In
+HotpotQA,eachquestionispairedwithtwopara-
+graphsconsidered‘gold’contextsandseveralother Figure1:2PLdiscriminationvs1PLdifficultyforquestions.
+paragraphs considered ‘distractor’ contexts. The
+answer to each question is a span in one of the Figure 1 shows a scatter-plot of estimated dif-
+goldcontexts,butcorrectlyansweringthequestion ficulty and discrimination values for individual
+requires combining information from both ‘gold’ questions. We note that some discrimination val-
+contexts. uesasymptoticallyapproach0. Thisoccurswhen
+somequestionsreceiveveryfewormanycorrect
+2.1 EstimatingIRTParameters
+answers;thesequestionscannotdiscriminatehigh-
+WeestimatetheIRTparametersforthequestions performingfromlow-performingmodels. Wealso
+in HotpotQA’s dev set (7,405 questions). How- notethatsomequestionshavenegativediscrimina-
+ever,collectinghumanresponsesforeachquestion, tion,i.e.,asamodel’sabilityincreases,itsprobabil-
+whichisnecessarytoestimateIRTparameters,is ityofansweringthequestioncorrectlydecreases.
+infeasible. Motivated by Lalor et al. (2019), we Thisisprimarilyaresultofsomeofthehighestper-
+create an artificial crowd of QA models in place
+3WechooseDFGNduetoitscompetitiveperformanceon
+2Code,models,anddataforallexperimentsareavailable theHotpotQAleaderboard,thenumberofmodelswetrainis
+athttps://github.com/ByrdOfAFeather/pred_irt primarilydrivenbycomputationallimits.
+120
+is2.27. Wefurtherexplorehowthesefactorsaffect
+predictingthedifficultyvaluesinsection4.
+3 PredictingIRTParameters
+Wenextdiscusspredictivemodelsfordiscrimina-
+tionanddifficultyusingfeaturesfromthequestion,
+answer,andassociatedcontext. First,wedescribe
+our feature set, then provide an ablation study, a
+featureimportancestudy,andfinallyqualitatively
+analyzethepredictionsofourbestmodel.
+Figure2:All3000questionsfromourtrain/devsetasUMAP-
+reducedBERTembeddings,color-codedbydifficulty(darker 3.1 FeatureDesign
+ismoredifficult).WefindthatclustersproducedbyKMeans
+We experiment with two categories of fea-
+(K=20)naturallyclustertogetherquestionsthataresimilar
+inhowtheyareaskedortopicsthatareaskedabout.Welabel tures: human-centricandmachine-centricfeatures.
+someclustersaccordingtothesetypes. Wespeciallymark
+For human-centric features, we considered (1)
+C.1,C.2,andC.3. C.1andC.2haveuniformityinthetype
+counting-basedLexical&Syntacticfeaturesex-
+ofquestionbeingasked,aswellaslowervariancethanother
+clusters. C.3isuniformintopicbutcanvaryinthetypeof tracted for both questions and answers like Con-
+question.
+tentWords, Type-token ratio, Avg. Word Length,
+Complex Words (> 3 syllables); (2) Semantic-
+formingmodelsgivingananswerwhichiseithera Ambiguityfeaturesmeasuringaquestion’soran-
+subspanoforcontainstheground-truthanswerof swer’sambiguity(Haetal.,2019);and(3)Read-
+questionsthatwereotherwiseansweredcorrectly ability features based on measures like Fleisch
+by lower-performing models. Overall, there is a Kincaidindex. Morefeaturedetailscanbefound
+weakpositivecorrelationbetweendiscrimination inAppendixC.Formachine-centricfeatures,we
+anddifficulty(ρ=0.04). considered(1)ContextualEmbeddingsforques-
+Tovisualizeanycorrelationbetweentheseman- tionsandanswersfromBERT(Devlinetal.,2019);
+ticandsyntacticinformationofquestionsandtheir (2)n-gramOverlapCountsbetweenthequestion
+respectivedifficultylevels,weclusteredquestions andanswer,andbetweenquestion/answerandthe
+based on their BERT embeddings using KMeans gold/distractor paragraphs; and (3) POS Counts
+(K=20)clustering(2DUMAPreductionshownin fromtheStanfordTagset(Toutanovaetal.,2003)
+Figure2). Throughmanuallyexaminingandlabel- forthequestionandanswer.
+ingtheclusters,wefoundthatmanyclusterscould
+3.2 QuantitativeAnalysisandAblation
+bedescribedwithaspecificstyle(e.g.,yes/noques-
+tions)orgeneraltopic. Someclusters,suchasC.3, Table 1 and Table 2 show the regression perfor-
+have a large variety in the phrasing of questions manceofourmodelsforpredictingtheIRTdiffi-
+beingaskedandthepotentialanswersinbothsyn- culty/discriminationparametersofthequestionsin
+tacticandsemanticfeatures. Forexample,bothQ: our dev/test sets using the feature sets described
+KhushiEkRoagisbroadcastbyacompanybased before. Thereportedresultsareaveragedovera10-
+outofwhere? A:DubaiandQ:ToCatchaPreda- foldcross-validation. Wenotethatthebestmodels
+torwasdevotedtoimpersonatingpeoplebelowthe forbothdifficultyanddiscriminationshowsignif-
+ageofconsentforwhichinNorthAmericavaries icant (ρ < 0.10) predictive performance (R2 of
+bywhat? A:jurisdictionareinC.3. 0.17and0.13)againstourbaseline(Mean).
+Otherclusters,suchasC.1andC.2,(yes/noclus- Thebestperformanceisachievedinbothtasks
+ters), only vary in topic rather than the type of byconsideringallfeatures. Inbothcases,thereis
+question. In particular, for these clusters, the es- asignificantdifference(ρ < 0.1)inperformance
+timateddifficultyhassignificantlylowervariance betweenusinganysinglesetandusingallfeatures,
+thantheotherclusters(ρ=0.02, ρ=0.04respec- exceptthebest-performingBERTfeatureset. We
+tively),indicatingthattheseyes/noquestionstend also note that features derived from the answer
+to be consistent in their difficulty. The standard are typically better at capturing difficulty, while
+deviationvaluesforC.1andC.2are1.08and1.19 features derived from the question better predict
+respectively,theaveragestandarddeviationvalue the discrimination parameters. However, the per-
+121
+Features Dev Dev Test Test Features Dev Dev Test Test
+MSE R2 MSE R2 MSE R2 MSE R2
+All 5.14 0.11 4.72 0.17 All 9.08 0.13 9.14 0.13
+All(Q) 5.43 0.07 5.10 0.10 All(Q) 9.32 0.10 9.50 0.09
+All(A) 5.41 0.08 5.05 0.11 All(A) 9.59 0.08 9.98 0.04
+BERT(Q) 5.41 0.07 4.99 0.12 BERT(Q) 9.02 0.11 9.27 0.11
+BERT(A) 5.25 0.10 5.05 0.11 BERT(A) 9.52 0.08 9.64 0.08
+H.C.(Q) 5.62 0.01 5.38 0.05 H.C(Q) 9.76 0.04 9.86 0.06
+H.C.(A) 5.45 0.06 5.20 0.08 H.C(A) 10.09 0.03 10.31 0.02
+Lex.&Syn.(Q) 5.62 0.01 5.37 0.05 Lex.&Syn.(Q) 9.75 0.04 9.86 0.06
+Lex.&Syn.(A) 5.47 0.03 5.36 0.06 Lex.&Syn.(A) 10.13 0.01 10.21 0.03
+Read.(Q) 5.80 0.00 5.71 0.00 Read.(Q) 10.08 0.01 10.17 0.03
+Read.(A) 5.63 0.02 5.48 0.03 Read.(A) 10.13 0.02 10.31 0.01
+Sem.Ambiguity(Q) 5.76 0.01 5.55 0.02 Sem.Ambiguity(Q) 10.05 0.02 10.16 0.03
+Sem.Ambiguity(A) 5.81 0.01 5.68 0.00 Sem.Ambiguity(A) 10.21 0.00 10.47 0.00
+P.O.S.(Q) 5.37 0.05 5.23 0.08 P.O.S.(Q) 9.96 0.04 10.10 0.03
+P.O.S.(A) 5.60 0.01 5.28 0.07 P.O.S.(A) 9.78 0.03 9.82 0.06
+A/Q/COverlap 5.39 0.05 4.92 0.13 A/Q/COverlap 9.56 0.06 9.63 0.08
+Mean 5.82 0.00 5.69 0.00 Mean 10.21 0.00 10.53 0.00
+Table1:Resultsforpredictingthe1PLdifficultyparameters. Table2:Resultsforpredictingthe2PLdiscriminationparam-
+BERT(Q)andBERT(A)usetheBERTembeddingsforthe eters. The setup is the same as in table 1. BERT (Q) has
+question/answerrespectively. H.C.(Q)/(A)arethehuman- thehighestperformance. However,thedifferenceinperfor-
+centricfeaturesforthequestion/answerrespectively.A/Q/C mancewhenusingBERT(Q)comparedtousingAllisnot
+Overlapisusingonlytheoverlapcountsbetweenquestion, statisticallysignificant.SeeAppendixDforsignificancetests.
+answer,andcontexts.
+Feature Change Interval Corr.
+inMSE
+formance of All (Q) and All (A) for both the dis- #CommasA. 0.06 ±0.02 0.10
+#ComplexWordsA. 0.05 ±0.01 -0.04
+criminationanddifficultyisweakerthanusingall
+#NNPA. 0.05 ±0.02 -0.16
+features. Sincethedifferenceisnotstatisticallysig- #SNPA/G.C. 0.02 ±0.01 0.04
+nificant,itisunclearhowmuchpredictivepoweris #CommasQ. 0.01 ±0.01 -0.11
+addedwhenconsideringbothanswerandquestion
+Table3:Featureimportancesfordifficultyparameters(allfea-
+featuresinthesepredictions. turesconsidered).A.referstoafeaturecapturinginformation
+Thefeaturesthatfocusonhumandifficultyare from the answer, Q. refers to a feature capturing informa-
+tionfromthequestion.A/G.C.referstoafeaturemeasuring
+amongthelesseffectivefeaturesets,indicatingthat
+overlapbetweentheanswerandgoldcontexts.
+thehumandifficultyfeaturesofaquestiondonot
+fullycapturedifficultyforQAmodels. Weprovide Feature Change Interval Corr.
+detailsofmodelsandtheirtrainingandtheexper- inMSE
+#CDA. 0.25 ±0.03 0.17
+iment setup in Appendix A; as well, significance
+#CommasQ. 0.08 ±0.02 -0.11
+testscanbefoundinAppendixD. Avg.Sense/AdverbA. 0.01 ±0.02 -0.03
+Table4: Featureimportancesfordiscriminationparameters
+3.3 FeatureImportanceStudy
+(allfeaturesconsidered)
+We estimated feature importance by permuting
+eachfeatureindividuallyandmeasuringthechange
+datawillbecapableofansweringthesequestions.
+inMSEonthedevset. Welistfeaturesthatcaused
+WefindasimilarpositivePearsonscore(ρ = 0.14)
+achangeinMSEofatleast.01intables3and4.
+betweenthedifficultyandthenumberofcardinal
+Wepointoutthatforpredictingthediscrimina-
+digits in the answer. While this weakness of the
+tion, the number of cardinal digits in the answer
+DFGNmodelcannotbeappliedtoanarbitraryQA
+wasthemostimportantindicatorofhighdiscrimi-
+model, the methodology used to determine this
+nation. Thepositivecorrelationbetweenthenum-
+weaknesscanbeappliedarbitrarily,whichcangive
+berofdigitsintheanswerandthediscrimination
+solidgroundingtoclaimsaboutmodelweaknesses.
+ofaquestionisexpected. Qiuetal.(2019)showed
+that the DFGN model has a significant weakness
+4 QualitativeAnalysis
+in numeric operations. This gives questions with
+numeric answers a high discrimination value as We qualitatively analyze the difficulty predic-
+DFGNmodelsarenaturallyinhibitedinthisregard, tions to understand the predictions of our best-
+andthusonlyafewmodelswiththemosttraining performing model. Similar to Figure 2, Figure 3
+122
+shows a UMAP scatterplot4 for questions on our
+testsplitoftheestimatedIRTparameters. Inthis
+case, instead of color-coding by difficulty as in
+Figure 2, we instead color-code by the absolute
+errorbetweenourpredictionsandthemeasureddif-
+ficultyofeachquestion. WeagainapplyKMeans
+(k = 10) to our data with a smaller number of
+clustersduetothesmallersizeofthetestset. We
+highlightCT.1,likeC.1andC.2ofFigure2, this
+clusterconsistsprimarilyofyes/noquestions. The
+Figure3:UMAPscatterplotofquestionscolorcodedbypre-
+difficulty in CT.1 has significantly smaller vari-
+dictionerrorfordifficulty.(Testset)
+ance in the estimated difficulties than the rest of
+the clusters (ρ = 0.02). As well, the prediction
+5 Conclusion
+error for CT.1 has significantly smaller variance
+(ρ=0.04)andhadthesmallestaverageprediction
+Inthispaper,weexploredQAdatasetsthroughthe
+error compared to the other clusters (0.68). This
+lens of Item Response Theory. We have demon-
+indicatesthatthemodelisabletorecognizewhen
+strated a way to build regression models that can
+questiongroupings,suchasyes/noquestions,have
+describethedifficultyanddiscriminationofaques-
+consistentdifficulties(asdiscussedin2.1)andhas
+tion. We note that our work is limited in two im-
+consistentlylowererrorwhenpredictingdifficulty
+portantways: firstly,weonlyusetheDFGNmodel
+forthesequestions. However,thepredictionerror
+inourartificialcrowd,whichmayhaveintroduced
+tends to vary more when the surface-level ques-
+abiasinwhichsomefactorsthatmakequestions
+tion types are not sufficient to characterize their
+difficult/discriminatoryareonlyapplicabletothis
+difficulty.
+model. Secondly,weonlyexploretheHotPotQA
+dataset, which may further limit our analysis to
+Weexplorethisfurtherthroughasmallcounter-
+onlybeapplicabletoHotPotQAorsimilardatasets.
+factualexperiment. Weareinterestedintakingan
+Futureworkcouldincorporatemultiplemodelsand
+itemwithhighpredictionerrorandslightlytweak-
+datasetstoexploreamoreeasilygeneralizabledif-
+ing it to understand how the model’s predictions
+ficulty/discriminationpredictionpipeline. Wealso
+can change with changes in the question and an-
+note that our analysis here focused on QA. How-
+swer. Weselectedanitemwith>2absoluteerror
+ever,therearemanyNLPtasksinwhichthediffi-
+to performthis experiment. The questionwe use
+cultyordiscriminationofanitemmaybeimportant.
+inthisstudyis: WhichuniversityisthisAmerican
+Ourworkherecouldnaturallyextendtothesedo-
+philosopher, theologian, and Christian apologist
+mains. Finally,automaticallypredictingthesetraits
+whosupportstheisticscience,professorat? with
+withoutrelyingonuserresponsescanengendera
+ananswerofBiolaUniversity. Thepredicteddif-
+host of creative educational applications. Future
+ficultywas−0.51. Wefoundthatsimplechanges
+workcanalsoleveragesuchpredictivemodelsto
+to the question, such as using synonyms and re-
+explore more efficient strategies for learning and
+movingunnecessaryinformation,canincreasethe
+evaluation.
+predicteddifficultyupto−0.21. However,bymod-
+ifyingtheanswer(andbynecessitythequestion)
+tobeeitheradateoryes,weachieveahigherdiffi-
+References
+cultyprediction(0.53and1.02,respectively). This
+furtherindicatesthemodel’sbiastowardsyes/no Moez Ali. 2020. PyCaret: An open source, low-code
+machinelearninglibraryinPython. PyCaretversion
+questionsbeingofahigherdifficultyregardlessof
+2.2.
+the style or topic of question being asked. Some
+ofourchangesandtheircorrespondingpredictions LucaBenedetto,AndreaCappelli,RobertoTurrin,and
+PaoloCremonesi.2020. R2DE:aNLPapproachto
+arelistedinAppendixE.
+estimatingIRTparametersofnewlygeneratedques-
+tions. In Proceedings of the Tenth International
+Conference on Learning Analytics & Knowledge,
+pages412–421.
+4Similar plots for the discrimination parameters are in-
+cludedinAppendixG Yoshua Bengio, Jérôme Louradour, Ronan Collobert,
+123
+and Jason Weston. 2009. Curriculum learning. PNatesan,RNandakumar,TMinka,andJDRubright.
+In Proceedings of the 26th Annual International 2016. Bayesian prior choice in irt estimation us-
+Conference on Machine Learning, ICML ’09, page ing mcmc and variational bayes. Front. Psychol. 7:
+41–48, New York, NY, USA. Association for Com- 1422.doi: 10.3389/fpsyg.
+putingMachinery.
+F. Pedregosa, G. Varoquaux, A. Gramfort, V. Michel,
+Jacob Devlin, Ming-Wei Chang, Kenton Lee, and B. Thirion, O. Grisel, M. Blondel, P. Prettenhofer,
+Kristina Toutanova. 2019. BERT: Pre-training of R. Weiss, V. Dubourg, J. Vanderplas, A. Passos,
+deep bidirectional transformers for language under- D.Cournapeau,M.Brucher,M.Perrot,andE.Duch-
+standing. In Proceedings of the 2019 Conference esnay. 2011. Scikit-learn: Machine learning in
+of the North American Chapter of the Association Python. Journal of Machine Learning Research,
+for Computational Linguistics: Human Language 12:2825–2830.
+Technologies, Volume 1 (Long and Short Papers),
+pages4171–4186,Minneapolis,Minnesota.Associ- Fernando Plumed, Ricardo Prudêncio, Adolfo
+ationforComputationalLinguistics. Martínez-Usó, and Jose Hernandez-Orallo. 2016.
+MakingsenseofItemResponseTheoryinmachine
+StevenMDowning.2003. Itemresponsetheory:appli-
+learning.
+cations of modern test theory in medical education.
+MedicalEducation,37(8):739–745. Caterina Primi, Kinga Morsanyi, Maria Anna Donati,
+andFrancescaChiesi.2014. ItemResponseTheory
+Eileen B. Entin and George R. Klare. 1978. Some
+analysisoftheCognitiveReflectionTest:Testingthe
+inter-relationships of readability, cloze and multi-
+psychometric properties of the original scale and a
+ple choice scores on a reading comprehension test.
+newlydeveloped8-itemversion,pages2799–2804.
+JournalofReadingBehavior,10(4):417–436.
+R. Prudêncio, J. Hernández-Orallo, and A. Martınez-
+R. Flesch. A new readability yardstick. Journal of
+Usó. 2015. Analysis of instance hardness in ma-
+appliedpsychology,32(3).
+chinelearningusingitemresponsetheory.
+R. Gunning. 1952. The Technique of Clear Writing.
+McGraw-Hill,NewYork. Lin Qiu, Yunxuan Xiao, Yanru Qu, Hao Zhou, Lei
+Li, Weinan Zhang, and Yong Yu. 2019. Dynami-
+Le An Ha, Victoria Yaneva, Peter Baldwin, and Janet cally fused graph network for multi-hop reasoning.
+Mee. 2019. Predicting the difficulty of multiple In Proceedings of the 57th Annual Meeting of the
+choice questions in a high-stakes medical exam. Association for Computational Linguistics, pages
+In Proceedings of the Fourteenth Workshop on 6140–6150,Florence,Italy.AssociationforCompu-
+Innovative Use of NLP for Building Educational tationalLinguistics.
+Applications, pages 11–20, Florence, Italy. Associ-
+ationforComputationalLinguistics. PranavRajpurkar,JianZhang,KonstantinLopyrev,and
+Percy Liang. 2016. Squad: 100,000+ questions for
+J. Kincaid, R. P. Fishburne, R. L. Rogers, and B. S. machinecomprehensionoftext.
+Chissom. 1975. Derivation of new readability for-
+mulas (automated readability index, fog count and Pedro Rodriguez, Joe Barrow, Alexander Miserlis
+flesch reading ease formula) for navy enlisted per- Hoyle, John P. Lalor, Robin Jia, and Jordan Boyd-
+sonnel. Graber. 2021. Evaluation examples are not equally
+informative: How should that change NLP leader-
+John P Lalor, Hao Wu, and Hong Yu. 2019. Learn-
+boards? InProceedingsofthe59thAnnualMeeting
+ing latent parameters without human response pat-
+of the Association for Computational Linguistics
+terns: Item response theory with artificial crowds.
+and the 11th International Joint Conference on
+InProceedingsofthe2019ConferenceonEmpirical
+Natural Language Processing (Volume 1: Long
+MethodsinNaturalLanguageProcessing.
+Papers), pages 4486–4503, Online. Association for
+ComputationalLinguistics.
+G. Harry Mc Laughlin. 1969. SMOG grading-a new
+readabilityformula. JournalofReading,12(8):639–
+F.A.SmithandR.J.Senter.1967. Automatedreadabil-
+646.
+ityindex. TechnicalReportAMRL-TR-6620.
+Frederic M. Lord. 1980. Applications of Item
+Kristina Toutanova, Dan Klein, Christopher D. Man-
+Response Theory to Practical Testing Problems.
+ning, and Yoram Singer. 2003. Feature-rich part-
+Routledge.
+of-speech tagging with a cyclic dependency net-
+Fernando Martínez-Plumed, Ricardo B.C. Prudêncio, work. In Proceedings of the 2003 Conference
+Adolfo Martínez-Usó, and José Hernández-Orallo. of the North American Chapter of the Association
+2019. Item response theory in ai: Analysing forComputationalLinguisticsonHumanLanguage
+machine learning classifiers at the instance level. Technology-Volume1,NAACL’03,page173–180,
+ArtificialIntelligence,271:18–42. USA.AssociationforComputationalLinguistics.
+GeorgeA.Miller.1995. WordNet: Alexicaldatabase Clara Vania, Phu Mon Htut, William Huang, Dhara
+forEnglish. Commun.ACM,38(11):39–41. Mungra, Richard Yuanzhe Pang, Jason Phang,
+124
+HaokunLiu,KyunghyunCho,andSamuelR.Bow-
+man.2021. Comparingtestsetswithitemresponse
+theory. InProceedingsofthe59thAnnualMeeting
+of the Association for Computational Linguistics
+and the 11th International Joint Conference on
+Natural Language Processing (Volume 1: Long
+Papers), pages 1141–1158, Online. Association for
+ComputationalLinguistics.
+Benjamin D. Wright and Mark H. Stone. 1979. Best
+testdesign. MesaPress.
+Zhilin Yang, Peng Qi, Saizheng Zhang, Yoshua Ben-
+gio, William W. Cohen, Ruslan Salakhutdinov, and
+Christopher D. Manning. 2018. HotpotQA: A
+dataset for diverse, explainable multi-hop question
+answering. InConferenceonEmpiricalMethodsin
+NaturalLanguageProcessing(EMNLP).
+125
+A Models&Training • FleschReadingEase-linearcombinationof
+words/sentenceandsyllables/word(Flesch)
+For the 1PL and 2PL prediction, we considered
+linearmodelswithL1&L2regularization,random • Flesch Kincaid Grade Level - linear combi-
+forests,gradientboostedregressors,andbayesian nation of word/sentence and syllables/word
+ridgemodels. Allhyperparameterswerekeptcon- (Kincaidetal.,1975)
+stant as the default in the sklearn package (Pe-
+• Automated Readability Index (ARI) - lin-
+dregosaetal.,2011). Weperformed10-foldcross-
+ear combination of characters/word and
+validationusingPyCaret(Ali,2020). Allmodels
+words/sentence(SmithandSenter,1967)
+weretrainedonaconsumergradeprocessor.
+• Gunning Fog index - linear combination of
+B FeatureDefinitions
+words/sentence and complex words/words.
+• Human-CentricFeatures Complex words are words with 3 syllabus
+– Lexical & Syntactic features: These (Gunning,1952)
+consist primarily of counting features:
+• Coleman-Liau - linear combination of
+ContentWords, Type-token ratio, Avg.
+letters/100 words and sentences/100
+WordLength,ComplexWords(> 3syl-
+words.(EntinandKlare,1978)
+lables). Thesearecalculatedforboththe
+answerandquestion. Afulllistofthese
+• SMOG index - calculates the grade level
+featurescanbefoundinAppendixF
+by considering the number of complex
+– Semantic-Ambiguityfeatures: Weuse
+words/sentence(Laughlin,1969)
+WordNet(Miller,1995)tocalculatethe
+ambiguity of sentences, similar to Ha D SignificanceTests
+et al. (2019). These are calculated for
+Weprovidesignificancetestsforthedifficultyand
+bothanswerandquestion.
+discriminationpredictionsintables5and6. Wesee
+– Readabilityfeatures: Weuseprevious
+that the BERT features and using all features are
+work (Kincaid et al., 1975; Gunning,
+abletobeatthebaselinewithstatisticalsignificance
+1952;Laughlin,1969)tomodeltheread-
+(ρ≤.1). NotethatwecompareusingMSErather
+abilityofaquestion/answer(e.g. Fleisch
+thanR2 asthebaselinealwayshasanR2 scoreof
+Kincaid index). These are further ex-
+0. Wealsoprovideintable7thesignificancetests
+pandedoninAppendixC.
+for using all features against BERT features. We
+• Machine-CentricFeatures
+findthatthebestperformingBERTfeaturesetdoes
+– Contextual Embeddings: We use the
+nothaveastatisticallysignificantimprovementin
+BERT-base model (Devlin et al., 2019)
+performancewhencomparedtotheallfeatureset.
+toobtainsentenceembeddingsforques-
+Inthiscase,weuseR2 astheperformancemetric.
+tionsandanswers.
+– Overlap Counts: We count overlaps Features p
+between the question and answer of n- All 0.034
+BERT(Q) 0.211
+grams up to n = 3. We also com-
+BERT(A) 0.078
+pute overlap counts between the ques- H.C.(Q) 0.551
+tion/answer and the gold and distractor H.C.(A) 0.261
+A/QCon. 0.674
+paragraphs.
+P.O.S.(Q) 0.501
+– PartofSpeechCounts: WecountPOS P.O.S.(A) 0.523
+tags for tags from the Stanford NLP
+Table5: 1PLdifficultypredictions. P-valuesforfeatureset
+tagset (Toutanova et al., 2003) for both
+performance(MSE)testedagainstthebaseline.
+thequestionandanswer.
+C ReadingDifficultyFeatures E CounterfactualResults
+Welistthereadingdifficultyfeaturesweusedinour • – Question(original): Whichuniversityis
+experimentsandanoverviewoftheircalculations. this American philosopher, theologian,
+Eachcalculationhasitsowncoefficientsthatcan and Christian apologist, who supports
+befoundintheirrespectivecitations. theisticscience,professorat?’
+126
+Features p • ContentWordCountNoStopwords
+All 0.007
+BERT(Q) 0.013
+• NounCount
+BERT(A) 0.098
+H.C.(Q) 0.165
+• NounIncidence
+H.C.(A) 0.726
+A/QCon. 0.831
+P.O.S.(Q) 0.656 • VerbCount
+P.O.S.(A) 0.174
+• VerbIncidence
+Table6:2PLdiscriminationpredictions.P-valuesforfeature
+setperformance(MSE)testedagainstthebaseline. • AdjectiveCount
+Features p • AdjectiveIncidence
+BERT(Q)(Diff.) 0.042
+BERT(Q)(Discrim.) 0.769
+• AdverbCount
+BERT(A)(Diff.) 0.278
+BERT(A)(Discrim.) 0.089
+• AdverbIncidence
+Table7: 1PLand2PLDifficultyandDiscriminationpredic-
+tions.P-valuesforBERTperformance(R2)testedagainstall • NumberCount
+featuresperformance.
+• NumberIncidence
+– Answer: "BiolaUniversity" • TypeCount
+– Pred. Diff: −0.51
+• TypeTokenRatio
+• – Question: Whichschoolisthisphiloso-
+• CommaCount
+pher and theologian who supports sci-
+ence,professorat? • CommaIncidence
+– Answer: "BiolaUniversity"
+• AverageWordLengthInSyllables
+– Pred. Diff: −0.21
+• ComplexWordCount
+• – Question: Whatwasthebirthdateofa
+professoratBiolaUniversitywhoisan • ComplexWordIncidence,
+American philosopher, theologian, and
+• AverageSentenceLength
+Christianapologist,whosupportstheis-
+ticscience?
+• NegationCount
+– Answer: March9,1948
+• NegationIncidence
+– Pred. Diff: 0.53
+• NegationInStem
+• – Question : Does Biola University have
+aprofessorwhoisanAmericanphiloso- • NPCount
+pher,theologian,andChristianapologist,
+• NPIncidence
+whosupportstheisticscience?
+– Answer: yes
+• AverageNPLength
+– Pred. Diff: 1.02
+• NPCountWithEmbedding
+F LexicalFeatures
+• NPIncidenceWithEmbedding
+Welistourfulllistoflexicalfeatures,thesefeatures
+• AverageAllNPLength,
+areasubsetofthelexicalfeaturesusedinHaetal.
+(2019).
+• PPCount
+• WordCount • PPIncidence
+• ContentWordCount • PPsPerSentenceRatio
+• ContentWordIncidence • VPCount
+127
+• VPIncidence • NotInFirst4000Incidence
+• PassiveActiveRatio • NotInFirst5000Count
+• ProportionActiveVPs • NotInFirst5000Incidence
+• ProportionPassiveVPs • Imagability
+• AgentlessPassiveCount • ImagabilityFoundOnly
+• RelativeClausesCount • ImagabilityRatio
+• RelativeClausesIncidence • Familiarity
+• ProportionRelativeClauses
+• FamiliarityFoundOnly
+• PolysemicWordCount
+• FamiliarityRatio
+• PolysemicWordIncidence
+• Concreteness
+• AverageSenseNoContentWords
+• ConcretenessFoundOnly
+• AverageSenseNoNouns
+• ConcretenessRatio
+• AverageSenseNoVerbs
+• AgeOfAcquisition
+• AverageSenseNoNonAuxiliaryVerbs
+• AgeOfAcquisitionFoundOnly
+• AverageSenseNoAdjectives
+• AgeOfAcquisitionRatio
+• AverageSenseNoAdverbs
+• MeaningfulnessColoradoFoundOnly
+• AverageNounDistanceToWNRoot
+• MeaningfulnessPavioFoundOnly
+• AverageVerbDistanceToWNRoot,
+• NoImagabilityRating
+• Average Noun And Verb Distance To WN-
+• NoFamiliarityRating
+Root
+• NoConcretenessRating
+• AnswerWordsInWordNetRatio
+• NoAgeofAcquisitionRating
+• AverageWordFrequencyAbs
+• ConnectivesCount
+• AverageWordFrequencyRel
+• ConnectivesIncidence
+• AverageWordFrequencyRank
+• AdditiveConnectivesCount
+• AverageContentFrequencyAbs
+• AverageContentFrequencyRel • AdditiveConnectivesIncidence
+• AverageContentFrequencyRank • TemporalConnectivesCount
+• NotInFirst2000Count • TemporalConnectivesIncidence
+• NotInFirst2000Incidence • CausalConnectivesCount
+• NotInFirst3000Count • CausalConnectivesIncidence
+• NotInFirst3000Incidence • ReferentialPronounCount,
+• NotInFirst4000Count • ReferentialPronounIncidence
+128
+G DiscriminationUMAPplots
+In the following section, we provide the UMAP
+reductionplotsforthediscriminationparameters
+(darkerbeingmorediscriminatory),aswellasthe
+prediction error UMAP plot for our best model
+(darkermeaninghighererror).
+Figure6:QuestionBERTUMAPReductionVSDiscrimina-
+tionvalues,train/devset
+Figure4:AnswerBERTUMAPReductionVSDiscrimination
+values,train/devset
+Figure7:QuestionBERTUMAPReductionVSDiscrimina-
+tionvalues,testset
+Figure5:AnswerBERTUMAPReductionVSDiscrimination
+values,testset
+Figure8: QuestionBERTUMAPReductionVSPredicted
+Discriminationvalues,testset
+129
+Figure9:QuestionBERTUMAPReductionVSDiscrimina-
+tionpredictionerror,testset
+130

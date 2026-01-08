@@ -1,0 +1,1951 @@
+CreativityPrism: A Holistic Benchmark for
+Large Language Model Creativity
+ZhaoyiJoeyHou BoweiAlvinZhang YiningLu
+UniversityofPittsburgh JohnsHopkinsUniversity UniversityofNotreDame
+BhimanKumarBaghel AnnelieseBrei XimingLu
+UniversityofPittsburgh UniversityofNorthCarolina UniversityofWashington
+atChapelHill
+MengJiang FaezeBrahman SnigdhaChaturvedi
+UniversityofNotreDame AllenInstitutefor UniversityofNorthCarolina
+ArtificialIntelligence atChapelHill
+Haw-ShiuanChang DanielKhashabi XiangLorraineLi
+UniversityofMassachusetts JohnsHopkinsUniversity UniversityofPittsburgh
+Amherst
+Abstract
+Creativityisoftenseenasahallmarkofhumanintelligence. Whilelargelanguage
+models(LLMs)areincreasinglyperceivedasproducingcreativetext,thereisstill
+noholisticframeworktoevaluatetheircreativityacrossdiversescenarios. Existing
+evaluationmethodsremainfragmented,withdramaticvariationacrossdomainsand
+tasks,largelyduetodifferingdefinitionsandmeasurementsofcreativity. Inspired
+by the hypothesis that creativity is not one fixed idea, we propose, CREATIVI-
+TYPRISM,anevaluationanalysisframeworkthatdecomposescreativityintothree
+dimensions: quality,novelty,anddiversity. CREATIVITYPRISMincorporatesnine
+tasks,threedomains,i.e.,divergentthinking,creativewriting,andlogicalreason-
+ing,andtwentyevaluationmetrics,whichmeasureeachdimensionintask-specific,
+uniqueways. Weevaluate17state-of-the-art(SoTA)proprietaryandopen-sourced
+LLMsonCREATIVITYPRISMandanalyzetheperformancecorrelationsamong
+different metrics and task domains. Our results reveal a notable gap between
+proprietary and open-source models. Overall, model performance tends to be
+highlycorrelatedacrosstaskswithinthesamedomainandlesssoacrossdifferent
+domains. Amongevaluationdimensions,diversityandqualitymetricsshowstrong
+correlations—modelsthatperformwellononeoftenexcelontheother—whereas
+noveltyexhibitsmuchweakercorrelationwitheither. Thesefindingssupportour
+hypothesisthatstrongperformanceinonecreativitytaskordimensiondoesnot
+necessarilygeneralizetoothers,underscoringtheneedforaholisticevaluationof
+LLMcreativity. 1.
+1 Introduction
+Creativity, the capacity to generate novel and valuable ideas or solutions [5, 15, 25], is a core
+humancognitiveability. Itappearsacrossmanydomains: craftingstorieswithsurprisingplottwists
+1Projectwebsite:https://joeyhou.github.io/CreativityPrism/
+Preprint.Underreview.
+5202
+tcO
+32
+]LC.sc[
+1v19002.0152:viXra
+[3,30],producinggroundbreakingscientificdiscoveries[26,55],solvingproblemsunderconstraints
+[42,62],orevenexpressinghumorineverydaylife [23,67]. Itsmultifacetednaturehasprompted
+extensivestudyinpsychologyandcognitivescience,witheffortstocapturecreativitythroughboth
+qualitativeandquantitativeapproaches [1,21,46,57].
+Recently,withtherapidriseofgeneral-purposeLLMs,interesthasgrowninprobingtheircreativity
+[3,8,17,42,65]. Butaswithhumancreativity,creativityspanssuchdiverseandexpansivecontexts,
+makingitdifficulttodefine,formalize,and,aboveall,measure. Moreconcretely,theevaluationof
+LLMcreativityfacestwomainchallenges: thedifficultyofscalable,automaticevaluationduetothe
+convolutednatureofcreativityandthedistinctdefinitionofcreativityacrossdifferentdomains. The
+formercallsforeffectiveautomaticevaluationmethods,asmanyexistingworks[8,61]heavilyrely
+onhumanevaluation,whichisexpensive,inaccessible,andalsotime-consuming. AsnewLLMs
+are coming out nearly every day, a scalable and accessible way of evaluating LLM creativity is
+necessary. Thelatterrequiresacomprehensiveevaluationframeworkthatincorporatesevaluation
+ofcreativityfromvariousdimensions,ascurrentworksarescatteredacrossdifferentdomainsand
+thus often target narrow or singular dimensions, failing to capture shortcomings in other equally
+important dimensions of creativity. For example, the Divergent Association Task (DAT) [4, 10]
+and the Creative Short Story Task [29] emphasize lexical diversity, yet LLMs can exploit them
+bygeneratingrandom,incoherentwords. TheCreativityIndex [40]comparesmodeloutputswith
+pre-trainingcorpusatthen-gramlevel,butrisksoverestimatingormisjudgingcreativityassigned
+toparaphrasedtextandmodelstrainedwithprivatedata. TheAlternativeUseTest(AUT) [17,48]
+solelyfocusesonunconventionalideasofusingdailyitems,overlookingthepragmaticsofthose
+solutions.Thesearejustexamplesfromthewiderangeofevaluationprotocolsforcreativity,asshown
+atthebottomofFigure.1. Suchtask-specific,adhocchoicesoftenyieldinconsistentconclusions
+aboutcreativity,obscuringtheiractualcreativecapacity. Together,thesechallengesunderscorea
+centralpoint: creativityismultidimensional,necessitatingaholisticevaluationframeworkthatcan
+scale—onethatintegratesmultipletasksandmetricstocapturequality,novelty,anddiversityina
+unifiedway.
+To this end, we propose a holistic, scalable evaluation framework for LLM creativity evaluation,
+CREATIVITYPRISM,consistingof9tasksand20metrics. Thesetasksencompassdomainssuchas
+logicalreasoning(includingmathematicalreasoningandcoding),creativewriting,anddivergent
+thinking. Due to the complexity of creativity, no single metric could represent the concept of
+creativity,soourframeworkevaluatescreativityfromthreedistinctdimensions—quality,novelty,
+anddiversity—whicharewidelyrecognizedinpriorinterdisciplinaryliteratureascoredimensions
+ofcreativity[1,25,28,56]. Wesystematicallycategorizeexistingtask-specificmetricsalongthe
+threedimensionstofacilitateacomprehensivemeasurementofmodelcreativity(Figure1). Quality
+evaluateswhetherLLMgenerationssatisfyfundamentaltaskrequirements,e.g,sentencecoherence
+andgrammaticalcorrectness. Noveltymeasurestheoriginalityofsolutionsorcontentbycomparing
+their difference from existing ones. Diversity examines the variation among generated content,
+capturingthemodel’scapacitytoproducedistinctoutputs. Ourevaluationframeworktaxonomy
+utilizesthesethreecreativitydimensionstoprovideaholisticandstructuredviewforanalysis.
+We evaluate 17 closed-sourced and open-sourced state-of-the-art (SoTA) LLMs on CREATIVI-
+TYPRISM and found a notable performance gap between proprietary and open-sourced models,
+especiallyinlogicalreasoningtasks,followedbycreativewritingtasks. Inordertobetterunderstand
+theconnectionsamongcreativitydimensionsandmetrics,wealsoconductadetailedanalysisof
+thecorrelationsamongmodels’performanceinallcreativitymetrics. Resultshaveshownthatthe
+models perform similarly in metrics from the same task or the same domain. For metrics from
+differentdomains,modelsperformsimilarlyindiversityandqualitydimensions,whileperformances
+innoveltydimensionsaremuchlesscorrelated. Webelievethisisduetoaninherentdifferencein
+hownoveltyisdefinedindifferenttasksanddomains. WebelievethatCREATIVITYPRISMlaysa
+solidfoundationformeasuringmachinecreativityandguidingthefuturedevelopmentofcreative
+models.
+2 RelatedWork
+HumanCreativity Thedefinitionofcreativityhasvariedacrossdifferentdomains. Inpsychology,
+TorranceTestofCreativeThinking(TTCT)[1]considerscreativityasacombinationoforiginality,
+flexibility,fluency,andelaboration. Inmarketing,El-MuradandWest[13],Rosengrenetal.[53]
+2
+💡
+🧠 Divergent Thinking ✍ Creative Writing 💻 Logical Reasoning
+Prompt: Please write 10 nouns in English Prompt: Please write a few paragraphs for Prompt: Find the length of longest …
+that are as irrelevant… a novel starting … Don’t use recursion
+Response: Certainly! Here are 10 single- Response: It’s been years: Bailey clearly Response:
+word, … 1. Volcano 2. Violin 3. means him no harm and has managed to be def solve():
+Democracy 4. Carpet discreet enough that Nick’s queerness isn’t test_cases = int(input())
+5. Bacteria 6. Satellite 7. Patience 8. the talk of the Chronicle…… for _ in range(test_cases):
+Apron 9. Oxygen 10. Comet …
+💎 💎 💎
+Creativity Creative
+AUT DAT TTCT Short Story TTCW CS4 NeoCoder
+Index Math
+Fluency Coherence
+Quality
+Elaboration Narrative Ending QUC Convergence@k Correctness
+Elaboration
+Novelty AUT Originality Surprise RCS L-Uniqueness Divergence@k Novelty
+Score
+Diversity DAT Flexibility N-gram Emotional Dist-N
+Score Diversity Flexibility
+Figure1: OverviewofCREATIVITYPRISM. Weevaluated17LLMsacrossninedatasetsspanning
+threedomains: divergentthinking,creativewriting,andlogicalreasoning. EachLLMwasprompted
+tocompletethetasks,andtheiroutputswereevaluatedusingtask-specificmetrics. However,these
+metricsarediverseanddifficulttointerpretholisticallyintermsofmachinecreativity. Toaddress
+this,weorganizethemetricsintothreekeydimensionsofcreativity: quality,novelty,anddiversity.
+Creativitycannotbecapturedbyasinglemeasure—itmustbeevaluatedthroughmultipledimensions.
+TaskdetailscanbefoundinTable1.
+considersadvertisementcreativityasthecombinationofusefulnessandoriginality;ontopofthat,
+Smith et al. [56] adds flexibility, fluency, elaboration, synthesis, and artistic values. In terms of
+creativityevaluation,Said-Metwalyetal.[54]summarizesmorethan100existingworksintofour
+perspectives to evaluate creativity: process, person, product, and press. Given this taxonomy of
+creativityevaluationsubjects,ourstudyonevaluatingLLMfocuseson“product”,i.e.,LLM-generated
+text,alongthreekeydimensions: novelty,diversity,andquality.
+MachineCreativity MeasurementofMachinecreativityhasbecomeincreasinglypopularwiththe
+rapiddevelopmentofLLMs. Manyrecentsurveysprovideacomprehensiveviewoftheprogress
+inmachinecreativity. Forexample,Ismayilzadaetal.[28]summarizesup-to-dateresearchinthe
+AIcommunityaboutcreativity(beforeDec. 2024),focusingonthevarietyoftasksthataredefined
+around creativity; Franceschelli and Musolesi [16] summarizes recent deep-learning methods to
+generateandevaluatecreativity,emphasizingthecomputationalmodelsinvolved. However,noneof
+themfocusedonsystematicallyevaluatingmachinecreativity. Morerecently,Luetal.[39]provides
+acomprehensiveanalysisofvariousevaluationmethodsforcreativityacrossmultipledomains,but
+theevaluationmetricsarelimitedtoonlyfour(CreativityIndex,Perplexity,SyntacticTemplates,
+andLLM-JudgeScores). Jainetal.[31]focusesonoutputhomogenizationandcoversdiversityand
+quality,insteadofallthreedimensionsinourcreativitytaxonomy. Heetal.[24]alsoproposesan
+evaluationframeworkformulti-modalcreativityevaluationamongfoundationalmodels,butthey
+focusonproposingcreativitymetricstobetterevaluatetheoutputofexisting,non-creativity-specific
+tasks, while we focus on setting up a unified task suite, including both task design and metrics,
+thatrequirescreativitytosolve. Fangetal.[14]alsointroducesamulti-modalcreativityevaluation
+benchmark, but they do not distinguish among different creativity dimensions and only conduct
+evaluationinoverallcreativity.
+The community has explored a wide range of domain-specific problems where LLMs show dif-
+ferent degrees of creativity. Examples include logical-based problem-solving [42, 62], physical
+andcommonsensereasoning[60],creativewriting[3,8,22,29,40,59],scientificdiscovery[55],
+3
+response diversity in question answering [43, 64], and human-ai collaborative creative problem
+solving[6,9,45]. However,alloftheseworksstudyLLM-generatedcontentinonespecificdomain
+andwiththeirownevaluationphilosophiesandmetrics. Ourworkaimsatprovidingaholisticand
+comprehensiveevaluationoftheLLM’soutputfortasksinavarietyofdomains. Todothis,wefind
+thecommongroundofcreativitydefinitionsacrosstaskswhilemaintainingthetask-specificmetrics
+bycategorizingthemintodifferentdimensions. Oneofthecommongroundsacrossthosestudiesis
+thattheyallconsidercreativityaseitherdivergenceoracombinationofconvergenceanddivergence.
+Inourevaluationframework,wealsoconsiderthisbalanceasoneofthekeythemesaswepropose
+ourcreativitytaxonomy,beingdivergence(noveltyanddiversity)andconvergence(quality)in§3.
+AutomaticTextEvaluation Evaluatingthecreativityofmachine-generatedtexthasbeenachal-
+lengingtask,andmuchoftheworkreliesonhumanevaluation. Butduetothecost,humanevaluation
+ishardtoscaleandrequiresalongwaittime. Toachieveevaluationscalability,researchersadapt
+various automatic text evaluation techniques [7]. There are two broad groups of such evaluation
+methods: feature-basedandgenerative-based. Theformerincludespsycholinguisticfeatures,such
+asarousal,valencescore[44],lexicalfeatures,suchaslexicaldiversity[49],andtextembedding
+distances[51,63]. ThelatterismainlyLLM-as-a-judge[37,38,58]. Recentworkhasshownthe
+promising potential of this method in human-LLM evaluation alignment [66]. In our work, we
+keeptheoriginalevaluationprocedureoftheoriginaltask,withextraverificationofhuman-LLM
+alignmentfortaskswithLLM-as-a-judge.
+3 CREATIVITYPRISM: AHolisticBenchmarkforMachineCreativity
+CREATIVITYPRISMstartsfromasimpleinsight:justasaprismrefractsasinglebeamintoaspectrum
+ofcolors,creativitysplitsintodistincthueswhenitpassesthroughadifferentcontextordomain.
+Asshownin1,CREATIVITYPRISMevaluatesanLLMbypromptingitwithtasksin divergent
+thinking, creativewriting,and logicalreasoning. Thedivergentthinkingdomainconsistsof
+establishedpsychologytasks,whichwereoriginallydesignedtoassesshumanabilityingenerating
+diverse and alternative answers to given questions [4, 10, 17, 65]. The creative writing domain
+includestasksthatrequiremodelstoproduceshortwrittenpieces—eitherthroughdirectinstructions
+to be creative or by imposing constraints that require unconventional thinking while adhering to
+specificrules[3,8,29,40]. Thelogicalreasoningdomainincludesonecodingandonemathtask
+toevaluatemodels’abilitytogeneratecreativesolutionsunderstrict,explicitreasoningconstraints.
+Ourtaskselection,whichresultsinninedatasets,isprimarilybasedontheavailabilityofautomatic
+evaluationmetricsthatarebothscalableandalignedwithhumanjudgments. Moretaskdetailsand
+inputexamplescanbefoundinTable1.
+LLMsarethentaskedtogenerateoutputsgiventhetask-specificinputandquestions. Thegenerated
+resultsareevaluatedwithvariousevaluationmetricsspanningquality,novelty,anddiversity. We
+believethatacreativeLLMshouldbeabletogenerate“novel”and“diverse”responseswithhigh
+“quality.” Followingthis,thetask-specificevaluationmetricsfromtheninetasksabovearegrouped
+intothreedimensions:quality,novelty,anddiversity.EachtaskthatweincludeinCREATIVITYPRISM
+touches at least one of those dimensions of creativity (Figure 1, more details in Appendix B).
+Note that not all tasks include all three evaluation dimensions, underscoring the importance of
+CREATIVITYPRISM-aholisticevaluationframeworkthatcapturesabroaderspectrumofcreativity
+thananysingletaskcanmeasure.
+Qualityincludesmetricsthatevaluatehowwellthegeneratedcontentfulfillsthetask’sfunctionality.
+Forexample,inNeoCoder,thequalityofgeneratedcodeismeasuredbythesuccessofexecutionand
+codingtaskcompletion;inCS4,thequalityofgeneratedstoryismeasuredbystorycoherenceand
+constraintsatisfaction.
+Noveltyincludesmetricsthatevaluatehowrarethegeneratedcontentiscomparedtoexistingor
+commonlyseencontent. Forexample,inbothNeoCoderandCreativeMath,noveltyinvolvescoming
+upwithsolutionsthataredifferentfromthereferencesolutions;inAUT,noveltyinvolvesdifferent
+useofthetoolcomparedtoordinaryuses;inCreativityIndex,noveltyismeasuredbythenormalized
+n-gramoverlapsbetweenmodel-generatedtextandthetraceablepartofthetrainingcorpus.
+DiversityincludesmetricsthatevaluatehowmuchtheLLM-generatedcontentdiffers. Forexample,
+forcreativewritingtaskssuchasCS4andCreativeShortStory, diversityscoresmeasurelexical
+4
+TaskDescription Example
+AlternativeUsesTest(AUT)[17]:Givenacom- Createalistofcreativealternativeusesforabottle.
+monlyseenobject(e.g,amug),LLMsgenerateun-
+conventionalusesofthatobject(e.g.,useamugasa
+plantpot).
+Divergent Association Task (DAT) [4, 10]: Pleasewrite10nounsinEnglishthatareasirrelevant
+LLMsgenerate10verydifferentnouns. fromeachotheraspossible,inallmeaningsanduses
+ofthewords.
+TorranceTestsofCreativeThinking(TTCT) Whatmightbetheconsequencesifhumanssuddenly
+[65]: LLMs answer psychological questions in losttheabilitytosleep?
+widely-usedhuman-facingcreativitytests.
+TorranceTestofCreativeWriting(TTCW)[8]: WriteaNewYorker-stylestorygiventheplotbelow.
+GivenasummaryofanarticlefromtheNewYorker, Makesureitisatleast2000words.Plot:Awoman
+LLMsgenerateanarticlewithasimilarstoryline. experiencesadisorientingnightinamaternityward
+wheresheencounters...;Story:
+Creative Short Story [29]: Given three key- Youneedtocomeupwithanovelanduniquestory
+words, LLMs generate a short story with at most thatusestherequiredwordsinunconventionalways
+fivesentences. orsettings.Makesureyouuseatmostfivesentences.
+Thegiventhreewords:petrol,diesel,andpump.
+Creativity Index [40]: Given a prefix from a Pleasewriteafewparagraphsforanovelstarting
+paragraphinanovel, apoem, oraspeech, LLMs withthefollowingprompt:“It’sbeenyears:Bailey
+generatecompletions. clearlymeanshimnoharmandhasmanagedto...”
+CS4 [3]:GivenabasestorygeneratedbyGPT-4, BaseStory: “Evelyn was introverted by nature...”
+LLMsgeneratearevisiontothestorytofulfillan Nowmodifytheexistingstorytoaccommodatethe
+increasingnumberofconstraintsonthestorycontent. followingconstraints:Theprotagonistsuffersphys-
+ical discomfort when overwhelmed by emotions...
+Comeupwithanewstoryin500words.
+NeoCoder [42]: Given a coding problem and You are given a sequence of integers a of length
+increasingconstraintsonavailabletechniques,LLMs 2n.Youhavetosplitthese2nintegersintonpairs...
+generatesolutioncodethatbothsolvesthecoding Don’tusehashmap,whileloop.
+problemandfulfillstheconstraints.
+CreativeMath[62]:Givenamathproblemand Question: Whatisthelargestpowerof2thatisa
+reference solutions, LLMs generate solutions that divisorof134-114? A.8B.16C.32D.64E.128;
+differfromtheprovidedones. ReferenceSolutions1:...;ReferenceSolutions2:...
+Table1: TasksinCREATIVITYPRISMwithexamples. : divergentthinking, : creativewriting,
+: logicalreasoning. SomeinputdetailsareomittedandcanbefoundinAppendixE.
+diversityofthegeneratedstories;fortheDATtask,diversityinvolvesthesemanticdifferenceamong
+theLLM-generatednouns.
+4 Experiments
+Toholisticallyevaluatemachinecreativity,weevaluated17state-of-the-artLLMsacrossninetasks,
+reportingbothtask-specificmetricsandanaggregatedcreativityscoreusingthethree-dimensional
+framework. Inthissection,wewillfirstintroducetheinferencesetups,whereLLMsareprompted
+togeneratecreativeresponsesaccordingtocorrespondingtaskrequirements(§4.1); thenwewill
+describetheevaluationprocess,includingscoreaggregation(§4.2)andhowweuseLLM-as-a-Judge
+forscalableautomaticevaluation(§4.2).
+4.1 Inference
+ForallthetasksinCREATIVITYPRISM,wecollecttheoriginaldatasets. Unlessotherwisespecified,
+allthedataprocessingisdoneaccordingtotheoriginalpapers. MoredetailsareinAppendixE.
+5
+In terms of models, we include 17 models in total, including open-source models from Mistral
+[32,33],Qwen[27,52],OLMo[20],Llama[19],andtheDeepseek[11,12]family,andproprietary
+modelsfromGPT[47],Claude[2],andtheGemini[18,35]family. Foropen-sourcedmodels,we
+usevLLM(v0.7.2)[36]torunallexperiments. Forproprietarymodels,weuseAPIaccessfromthe
+correspondingcompany. Inferencetimeparametersvarydependingonthetaskandcanbefoundin
+thecorrespondingsectionsinAppendixE.
+4.2 Evaluation
+AggregatedCreativityScoring Wechoosetoaggregatescoresfromallmetricsineachdimension
+sothatwecanhaveaholisticinsightintohowamodelperformsinaspecificdimensionofcreativity.
+Althoughthesedimensionscoresarelaterfurtheraggregated(takingasimpleaverage)intoan“overall”
+creativityscore(showninTable2),this“overall”scoreisonlytofacilitatemodelcomparison. We
+suggestfutureresearchersinterestedinusingourbenchmarkchoosefromthosethreeseparatescores
+accordingtotheirownpurpose. Thescoreaggregationfollowsthesesteps: first,everyevaluation
+metricismin-maxnormalizedtobetween0and1,whereminandmaxareminandmaxpossible
+scoresonthistask. Second,basedonthecategorizationinFigure1,quality,novelty,anddiversity
+scoresofeachLLMareaggregatedbyaveragingallthenormalizedmetricsinthecorresponding
+category. Also,toavoidtaskswithmultiplemetricsinonedimensionhavingahigherinfluenceon
+thedimensionscore(e.g.,TTCWhasthreemetricsinthequalitydimension),theaveragenormalized
+scoresfromeverysingletaskwillbeusedtocalculatedimensionscores. Moredetailsaboutscore
+aggregationcanbefoundinAppendixB.
+LLM-as-a-Judge Reliability In CREATIVITYPRISM, the evaluation of six tasks (out of nine)
+involves using LLM as part of the automatic evaluation procedure. To ensure the reliability of
+theLLM-Judge,weconductthefollowinganalysis,inwhichweuseQwen2.5-72Basthedefault
+LLM-Judge model, unless otherwise specified. For AUT, Organisciak et al. [48] has reported
+human-LLM-Judgeagreement;sinceweareusingthesamesetup(i.e.,thesamemodel,prompts,
+andconfiguration),wedirectlyreporttheoriginalpaper’shuman-LLM-Judgeagreement: Pearson
+correlationis0.7. ThesameappliestoNeoCoder[42],andthesolutiontechniquedetectionrecall
+is0.94. 2 ForTTCW[8],CS4[3],CreativeMath[62],weeitherhavehumanannotationfromthe
+originalpapersorcollectedasmallsampleofhumanannotation;wethencalculatetheagreement
+betweenthejudgmentbyannotatorsandbyLLM-Judge;forCS4,thePearsoncorrelationis0.55
+(p<0.01);forCreativeMath,LLM-Judgeaccuracyis0.78fornoveltyand0.94forcorrectness3;for
+TTCW,LLM-Judgeonlyaccuratelymakesjudgmentinfourmetrics(numbersinparenthesesare
+accuracy): NarrativeEnding(0.69),UnderstandabilityandCoherence(0.78),EmotionalFlexibility
+(0.86),WorldBuildingandSetting(0.72),soweonlyincludethosefourmetrics. 4 FortheTTCT
+[65],sincewehavenohumanannotationsatall,weusethePearsoncorrelationbetweenGPT-4.1
+(theLLM-Judgeusedbytheoriginalpaper)andQwen2.5-72BasaproxyofLLM-Judgequality
+measurement(numbersinparenthesesarePearsoncorrelationandp-value):Fluency(0.6884,p<0.01),
+Flexibility(0.6592,p<0.01),Originality(0.5152,p<0.01),Elaboration(0.5033,p<0.01). 5 More
+detailsaboutLLM-JudgereliabilitystatisticscanbefoundinAppendixD;evaluationmetricsand
+evaluationpromptsforeachtaskareprovidedinAppendixE.
+5 Results&Analysis
+5.1 Overview
+Table2summarizesmodelperformancesacrossdomainsandthreecreativitydimensions(quality,
+novelty,anddiversity),wheretheoverallscore,averagedacrossthesedimensions,servesasaproxy
+2InNeoCoder,LLM-Judgeisnotusedformakingthefinaljudgment;instead,itisusedtodetectwhich
+technique(s)areusedinagivensolutionduringevaluation.Sinceitisadetectiontask,recallisreported.
+3Wefollowtheoriginalpaperanduseamulti-LLM-Judgesetup, withGemini-2.0-Flash, GPT-4.1, and
+Claude-3.7-Sonnet
+4Becauseinstorycreativityevaluation,thehuman-to-humanagreementisalsorelativelylow,wehavea
+loweracceptancethresholdwhenweareconsideringwhatkindofhuman-LLMagreement.
+5Wearealsocollectingmorehumanannotationsforalltasksabovetofurthervalidatethealignmentbetween
+humanandLLM-Judge.Moredetailswillbeavailableintheupdatedversionofthispaper.
+6
+Creative Divergent Logical
+Model Overall Quality Novelty Diversity
+Writing Thinking Reasoning
+<10B
+Mistral-7B .522 .376 .558 .649 .446 .758 .320
+Qwen2.5-7B .490 .478 .542 .489 .356 .687 .460
+OLMo2-7B .520 .419 .479 .698 .509 .712 .257
+Llama3.1-8B .499 .409 .530 .566 .370 .729 .409
+10-40B
+OLMo2-13B .538 .433 .494 .707 .536 .713 .278
+Mistral-24B .534 .487 .578 .591 .484 .642 .473
+Qwen2.5-32B .523 .510 .491 .644 .462 .715 .358
+40-80B
+Mixtral-8x7B .525 .416 .540 .630 .410 .749 .420
+Llama3.3-70B .541 .533 .574 .562 .411 .722 .529
+Qwen2.5-72B .596 .581 .595 .674 .517 .731 .554
+Proprietary
+Claude3-Sonnet .697 .672 .663 .835 .637 .833 .612
+Claude3-Haiku .611 .542 .612 .692 .505 .782 .568
+GPT4.1 .721 .697 .692 .871 .686 .793 .682
+GPT4.1-mini .695 .681 .678 .774 .656 .778 .649
+Gemini2.0-Flash .677 .645 .654 .822 .592 .806 .655
+DeepSeek-R1 .638 .573 .600 .710 .662 .603 .643
+DeepSeek-V3 .739 .716 .720 .854 .695 .805 .726
+Table2: ModelperformanceonCREATIVITYPRISM,groupedbymodelsize. Proprietarymodelsare
+groupedtogether. Allscoresarebetween0and1,andthehigherthebetter. Overallistheaverageof
+Quality,Novelty,andDiversityscores. Therightmostthreecolumnsaretheaveragescoresacross
+tasksineachdomain. Boldarethebestresultsinthecorrespondingmodelsizegroup.
+(a) (b)
+Figure 2: (a) Performance v.s. Day since LLM release date. The line represents best fit linear
+regression. Wecanseethatmodelperformanceinalldimensionshasseenimprovementsovertime.
+(b) Performance gap between the open-sourced models and the proprietary models, averaged by
+modelsizegroup.
+foramodel’soverallcreativecapability. Aswecanseefromthetable,Qwen2.5-72BandDeepSeek-
+V3arethebest-performingmodelsamongopen-sourceandproprietarymodels. Foropen-source
+models, we can see that the model performances improve as the model size increases, while for
+proprietarymodels,wedonotknowtheexactmodelsizesandhencecannotmakeacomparison
+basedonmodelsizes.
+We have also found a performance improvement along the time axis (Figure 2a) where models
+releasedinthepasttwoyearshavebecomeincreasinglycompetitive. Sincemanyofourmetrics
+(e.g.,L-uniquenessinCreativityIndex,divergent@0inNeoCoder)wouldrewardmodelsthatcan
+generatecontentdifferentfrompriorcontent,havingthechanceoflearningthelatestcontentfrom
+7
+!Divergent ✍ Creative # Logical
+Thinking Writing Reasoning
+tnegreviD!
+evitaerC
+✍
+lacigoL
+#
+gniknihT
+gnitirW
+gninosaeR
+Figure3:Models’performancecorrelations,groupedbytaskanddomain;C-IndexreferstoCreativity
+Index;C-ShortreferstoCreativeShortStory;C-MathreferstoCreativeMath;allcorrelationsare
+Pearson’scorrelation.
+thecorpuswithlatercutoffdateswouldintuitivelymakemodelsmorecompetitive. Moredetailson
+modelreleasetimedetailscanbefoundinAppendixA.
+5.2 GapBetweenProprietaryModelsandOpenModels
+OverallPerformanceGapAsshowninTable2,thebestproprietarymodel(s)outperformtheirbest
+open-sourcecounterpartsbymorethan20%ineachdimensionofcreativityandbymorethan10%
+ineachdomain. Thisagainshowsabiggapbetweenproprietaryandopen-sourcedLLMswhenit
+comestocreativity-relatedtasks. Amorein-depthbreakdownofthisgapcanbefoundinFigure2b,
+withthegapsoftheaverageperformanceofthreeopenmodelgroups(bymodelsizes)comparedto
+thatofallproprietarymodels. Analysisofthisfigureleadstothefollowingtwofindings.
+Domain-SpecificDifferencesAmongthethreedomains,logicalreasoningandcreativewriting
+seeanotablylargergapthandivergentthinking. Wehypothesizethatthisisbecausethosetasksare
+morecloselyrelatedtoreal-worldapplicationsthandivergentthinkingtasks,andthusthecompanies
+thatdevelopedtheseproprietarymodelsemphasizealotonthosetwoaspectsofLLMtraining. In
+particular,allproprietarymodelsincludecodingandmathematicalreasoningaspartofevaluation
+intheirtechnicalreport[2,11,12,18,47];mostmodelsincludesomewritingtasks,suchasGRE
+Test[2,47],orincludecreativewritingorrole-playingdataaspartofthepost-trainingdata[11,12],
+whereasnoneofthesemodelshasputspecialemphasisindivergentthinkingtaskduringtrainingor
+evaluation.
+Dimension-Level Differences Across three creativity dimensions, quality and diversity both
+have a larger performance gap than novelty. We believe the gap in quality comes from a similar
+reasonasmentionedabove,asthequalitydimensionincludesmanyreasoning-relatedmetrics(e.g.,
+convergent@0fromNeoCoderandCorrectnessfromCreativeMath)thatwouldbenefitfromcoding
+andmathematicaltasksduringtraining. Asfordiversity,wehypothesizethatthehigh-qualityprivate
+8
+Quality Novelty Diversity
+ytisreviD
+ytilauQ
+ytlevoN
+Diversity
+Quality
+Novelty
+Figure4:Left:models’performancecorrelations,groupedbycreativitydimensions;Right:individual
+modelperformance,min-maxnormalizedbydomains. TTCTandTTCWtasksareomittedhereas
+theyhaveveryhighinter-taskcorrelation. AfullversionoftheheatmapcanbefoundinFigure6.
+orcopyrighteddatathatareaccessiblefortheproprietarymodelsenablesthemtolearnfrommore
+diversecorpora,leadingtoanadvantageinthisdimension.
+5.3 CorrelationsAmongModelPerformance
+Doesagoodperformanceinonetask/domain/dimensionimplysimilarsuperiorityinanothertask/
+domain/dimension? Toanswerthisresearchquestion,weanalyzethecorrelationbetweenmodels’
+performanceamongdifferenttasks,domains,anddimensions. Tobemorespecific,foreachmetric
+m, we form a vector s ∈ RM by stacking the normalized scores of all M models evaluated in
+m
+CREATIVITYPRISM. WethencomputethePearsoncorrelationr(s
+m
+,s
+m′
+)betweeneverypairof
+metrics(m,m′). Figure3, 4showstheresultingcorrelationmatrix,orderedbytaskanddimension,
+respectively,sothatdiagonalblockscorrespondtowithin-task/within-dimensionmetricgroups.
+Strong Within-Task Correlations We find a strong correlation in the models’ performance on
+metricscomingfromthesametask. AsshowninFigure3,thecorrelationalongthediagonalsismost
+pronounced,withsometasks,suchasTTCWandTTCT,havingcorrelationsgreaterthan0.85for
+allmetricsinthosetasks. InAddition,metricsincreativewritingtasks(inthecentralsquareofthe
+heatmap)generallyhavedecentcorrelationwithothermetricswithinthesamedomain,evenifthey
+comefromdifferenttasks. Webelievethiscomesfromahigherinherentsimilarityamongtasksfrom
+thecreativewritingdomainthantasksfromtheothertwodomains.
+Mixed Within-Dimension Correlations We also observe high correlations among metrics that
+belongtothediversityorqualitydimension,eveniftheyoriginatefromdifferenttasksordomains.
+Thisismoreobviousindiversityandqualitydimensionsandlesssoinnovelty. AsshowninFigure
+4,thecorrelationalongthediagonalishigher(i.e.,lighter)inthetopleft,whilethebottomright
+(noveltydimension)showsmixedcorrelations. Thisobservationisalsoconfirmedbytheindividual
+modelperformance(radarchartsinFigure4),wherethemodelperformancesfordiversityandquality
+aremoreorganized,whiletheonefornoveltyismorecrowded. Alloftheseshowthatthemodels’
+performanceinanyoneofthediversitymetricsisagoodindicatorfortheirperformanceinother
+diversity metrics; the same goes for quality metrics. On the other hand, metrics in the novelty
+dimensionhavelowcorrelationswithothermetricsinthesamedimension,asshowninthebottom
+rightpartofFigure4. Webelievethesefindingshighlightthediversedefinitionofnoveltyacross
+9
+tasksanddomains. Forexample,Surprises(CreativeShortStory)measuresthesemantictransitions
+acrossneighboringsentencesinstories,whereasDivergence@0(NeoCoder)measuresthecapability
+ofcomingupwithasolutiontoacodingproblemthatisdifferentfromexistingones. Givensuch
+ahugedifferenceinmetricdefinition,itisnotsurprisingthattheyevenhaveanegativecorrelation
+(-0.25)inmodelperformances.
+WeakCross-TaskorCross-DomainCorrelationsMetricsfromdifferentdomains(e.g.,divergent
+thinkingv.s. creativewritinginFigure3)andmetricsfromdifferentdimensions(e.g.,noveltyv.s.
+diversityinFigure4)allhaverelativelylowercorrelations,comparedtowithin-domainorwithin-
+dimensioncorrelations. Inotherwords,modelsperformwellinonedomainorinonedimensionof
+creativitydonotnecessarilyperformsimilarlywellinanotherdomainordimension.Thisconfirmsthe
+necessityofincludingadiversesetoftasksandcreativitydimensionstoachieveaholisticevaluation
+ofcreativity.
+6 Conclusion
+WeproposedCREATIVITYPRISM,acomprehensiveevaluationframeworkdesignedtocapturethe
+diversenatureofmachinecreativitybytasksinthreedistinctdomainsandtwentymetricscovering
+quality,novelty,anddiversity. Weevaluate17LLMsfrommultiplefamiliesofproprietaryandopen-
+sourcedLLMsandexplorewaysofamplifyingcreativity. WithCREATIVITYPRISM,LLMdevelopers
+willbeabletosystematicallyevaluateLLMcreativityandidentifythedirectionofoptimizationfor
+morecreativeLLMs.
+LimitationOneclearlimitationisthatourbenchmarkislimitedtoEnglish. Creativitycanbehighly
+cultural,suchasreferencestoculturalhistoryorconvention. Therefore,cautioniswarrantedwhen
+generalizingourresultstocreativityinotherlanguages.
+AnotherpotentiallimitationistheinherentbiasbroughtbyLLMsduringevaluation. InCREATIVI-
+TYPRISM,sixoutofninetasksrequireLLM-as-a-judgeforevaluation,whichinevitablycontainsthe
+biasesfromevaluatorLLMs. Thisposespotentialsocietalrisksifevaluationresultsofthisbenchmark
+isusedtoinformthedevelopmentofconsumer-facinggenerativeAItools. Weadviseresearcheror
+developerscarefullyexanimatepotentialbiasesbeforemakingchoicesinpracticalapplications.
+Wealsoacknowledgethelimitationsofonlyworkingwithtextdatainsteadofmultimodaldata. There
+aretwomainreasons: 1)therearemanymorecreativetasksintextmodalitythaninmultimodal
+thathavereliableautomaticevaluationmethods. 2)Wewanttobuildtheevaluationframeworkfirst
+beforeweexpandtoothermodalities. Givenawell-definedevaluationframework,wecaneasily
+extendourbenchmarksfurthertoincludemultimodalsettingsinfuturework.
+Thereisalsoalimitationinhowwellourtaskselectionworks: weselectourtasksandmetricsbased
+ontheavailabilityofscalable, automaticevaluationmethods, whichmeanswenaturallyexclude
+high-conceptmetrics,especiallyfornovelty,whereachievinggenuinenoveltyrequiresreasoningata
+veryhighlevel. However,sincethisisalsochallengingforhumans(e.g.,judgingnoveltyinartwork
+requiresyearsoftraining),webelieveitisreasonablethatnoautomaticevaluationisavailablefor
+thosehigh-conceptmetrics. Giventhat,weadvisetheresearcherswhoareusingourbenchmarktobe
+awareofthislimitationbeforehand.
+Last but not least, we did not conduct any fine-tuning experiments due to limited computational
+resources. Fine-tuning existing LLMs on a subset of CREATIVITYPRISM and evaluating their
+performancerepresentsanexcitingdirectionforfuturework. Alsoduetolimitationofresources,we
+onlyincludetasksthatalreadyhaveautomaticevaluationmethods. Manycreativitytasksrequire
+humanevaluation(e.g.,[61])andfutureworkshouldstudyeffectivewaystoautomaticallyevaluating
+them.
+References
+[1] AhmedMAbdullaAlabbasi,SueHyeonPaek,DaehyunKim,andBonnieCramond. Whatdo
+educatorsneedtoknowaboutthetorrancetestsofcreativethinking: Acomprehensivereview.
+Front.Psychol.,13:1000385,October2022.
+[2] Anthropic. Claude 3 model family, 2024. URL https://www.anthropic.com/news/
+claude-3-family. Accessed: 2025-04-30.
+10
+[3] AnirudhAtmakuru,JatinNainani,RohithSiddharthaReddyBheemreddy,AnirudhLakkaraju,
+ZonghaiYao,HamedZamani,andHaw-ShiuanChang. CS4: Measuringthecreativityoflarge
+languagemodelsautomaticallybycontrollingthenumberofstory-writingconstraints. arXiv
+[cs.CL],October2024.
+[4] AntoineBellemare-Pepin,FrançoisLespinasse,PhilippThölke,YannHarel,KoryMathewson,
+Jay A Olson, Yoshua Bengio, and Karim Jerbi. Divergent creativity in humans and large
+languagemodels. arXiv[cs.CL],May2024.
+[5] MargaretABoden,editor. DimensionsofCreativity. TheMITPress,June1994.
+[6] LéonardBoussioux,JacquelineNLane,MiaomiaoZhang,VladimirJacimovic,andKarimR
+Lakhani. The crowdless future? generative ai and creative problem-solving. Organization
+Science,35(5):1589–1607,2024.
+[7] AsliCelikyilmaz,ElizabethClark,andJianfengGao. Evaluationoftextgeneration: Asurvey.
+arXiv[cs.CL],June2020.
+[8] TuhinChakrabarty,PhilippeLaban,DivyanshAgarwal,SmarandaMuresan,andChien-Sheng
+Wu. Artorartifice? largelanguagemodelsandthefalsepromiseofcreativity. InProceedings
+oftheCHIConferenceonHumanFactorsinComputingSystems,volume70,pages1–34,New
+York,NY,USA,May2024.ACM.
+[9] TuhinChakrabarty,VishakhPadmakumar,FaezeBrahman,andSmarandaMuresan. Creativity
+supportintheageoflargelanguagemodels: Anempiricalstudyinvolvingprofessionalwriters.
+InCreativityandCognition,NewYork,NY,USA,June2024.ACM.
+[10] HonghuaChenandNaiDing. Probingthe“creativity”oflargelanguagemodels: Canmodels
+producedivergentsemanticassociation? InThe2023ConferenceonEmpiricalMethodsin
+NaturalLanguageProcessing,December2023.
+[11] DeepSeek-AI, Aixin Liu, Bei Feng, Bing Xue, Bingxuan Wang, Bochao Wu, Chengda Lu,
+ChenggangZhao,ChengqiDeng,ChenyuZhang,ChongRuan,DamaiDai,DayaGuo,Dejian
+Yang,DeliChen,DongjieJi,ErhangLi,FangyunLin,FucongDai,FuliLuo,GuangboHao,
+GuantingChen,GuoweiLi,HZhang,HanBao,HanweiXu,HaochengWang,HaoweiZhang,
+HonghuiDing,HuajianXin,HuazuoGao,HuiLi,HuiQu,JLCai,JianLiang,JianzhongGuo,
+JiaqiNi,JiashiLi,JiaweiWang,JinChen,JingchangChen,JingyangYuan,JunjieQiu,Junlong
+Li,JunxiaoSong,KaiDong,KaiHu,KaigeGao,KangGuan,KexinHuang,KuaiYu,Lean
+Wang,LecongZhang,LeiXu,LeyiXia,LiangZhao,LitongWang,LiyueZhang,MengLi,
+MiaojunWang,MingchuanZhang,MinghuaZhang,MinghuiTang,MingmingLi,NingTian,
+PanpanHuang,PeiyiWang,PengZhang,QianchengWang,QihaoZhu,QinyuChen,Qiushi
+Du,RJChen,RLJin,RuiqiGe,RuisongZhang,RuizhePan,RunjiWang,RunxinXu,Ruoyu
+Zhang,RuyiChen, SSLi,ShanghaoLu,ShangyanZhou,ShanhuangChen,ShaoqingWu,
+ShengfengYe,ShengfengYe,ShirongMa,ShiyuWang,ShuangZhou,ShuipingYu,Shunfeng
+Zhou,ShutingPan,TWang,TaoYun,TianPei,TianyuSun,WLXiao,WangdingZeng,Wanjia
+Zhao,WeiAn,WenLiu,WenfengLiang,WenjunGao,WenqinYu,WentaoZhang,XQLi,
+XiangyueJin,XianzuWang,XiaoBi,XiaodongLiu,XiaohanWang,XiaojinShen,Xiaokang
+Chen, Xiaokang Zhang, Xiaosha Chen, Xiaotao Nie, Xiaowen Sun, Xiaoxiang Wang, Xin
+Cheng,XinLiu,XinXie,XingchaoLiu,XingkaiYu,XinnanSong,XinxiaShan,XinyiZhou,
+XinyuYang,XinyuanLi,XuechengSu,XuhengLin,YKLi,YQWang,YXWei,YXZhu,
+Yang Zhang, Yanhong Xu, Yanhong Xu, Yanping Huang, Yao Li, Yao Zhao, Yaofeng Sun,
+YaohuiLi,YaohuiWang,YiYu,YiZheng,YichaoZhang,YifanShi,YiliangXiong,YingHe,
+YingTang,YishiPiao,YisongWang,YixuanTan,YiyangMa,YiyuanLiu,YongqiangGuo,
+YuWu,YuanOu,YuchenZhu,YuduanWang,YueGong,YuhengZou,YujiaHe,YukunZha,
+Yunfan Xiong, Yunxian Ma, Yuting Yan, Yuxiang Luo, Yuxiang You, Yuxuan Liu, Yuyang
+Zhou,ZFWu,ZZRen,ZehuiRen,ZhangliSha,ZheFu,ZheanXu,ZhenHuang,ZhenZhang,
+ZhendaXie,ZhengyanZhang,ZhewenHao,ZhibinGou,ZhichengMa,ZhigangYan,Zhihong
+Shao,ZhipengXu,ZhiyuWu,ZhongyuZhang,ZhuoshuLi,ZihuiGu,ZijiaZhu,ZijunLiu,
+ZilinLi,ZiweiXie,ZiyangSong,ZiyiGao,andZizhengPan. DeepSeek-V3technicalreport.
+arXiv[cs.CL],December2024.
+11
+[12] DeepSeek-AI,DayaGuo,DejianYang,HaoweiZhang,JunxiaoSong,RuoyuZhang,Runxin
+Xu,QihaoZhu,ShirongMa,PeiyiWang,XiaoBi,XiaokangZhang,XingkaiYu,YuWu,ZF
+Wu,ZhibinGou,ZhihongShao,ZhuoshuLi,ZiyiGao,AixinLiu,BingXue,BingxuanWang,
+BochaoWu,BeiFeng,ChengdaLu,ChenggangZhao,ChengqiDeng,ChenyuZhang,Chong
+Ruan, Damai Dai, Deli Chen, Dongjie Ji, Erhang Li, Fangyun Lin, Fucong Dai, Fuli Luo,
+GuangboHao,GuantingChen,GuoweiLi,HZhang,HanBao,HanweiXu,HaochengWang,
+HonghuiDing,HuajianXin,HuazuoGao,HuiQu,HuiLi,JianzhongGuo,JiashiLi,Jiawei
+Wang,JingchangChen,JingyangYuan,JunjieQiu,JunlongLi,JLCai,JiaqiNi,JianLiang,Jin
+Chen,KaiDong,KaiHu,KaigeGao,KangGuan,KexinHuang,KuaiYu,LeanWang,Lecong
+Zhang,LiangZhao,LitongWang,LiyueZhang,LeiXu,LeyiXia,MingchuanZhang,Minghua
+Zhang, Minghui Tang, Meng Li, Miaojun Wang, Mingming Li, Ning Tian, Panpan Huang,
+PengZhang, QianchengWang, QinyuChen, QiushiDu, RuiqiGe, RuisongZhang, Ruizhe
+Pan,RunjiWang,RJChen,RLJin,RuyiChen,ShanghaoLu,ShangyanZhou,Shanhuang
+Chen,ShengfengYe,ShiyuWang,ShuipingYu,ShunfengZhou,ShutingPan,SSLi,Shuang
+Zhou,ShaoqingWu,ShengfengYe,TaoYun,TianPei,TianyuSun,TWang,WangdingZeng,
+WanjiaZhao,WenLiu,WenfengLiang,WenjunGao,WenqinYu,WentaoZhang,WLXiao,
+WeiAn,XiaodongLiu,XiaohanWang,XiaokangChen,XiaotaoNie,XinCheng,XinLiu,Xin
+Xie,XingchaoLiu,XinyuYang,XinyuanLi,XuechengSu,XuhengLin,XQLi,Xiangyue
+Jin,XiaojinShen,XiaoshaChen,XiaowenSun,XiaoxiangWang,XinnanSong,XinyiZhou,
+XianzuWang,XinxiaShan,YKLi,YQWang,YXWei,YangZhang,YanhongXu,YaoLi,
+YaoZhao,YaofengSun,YaohuiWang,YiYu,YichaoZhang,YifanShi,YiliangXiong,Ying
+He, YishiPiao, YisongWang, YixuanTan, YiyangMa, YiyuanLiu, YongqiangGuo, Yuan
+Ou,YuduanWang,YueGong,YuhengZou,YujiaHe,YunfanXiong,YuxiangLuo,Yuxiang
+You,YuxuanLiu,YuyangZhou,YXZhu,YanhongXu,YanpingHuang,YaohuiLi,YiZheng,
+YuchenZhu,YunxianMa,YingTang,YukunZha,YutingYan,ZZRen,ZehuiRen,Zhangli
+Sha,ZheFu,ZheanXu,ZhendaXie,ZhengyanZhang,ZhewenHao,ZhichengMa,Zhigang
+Yan,ZhiyuWu,ZihuiGu,ZijiaZhu,ZijunLiu,ZilinLi,ZiweiXie,ZiyangSong,Zizheng
+Pan,ZhenHuang,ZhipengXu,ZhongyuZhang,andZhenZhang. DeepSeek-R1: Incentivizing
+reasoningcapabilityinLLMsviareinforcementlearning. arXiv[cs.CL],January2025.
+[13] JaafarEl-MuradandDouglasCWest. Thedefinitionandmeasurementofcreativity: Whatdo
+weknow? J.Advert.Res.,44(02):188–201,June2004.
+[14] XinyuFang,ZhijianChen,KaiLan,LixinMa,ShengyuanDing,YingjiLiang,XiangyuZhao,
+Farong Wen, Zicheng Zhang, Guofeng Zhang, Haodong Duan, Kai Chen, and Dahua Lin.
+Creation-MMBench: Assessingcontext-awarecreativeintelligenceinMLLM. arXiv[cs.CV],
+March2025.
+[15] RonaldAFinke,ThomasBWard,andStevenMSmith. CreativeCognition: Theory,research,
+andapplications. TheMITPress,October1992.
+[16] GiorgioFranceschelliandMircoMusolesi. Creativityandmachinelearning: Asurvey. ACM
+Comput. Surv., 56(11), June 2024. ISSN 0360-0300. doi: 10.1145/3664595. URL https:
+//doi.org/10.1145/3664595.
+[17] FabricioGoes,MarcoVolpe,PiotrSawicki,MarekGrzes,andJacobWatson. PushingGPT’s
+creativitytoitslimits: Alternativeusesandtorrancetests. In14thInternationalConferenceon
+ComputationalCreativity2023,2023.
+[18] GoogleDeepMind. Gemini1.5and2.0: Next-genmultimodalmodels,2024. URLhttps:
+//deepmind.google/technologies/gemini/. Accessed: 2025-04-30.
+[19] AaronGrattafiori,AbhimanyuDubey,AbhinavJauhri,AbhinavPandey,AbhishekKadian,Ah-
+madAl-Dahle,AieshaLetman,AkhilMathur,AlanSchelten,AlexVaughan,AmyYang,Angela
+Fan,AnirudhGoyal,AnthonyHartshorn,AoboYang,ArchiMitra,ArchieSravankumar,Artem
+Korenev,ArthurHinsvark,ArunRao,AstonZhang,AurelienRodriguez,AustenGregerson,
+AvaSpataru,BaptisteRoziere,BethanyBiron,BinhTang,BobbieChern,CharlotteCaucheteux,
+ChayaNayak,ChloeBi,ChrisMarra,ChrisMcConnell,ChristianKeller,ChristopheTouret,
+ChunyangWu,CorinneWong,CristianCantonFerrer,CyrusNikolaidis,DamienAllonsius,
+DanielSong,DaniellePintz,DannyLivshits,DannyWyatt,DavidEsiobu,DhruvChoudhary,
+DhruvMahajan,DiegoGarcia-Olano,DiegoPerino,DieuwkeHupkes,EgorLakomkin,Ehab
+12
+AlBadawy, Elina Lobanova, Emily Dinan, Eric Michael Smith, Filip Radenovic, Francisco
+Guzmán,FrankZhang,GabrielSynnaeve,GabrielleLee,GeorgiaLewisAnderson,Govind
+Thattai,GraemeNail,GregoireMialon,GuanPang,GuillemCucurell,HaileyNguyen,Hannah
+Korevaar,HuXu,HugoTouvron,IliyanZarov,ImanolArrietaIbarra,IsabelKloumann,Ishan
+Misra,IvanEvtimov,JackZhang,JadeCopet,JaewonLee,JanGeffert,JanaVranes,Jason
+Park,JayMahadeokar,JeetShah,JelmervanderLinde,JenniferBillock,JennyHong,Jenya
+Lee,JeremyFu,JianfengChi,JianyuHuang,JiawenLiu,JieWang,JiecaoYu,JoannaBitton,
+JoeSpisak,JongsooPark,JosephRocca,JoshuaJohnstun,JoshuaSaxe,JuntengJia,KalyanVa-
+suden Alwala, Karthik Prasad, Kartikeya Upasani, Kate Plawiak, Ke Li, Kenneth Heafield,
+KevinStone,KhalidEl-Arini,KrithikaIyer,KshitizMalik,KuenleyChiu,KunalBhalla,Kushal
+Lakhotia, Lauren Rantala-Yeary, Laurens van der Maaten, Lawrence Chen, Liang Tan, Liz
+Jenkins, Louis Martin, Lovish Madaan, Lubo Malo, Lukas Blecher, Lukas Landzaat, Luke
+de Oliveira, Madeline Muzzi, Mahesh Pasupuleti, Mannat Singh, Manohar Paluri, Marcin
+Kardas,MariaTsimpoukelli,MathewOldham,MathieuRita,MayaPavlova,MelanieKam-
+badur,MikeLewis,MinSi,MiteshKumarSingh,MonaHassan,NamanGoyal,NarjesTorabi,
+Nikolay Bashlykov, Nikolay Bogoychev, Niladri Chatterji, Ning Zhang, Olivier Duchenne,
+OnurÇelebi,PatrickAlrassy,PengchuanZhang,PengweiLi,PetarVasic,PeterWeng,Prajjwal
+Bhargava,PratikDubal,PraveenKrishnan,PunitSinghKoura,PuxinXu,QingHe,Qingxiao
+Dong,RagavanSrinivasan,RajGanapathy,RamonCalderer,RicardoSilveiraCabral,Robert
+Stojnic,RobertaRaileanu,RohanMaheswari,RohitGirdhar,RohitPatel,RomainSauvestre,
+RonniePolidoro,RoshanSumbaly,RossTaylor,RuanSilva,RuiHou,RuiWang,SagharHos-
+seini,SahanaChennabasappa,SanjaySingh,SeanBell,SeohyunSoniaKim,SergeyEdunov,
+ShaoliangNie,SharanNarang,SharathRaparthy,ShengShen,ShengyeWan,ShrutiBhosale,
+ShunZhang,SimonVandenhende,SoumyaBatra,SpencerWhitman,StenSootla,Stephane
+Collot,SuchinGururangan,SydneyBorodinsky,TamarHerman,TaraFowler,TarekSheasha,
+ThomasGeorgiou,ThomasScialom,TobiasSpeckbacher,TodorMihaylov,TongXiao,Ujjwal
+Karn,VedanujGoswami,VibhorGupta,VigneshRamanathan,ViktorKerkez,VincentGonguet,
+VirginieDo,VishVogeti,VítorAlbiero,VladanPetrovic,WeiweiChu,WenhanXiong,Wenyin
+Fu,WhitneyMeers,XavierMartinet,XiaodongWang,XiaofangWang,XiaoqingEllenTan,
+XideXia,XinfengXie,XuchaoJia,XueweiWang,YaelleGoldschlag,YasheshGaur,Yasmine
+Babaei,YiWen,YiwenSong,YuchenZhang,YueLi,YuningMao,ZacharieDelpierreCoudert,
+ZhengYan,ZhengxingChen,ZoePapakipos,AadityaSingh,AayushiSrivastava,AbhaJain,
+Adam Kelsey, Adam Shajnfeld, Adithya Gangidi, Adolfo Victoria, Ahuva Goldstand, Ajay
+Menon,AjaySharma,AlexBoesenberg,AlexeiBaevski,AllieFeinstein,AmandaKallet,Amit
+Sangani,AmosTeo,AnamYunus,AndreiLupu,AndresAlvarado,AndrewCaples,AndrewGu,
+AndrewHo,AndrewPoulton,AndrewRyan,AnkitRamchandani,AnnieDong,AnnieFranco,
+Anuj Goyal, Aparajita Saraf, Arkabandhu Chowdhury, Ashley Gabriel, Ashwin Bharambe,
+AssafEisenman,AzadehYazdan,BeauJames,BenMaurer,BenjaminLeonhardi,BernieHuang,
+BethLoyd,BetoDePaola,BhargaviParanjape,BingLiu,BoWu,BoyuNi,BradenHancock,
+BramWasti, BrandonSpence, BraniStojkovic, BrianGamido, BrittMontalvo, CarlParker,
+CarlyBurton,CatalinaMejia,CeLiu,ChanghanWang,ChangkyuKim,ChaoZhou,Chester
+Hu,Ching-HsiangChu,ChrisCai,ChrisTindal,ChristophFeichtenhofer,CynthiaGao,Damon
+Civin,DanaBeaty,DanielKreymer,DanielLi,DavidAdkins,DavidXu,DavideTestuggine,
+Delia David, Devi Parikh, Diana Liskovich, Didem Foss, Dingkang Wang, Duc Le, Dustin
+Holland,EdwardDowling,EissaJamil,ElaineMontgomery,EleonoraPresani,EmilyHahn,
+EmilyWood,Eric-TuanLe,ErikBrinkman,EstebanArcaute,EvanDunbar,EvanSmothers,
+FeiSun,FelixKreuk,FengTian,FilipposKokkinos,FiratOzgenel,FrancescoCaggioni,Frank
+Kanayet,FrankSeide,GabrielaMedinaFlorez,GabriellaSchwarz,GadaBadeer,GeorgiaSwee,
+GilHalpern,GrantHerman,GrigorySizov,Guangyi,Zhang,GunaLakshminarayanan,Hakan
+Inan,HamidShojanazeri,HanZou,HannahWang,HanwenZha,HarounHabeeb,Harrison
+Rudolph, HelenSuk, HenryAspegren, HunterGoldman, HongyuanZhan, IbrahimDamlaj,
+IgorMolybog,IgorTufanov,IliasLeontiadis,Irina-ElenaVeliche,ItaiGat,JakeWeissman,
+JamesGeboski,JamesKohli,JaniceLam,JaphetAsher,Jean-BaptisteGaya,JeffMarcus,Jeff
+Tang,JenniferChan,JennyZhen,JeremyReizenstein,JeremyTeboul,JessicaZhong,JianJin,
+JingyiYang,JoeCummings,JonCarvill,JonShepard,JonathanMcPhie,JonathanTorres,Josh
+Ginsburg,JunjieWang,KaiWu,KamHouU,KaranSaxena,KartikayKhandelwal,Katayoun
+Zand,KathyMatosich,KaushikVeeraraghavan,KellyMichelena,KeqianLi,KiranJagadeesh,
+KunHuang,KunalChawla,KyleHuang,LailinChen,LakshyaGarg,LavenderA,Leandro
+Silva,LeeBell,LeiZhang,LiangpengGuo,LichengYu,LironMoshkovich,LucaWehrstedt,
+13
+MadianKhabsa,ManavAvalani,ManishBhatt,MartynasMankus,MatanHasson,Matthew
+Lennie,MatthiasReso,MaximGroshev,MaximNaumov,MayaLathi,MeghanKeneally,Miao
+Liu,MichaelLSeltzer,MichalValko,MichelleRestrepo,MihirPatel,MikVyatskov,Mikayel
+Samvelyan, Mike Clark, Mike Macey, Mike Wang, Miquel Jubert Hermoso, Mo Metanat,
+MohammadRastegari,MunishBansal,NandhiniSanthanam,NataschaParks,NatashaWhite,
+NavyataBawa,NayanSinghal,NickEgebo,NicolasUsunier,NikhilMehta,NikolayPavlovich
+Laptev,NingDong,NormanCheng,OlegChernoguz,OliviaHart,OmkarSalpekar,Ozlem
+Kalinli,ParkinKent,ParthParekh,PaulSaab,PavanBalaji,PedroRittner,PhilipBontrager,
+PierreRoux,PiotrDollar,PolinaZvyagina,PrashantRatanchandani,PritishYuvraj,QianLiang,
+RachadAlao,RachelRodriguez,RafiAyub,RaghothamMurthy,RaghuNayani,RahulMitra,
+RangaprabhuParthasarathy,RaymondLi,RebekkahHogan,RobinBattey,RockyWang,Russ
+Howes,RutyRinott,SachinMehta,SachinSiby,SaiJayeshBondu,SamyakDatta,SaraChugh,
+SaraHunt,SargunDhillon, SashaSidorov, SatadruPan, SaurabhMahajan,SaurabhVerma,
+SeijiYamamoto,SharadhRamaswamy,ShaunLindsay,ShaunLindsay,ShengFeng,Shenghao
+Lin, Shengxin Cindy Zha, Shishir Patil, Shiva Shankar, Shuqiang Zhang, Shuqiang Zhang,
+Sinong Wang, Sneha Agarwal, Soji Sajuyigbe, Soumith Chintala, Stephanie Max, Stephen
+Chen,SteveKehoe,SteveSatterfield,SudarshanGovindaprasad,SumitGupta,SummerDeng,
+SungminCho,SunnyVirk,SurajSubramanian,SyChoudhury,SydneyGoldman,TalRemez,
+TamarGlaser,TamaraBest,ThiloKoehler,ThomasRobinson,TianheLi,TianjunZhang,Tim
+Matthews,TimothyChou,TzookShaked,VarunVontimitta,VictoriaAjayi,VictoriaMontanez,
+VijaiMohan,VinaySatishKumar,VishalMangla,VladIonescu,VladPoenaru,VladTiberiu
+Mihailescu,VladimirIvanov,WeiLi,WenchenWang,WenwenJiang,WesBouaziz,WillCon-
+stable,XiaochengTang,XiaojianWu,XiaolanWang,XilunWu,XinboGao,YanivKleinman,
+YanjunChen,YeHu,YeJia,YeQi,YendaLi,YilinZhang,YingZhang,YossiAdi,Youngjin
+Nam,Yu,Wang,YuZhao,YuchenHao,YundiQian,YunluLi,YuziHe,ZachRait,Zachary
+DeVito,ZefRosnbrick,ZhaoduoWen,ZhenyuYang,ZhiweiZhao,andZhiyuMa. Thellama3
+herdofmodels. arXiv[cs.AI],July2024.
+[20] DirkGroeneveld,IzBeltagy,EvanWalsh,AkshitaBhagia,RodneyKinney,OyvindTafjord,
+AnanyaJha,HamishIvison,IanMagnusson,YizhongWang,ShaneArora,DavidAtkinson,
+RussellAuthur,KhyathiChandu,ArmanCohan,JenniferDumas,YanaiElazar,YulingGu,Jack
+Hessel,TusharKhot,WilliamMerrill,JacobMorrison,NiklasMuennighoff,AakankshaNaik,
+CrystalNam, MatthewPeters, ValentinaPyatkin, AbhilashaRavichander, DustinSchwenk,
+SaurabhShah,WilliamSmith,EmmaStrubell,NishantSubramani,MitchellWortsman,Pradeep
+Dasigi, Nathan Lambert, Kyle Richardson, Luke Zettlemoyer, Jesse Dodge, Kyle Lo, Luca
+Soldaini,NoahSmith,andHannanehHajishirzi. OLMo: Acceleratingthescienceoflanguage
+models. In Proceedings of the 62nd Annual Meeting of the Association for Computational
+Linguistics (Volume 1: Long Papers), pages 15789–15809, Stroudsburg, PA, USA, 2024.
+AssociationforComputationalLinguistics.
+[21] JPGuilford,PaulRChristensen,PhilipRMerrifield,andRobertCWilson. Alternateuses,
+June2012. Titleofthepublicationassociatedwiththisdataset: PsycTESTSDataset.
+[22] Carlos Gómez-Rodríguez and Paul Williams. A confederacy of models: A comprehensive
+evaluation of LLMs on creative writing. In Findings of the Association for Computational
+Linguistics: EMNLP 2023, pages 14504–14528, Stroudsburg, PA, USA, December 2023.
+AssociationforComputationalLinguistics.
+[23] HeHe,NanyunPeng,andPercyLiang. Pungenerationwithsurprise. InJillBurstein,Christy
+Doran,andThamarSolorio,editors,Proceedingsofthe2019ConferenceoftheNorthAmerican
+Chapter of the Association for Computational Linguistics: Human Language Technologies,
+Volume 1 (Long and Short Papers), pages 1734–1744, Minneapolis, Minnesota, June 2019.
+AssociationforComputationalLinguistics.
+[24] ZicongHe,BoxuanZhang,WeihaoLiu,RuixiangTang,andLuCheng. Whatshapesacreative
+machinemind? comprehensivelybenchmarkingcreativityinfoundationmodels. arXiv[cs.AI],
+October2025.
+[25] K.J.HolyoakandR.G.Morrison. TheCambridgeHandbookofThinkingandReasoning. Cam-
+bridgeHandbooksinPsychology.CambridgeUniversityPress,2005. ISBN9780521824170.
+URLhttps://books.google.com/books?id=znbkHaC8QeMC.
+14
+[26] WeipingHuandPhilipAdey. Ascientificcreativitytestforsecondaryschoolstudents. Int.J.
+Sci.Educ.,24(4):389–403,April2002.
+[27] BinyuanHui,JianYang,ZeyuCui,JiaxiYang,DayihengLiu,LeiZhang,TianyuLiu,Jiajun
+Zhang,BowenYu,KemingLu,KaiDang,YangFan,YichangZhang,AnYang,RuiMen,Fei
+Huang,BoZheng,YiboMiao,ShanghaoranQuan,YunlongFeng,XingzhangRen,Xuancheng
+Ren,JingrenZhou,andJunyangLin.Qwen2.5-codertechnicalreport.arXiv[cs.CL],September
+2024.
+[28] MeteIsmayilzada,DebjitPaul,AntoineBosselut,andLonnekevanderPlas. Creativityinai:
+Progressesandchallenges,2024. URLhttps://arxiv.org/abs/2410.17218.
+[29] MeteIsmayilzada,ClaireStevenson,andLonnekevanderPlas. Evaluatingcreativeshortstory
+generationinhumansandlargelanguagemodels. arXiv[cs.CL],November2024.
+[30] MeteIsmayilzada,ClaireStevenson,andLonnekevanderPlas. Evaluatingcreativeshortstory
+generationinhumansandlargelanguagemodels. arXivpreprintarXiv:2411.02316,2024.
+[31] ShomikJain,JackLanchantin,MaximilianNickel,KarenUllrich,AshiaWilson,andJamelle
+Watson-Daniels. LLMoutputhomogenizationistaskdependent. arXiv[cs.CL],September
+2025.
+[32] Albert Q Jiang, Alexandre Sablayrolles, Arthur Mensch, Chris Bamford, Devendra Singh
+Chaplot,DiegodelasCasas,FlorianBressand,GiannaLengyel,GuillaumeLample,Lucile
+Saulnier,LélioRenardLavaud,Marie-AnneLachaux,PierreStock,TevenLeScao,Thibaut
+Lavril,ThomasWang,TimothéeLacroix,andWilliamElSayed. Mistral7B. arXiv[cs.CL],
+October2023.
+[33] AlbertQJiang,AlexandreSablayrolles,AntoineRoux,ArthurMensch,BlancheSavary,Chris
+Bamford,DevendraSinghChaplot,DiegodelasCasas,EmmaBouHanna,FlorianBressand,
+GiannaLengyel,GuillaumeBour,GuillaumeLample,LélioRenardLavaud,LucileSaulnier,
+Marie-AnneLachaux,PierreStock,SandeepSubramanian,SophiaYang,SzymonAntoniak,
+Teven Le Scao, Théophile Gervet, Thibaut Lavril, Thomas Wang, Timothée Lacroix, and
+WilliamElSayed. Mixtralofexperts. arXiv[cs.LG],January2024.
+[34] JaehunJung,FaezeBrahman,andYejinChoi. Trustorescalate: LLMjudgeswithprovable
+guarantees for human agreement. In The Thirteenth International Conference on Learning
+Representations,October2024.
+[35] KorayKavukcuoglu. Gemini2.5: OurmostintelligentAImodel. https://blog.google/
+technology/google-deepmind/gemini-model-thinking-updates-march-2025/,
+March2025. Accessed: 2025-4-30.
+[36] Woosuk Kwon, Zhuohan Li, Siyuan Zhuang, Ying Sheng, Lianmin Zheng, Cody Hao Yu,
+JosephE.Gonzalez,HaoZhang,andIonStoica. Efficientmemorymanagementforlargelan-
+guagemodelservingwithpagedattention. InProceedingsoftheACMSIGOPS29thSymposium
+onOperatingSystemsPrinciples,2023.
+[37] DaweiLi,BohanJiang,LiangjieHuang,AlimohammadBeigi,ChengshuaiZhao,ZhenTan,
+AmritaBhattacharjee,YuxuanJiang,CanyuChen,TianhaoWu,KaiShu,LuCheng,andHuan
+Liu. Fromgenerationtojudgment: Opportunitiesandchallengesofllm-as-a-judge,2024.
+[38] HaitaoLi,QianDong,JunjieChen,HuixueSu,YujiaZhou,QingyaoAi,ZiyiYe,andYiqun
+Liu. Llms-as-judges: Acomprehensivesurveyonllm-basedevaluationmethods,2024. URL
+https://arxiv.org/abs/2412.05579.
+[39] Li-ChunLu,MiriLiu,Pin-ChunLu,YufeiTian,Shao-HuaSun,andNanyunPeng. Rethinking
+creativityevaluation:Acriticalanalysisofexistingcreativityevaluations.arXiv[cs.CL],August
+2025.
+[40] XimingLu,MelanieSclar,SkylerHallinan,NiloofarMireshghallah,JiachengLiu,Seungju
+Han, Allyson Ettinger, Liwei Jiang, Khyathi Chandu, Nouha Dziri, and Yejin Choi. AI
+as humanity’s salieri: Quantifying linguistic creativity of language models via systematic
+attributionofmachinetextagainstwebtext. InTheThirteenthInternationalConferenceon
+LearningRepresentations,October2024.
+15
+[41] XimingLu,MelanieSclar,SkylerHallinan,NiloofarMireshghallah,JiachengLiu,Seungju
+Han,AllysonEttinger,LiweiJiang,KhyathiRaghaviChandu,NouhaDziri,andYejinChoi.
+Aiashumanity’ssalieri: Quantifyinglinguisticcreativityoflanguagemodelsviasystematic
+attribution of machine text against web text. CoRR, abs/2410.04265, 2024. URL https:
+//doi.org/10.48550/arXiv.2410.04265.
+[42] YiningLu,DixuanWang,TianjianLi,DongweiJiang,SanjeevKhudanpur,MengJiang,and
+DanielKhashabi.Benchmarkinglanguagemodelcreativity:Acasestudyoncodegeneration.In
+Proceedingsofthe2025ConferenceoftheNationsoftheAmericasChapteroftheAssociation
+forComputationalLinguistics: HumanLanguageTechnologies(Volume1: LongPapers),pages
+2776–2794,2025.
+[43] AidanMcLaughlin,AnujaUppuluri,andJamesCampbell. AidanBench: Evaluatingnovelidea
+generationonopen-endedquestions. InLanguageGamification-NeurIPS2024Workshop,
+December2024.
+[44] SaifMohammad. Obtainingreliablehumanratingsofvalence, arousal, anddominancefor
+20,000 english words. In Proceedings of the 56th Annual Meeting of the Association for
+ComputationalLinguistics(Volume1: LongPapers),pages174–184,Stroudsburg,PA,USA,
+2018.AssociationforComputationalLinguistics.
+[45] JacquelineN.Lane,LeonardBoussioux,CharlesAyoubi,YingHaoChen,CamilaLin,Rebecca
+Spens, Pooja Wagh, and Pei-Hsin Wang. The narrative AI advantage? a field experiment
+ongenerativeAI-augmentedevaluationsofearly-stageinnovations. SocialScienceResearch
+Network,August2024.
+[46] JayAOlson,JohnnyNahas,DenisChmoulevitch,SimonJCropper,andMargaretEWebb.Nam-
+ingunrelatedwordspredictscreativity. Proc.Natl.Acad.Sci.U.S.A.,118(25):e2022340118,
+June2021.
+[47] OpenAI. Gpt-4technicalreport,2024. URLhttps://openai.com/research/gpt-4. Ac-
+cessed: 2025-04-30.
+[48] PeterOrganisciak,SelcukAcar,DenisDumas,andKellyBerthiaume.Beyondsemanticdistance:
+Automatedscoringofdivergentthinkinggreatlyimproveswithlargelanguagemodels. Think.
+SkillsCreat.,49(101356):101356,September2023.
+[49] VishakhPadmakumarandHeHe. Doeswritingwithlanguagemodelsreducecontentdiversity?
+InTheTwelfthInternationalConferenceonLearningRepresentations,October2023.
+[50] JeffreyPennington,RichardSocher,andChristopherManning. GloVe: Globalvectorsforword
+representation. InAlessandroMoschitti,BoPang,andWalterDaelemans,editors,Proceedings
+of the 2014 Conference on Empirical Methods in Natural Language Processing (EMNLP),
+pages1532–1543,Doha,Qatar,October2014.AssociationforComputationalLinguistics. doi:
+10.3115/v1/D14-1162. URLhttps://aclanthology.org/D14-1162/.
+[51] JeffreyPennington,RichardSocher,andChristopherDManning. GloVe: Globalvectorsfor
+wordrepresentation. InProceedingsofthe2014ConferenceonEmpiricalMethodsinNatural
+LanguageProcessing(EMNLP),pages1532–1543,October2014.
+[52] Qwen, An Yang, Baosong Yang, Beichen Zhang, Binyuan Hui, Bo Zheng, Bowen Yu,
+Chengyuan Li, Dayiheng Liu, Fei Huang, Haoran Wei, Huan Lin, Jian Yang, Jianhong Tu,
+JianweiZhang,JianxinYang,JiaxiYang,JingrenZhou,JunyangLin,KaiDang,KemingLu,
+KeqinBao,KexinYang,LeYu,MeiLi,MingfengXue,PeiZhang,QinZhu,RuiMen,Runji
+Lin,TianhaoLi,TianyiTang,TingyuXia,XingzhangRen,XuanchengRen,YangFan,Yang
+Su,YichangZhang,YuWan,YuqiongLiu,ZeyuCui,ZhenruZhang,andZihanQiu. Qwen2.5
+technicalreport. arXiv[cs.CL],December2024.
+[53] SaraRosengren,MartinEisend,ScottKoslow,andMicaelDahlen. Ameta-analysisofwhen
+andhowadvertisingcreativityworks. J.Mark.,84(6):39–56,November2020.
+[54] Sameh Said-Metwaly, Wim Van den Noortgate, and Eva Kyndt. Approaches to measuring
+creativity: Asystematicliteraturereview. Creativity.Theories–Research-Applications,4(2):
+238–275,December2017.
+16
+[55] ChengleiSi,DiyiYang,andTatsunoriHashimoto. CanLLMsgeneratenovelresearchideas?
+alarge-scalehumanstudywith100+NLPresearchers. InTheThirteenthInternationalCon-
+ferenceonLearningRepresentations,2025. URLhttps://openreview.net/forum?id=
+M23dTGWCZy.
+[56] RobertESmith,ScottBMacKenzie,XiaojingYang,LauraMBuchholz,andWilliamKDarley.
+Modelingthedeterminantsandeffectsofcreativityinadvertising. Mark.Sci.,26(6):819–833,
+November2007.
+[57] RSternbergandTLubart. Aninvestmenttheoryofcreativityanditsdevelopment. Human
+Development,34(1):1–31,June1991.
+[58] SijunTan,SiyuanZhuang,KyleMontgomery,WilliamYuanTang,AlejandroCuadron,Chen-
+guangWang,RalucaPopa,andIonStoica.Judgebench:AbenchmarkforevaluatingLLM-based
+judges. InTheThirteenthInternationalConferenceonLearningRepresentations,2025. URL
+https://openreview.net/forum?id=G0dksFayVq.
+[59] YufeiTian,TenghaoHuang,MiriLiu,DerekJiang,AlexanderSpangher,MuhaoChen,Jonathan
+May,andNanyunPeng. Arelargelanguagemodelscapableofgeneratinghuman-levelnar-
+ratives? InProceedingsofthe2024ConferenceonEmpiricalMethodsinNaturalLanguage
+Processing, pages 17659–17681, Stroudsburg, PA, USA, November 2024. Association for
+ComputationalLinguistics.
+[60] YufeiTian,AbhilashaRavichander,LianhuiQin,RonanLeBras,RajaMarjieh,NanyunPeng,
+YejinChoi, ThomasGriffiths, andFaezeBrahman. MacGyver: Arelargelanguagemodels
+creative problem solvers? In Proceedings of the 2024 Conference of the North American
+Chapter of the Association for Computational Linguistics: Human Language Technologies
+(Volume 1: Long Papers), pages 5303–5324, Stroudsburg, PA, USA, 2024. Association for
+ComputationalLinguistics.
+[61] Yufei Tian, Abhilasha Ravichander, Lianhui Qin, Ronan Le Bras, Raja Marjieh, Nanyun
+Peng, Yejin Choi, Thomas Griffiths, and Faeze Brahman. MacGyver: Are large language
+modelscreativeproblemsolvers? InKevinDuh,HelenaGomez,andStevenBethard,editors,
+Proceedings of the 2024 Conference of the North American Chapter of the Association for
+ComputationalLinguistics: HumanLanguageTechnologies(Volume1: LongPapers),pages
+5303–5324,MexicoCity,Mexico,June2024.AssociationforComputationalLinguistics. doi:
+10.18653/v1/2024.naacl-long.297. URLhttps://aclanthology.org/2024.naacl-long.
+297/.
+[62] JunyiYe,JingyiGu,XinyunZhao,WenpengYin,andGuilingWang. Assessingthecreativity
+ofLLMsinproposingnovelsolutionstomathematicalproblems. arXiv[cs.CL],October2024.
+[63] TianyiZhang,VarshaKishore,FelixWu,KilianQWeinberger,andYoavArtzi. BERTScore:
+EvaluatingtextgenerationwithBERT. arXiv[cs.CL],April2019.
+[64] YimingZhang,HarshitaDiddee,SusanHolm,HanchenLiu,XinyueLiu,VinaySamuel,Barry
+Wang,andDaphneIppolito. NoveltyBench: Evaluatingcreativityanddiversityinlanguage
+models. InSecondConferenceonLanguageModeling,August2025.
+[65] YunpuZhao,RuiZhang,WenyiLi,andLingLi. Assessingandunderstandingcreativityin
+largelanguagemodels. Mach.Intell.Res.,pages1–20,April2025.
+[66] LianminZheng,Wei-LinChiang,YingSheng,SiyuanZhuang,ZhanghaoWu,YonghaoZhuang,
+ZiLin,ZhuohanLi,DachengLi,EricPXing,HaoZhang,JosephEGonzalez,andIonStoica.
+JudgingLLM-as-a-judgewithMT-benchandchatbotarena. arXiv[cs.CL],June2023.
+[67] ShanshanZhong,ZhongzhanHuang,ShanghuaGao,WushaoWen,LiangLin,MarinkaZitnik,
+andPanZhou. Let’sthinkoutsidethebox: Exploringleap-of-thoughtinlargelanguagemodels
+withcreativehumorgeneration.In2024IEEE/CVFConferenceonComputerVisionandPattern
+Recognition(CVPR),pages13246–13257,2024. doi: 10.1109/CVPR52733.2024.01258.
+17
+A ModelDetails
+ShortName ExactModelName Size Family ReleaseTime
+Mistral-7B Mistral-7B-Instruct-v0.3 7B Mistral 05/2024
+Qwen2.5-7B Qwen2.5-7B-Instruct 7B Qwen 09/2024
+OLMo2-7B OLMo-2-1124-7B-Instruct 7B Olmo 11/2024
+Llama3.1-8B Llama-3.1-8B-Instruct 8B Llama 07/2024
+OLMo2-13B OLMo-2-1124-13B-Instruct 13B Olmo 11/2024
+OLMo2-13B-SFT OLMo-2-1124-13B-SFT 13B Olmo 11/2024
+OLMo2-13B-DPO OLMo-2-1124-13B-DPO 13B Olmo 11/2024
+Mistral-24B Mistral-Small-24B-Instruct-2501 24B Mistral 01/2025
+Qwen2.5-32B Qwen2.5-32B-Instruct 32B Qwen 09/2024
+Mixtral-8x7B Mixtral-8x7B-Instruct-v0.1 56B Mistral 12/2023
+Llama3.3-70B Llama-3.3-70B-Instruct 70B Llama 12/2024
+Qwen2.5-72B Qwen2.5-72B-Instruct 72B Qwen 09/2024
+Claude3-Sonnet claude-3-7-sonnet-20250219 - Claude 02/2025
+Claude3-Haiku claude-3-5-haiku-20241022 - Claude 11/2024
+GPT4.1 gpt-4.1-2025-04-14 - GPT 04/2025
+GPT4.1-mini gpt-4.1-mini-2025-04-14 - GPT 04/2025
+Gemini2.0-Flash gemini-2.0-flash - Gemini 12/2024
+Deepseek-R1 deepseek-reasoner - Gemini 01/2025
+Deepseek-V3 deepseek-chat - Gemini 12/2024
+Table3: Listofmodelsincludedinourbenchmark.
+DeepseekModels ForDeepseekmodels,wealsouseAPIduetoconstraintsincomputeresources.
+APIconsole: https://platform.deepseek.com.
+18
+B BenchmarkDesign
+B.1 DatasetSizes
+Task Count Note
+AUT 105(tooluse) 21toolswith5roundsofpromptingpertool
+DAT 100(round) Noinputdata,weprompteachLLM100rounds
+TTCT 700(question) 7tasks(100questions/task)
+TTCW 12(storyprompt) Onestoryperstoryprompt
+CreativeShortStory 10(keywordtuple) Onestoryperkeywordtuple
+CreativityIndex 300(documentsample) 100samplesfrom3subsets:book,poem,andspeech
+CS4 250(story) 50basestorieswith5constraintconfigurationsperstory
+NeoCoder 198(question) Onesolutionpercodingquestion
+CreativeMath 400(question) Onesolutionpermathquestion
+Table4: DatasetsizeofCREATIVITYPRISM. Moredetailscanbefoundinthecorrespondingsection
+ofAppendixE.
+B.2 Metrics
+Table5showsacompletelisttometricsinCREATIVITYPRISM,groupedbytasks. Moredetailsabout
+howeachmetriciscalculatedcanbefoundincorrespondingsectionsinAppendixE.
+Task Quality Novelty Diversity
+AUT - AUTScore -
+DAT - - DATScore
+TTCT Fluency,Elaboration Originality Flexibility
+TTCW Coherence,Ending,Elaboration - EmotionalFlexibility
+CreativeShortStory - NoveltyScore,Surprise-ness N-gramDiversity
+CreativityIndex - L-uniqueness -
+CS4 QUC RCS Dist-N
+NeoCoder Convergence@k Divergent@k -
+CreativeMath CorrectnessRatio NoveltyRatio -
+Table5: Evaluationmetricsin CREATIVITYPRISM; “-”meansthistask(row)doesnothaveany
+metricinthecorrespondingcreativitydimension.
+B.3 ScoreCalculations
+ScoreNormalization ForeverymodeliandeveryrawmetricscoreS (metricmlivesonsome
+i,m
+knownscale[min ,max ]),thenormalizedscoreSˆ isgivenby:
+m m i,m
+S −min
+Sˆ = i,m m
+i,m max −min
+m m
+S −1 S −1
+Forexample,AUTscoreisona1–5Likertscale: Sˆ = i,AUT = i,AUT .
+i,AUT 5−1 4
+AggregateNormalizedScores First,wecollapsemultiplemetricswithinthesametask: iftaskt
+hasasetM ofk metricsinagivendimension(e.g. threequalitymetricsforTTCW),averagethem
+t t
+first:
+S¯ = 1 (cid:88) Sˆ
+i,t k i,m
+t
+m∈Mt
+19
+Then,wetakeaverageacrossalltasksthatbelongtothatdimension. LetT ,T ,T bethetask
+qual nov div
+setsforquality,novelty,diversity. Fordimensiond∈{qual,nov,div}:
+D(d) = 1 (cid:88) S¯
+i |T | i,t
+d
+t∈Td
+Inthisway,weendupwiththreenumberspermodel: D(qual), D(nov), D(div). Wecanalsocalculate
+i i i
+aggregatedscoreforcreativewriting,divergentthinking,andlogicalreasoning(asshowninTable2).
+Overall creativity score Just take the straight mean of those three dimension scores to stay
+balanced:
+D(qual)+D(nov)+D(div)
+C = i i i
+i 3
+C PerformanceSummaries
+Figure5: Overallperformances.
+20
+Figure6: Inter-metriccorrelation(groupedbycreativitytaxonomy).
+21
+Figure7: Performanceonqualitydimension
+Figure8: Performanceonnoveltydimension
+Figure9: Performanceondiversitydimension
+22
+Figure10: Performanceoncreativewritingtasks
+Figure11: Performanceondivergentthinkingtasks
+Figure12: Performanceonlogicalreasoningdimension
+23
+D LLM-as-a-JudgeDesignDetails
+SixoutofninetasksinourbenchmarkrequireLLM-Judgeforoneormoremetrics. WeuseQwen2.5-
+72BasthedefaultLLM-Judgemodel,unlessotherwisespecified. ThechoiceofQwen2.5-72Bis
+basedonapilotstudyonTTCWandAUTtask,whereQwen2.5-72Bistheopen-sourceLLM(within
+ourcomputebudget)thatcorrelatesthebesteitherwithhumansorwithclosed-sourceLLMsthatare
+typicallyusedasLLM-Judge(asdetailedbelow).
+ToensurethereliabilityoftheLLM-Judge,wefollowthefollowingprinciples: iftheoriginalpaper
+hasreportedhuman-LLM-Judgeagreementandweareusingthesamesetup,wedirectlyreportthe
+originalpaper’sagreement;otherwise,ifwehavehumanannotation,we’llcalculatetheagreement
+betweenhumanjudgmentandLLM-Judge’sjudgement;ifnohumanannotationisavailable,we’ll
+calculatetheagreementbetweenjudgementbyQwenandbytheclosed-sourceLLM-Judgeinthe
+originalpaper.
+Forbinarylabels(TTCW,CreativeMath),agreementreferstoLLM-Judgepredictionaccuracy(with
+humanannotationsbeinggroundtruth);forlikert-scalelabels(AUT,CS4,TTCT),agreementrefers
+toPearsoncorrelationbetweenhumanandLLM-Judge;theremainingtask,NeoCoder,isaspecial
+casebecausetheLLM-Judgeisnotdirectlyusedtogeneratethemetricandwewillprovidemore
+detailbelow. Herewereportthecorrelationstatistics:
+TTCW:Theoriginalauthors[8]provide36machine-generatedstorieswith3creative-writingexpert
+annotations(binary)foreach. WecheckthequalitybycalculatingagreementoftheQwen2.5-72B
+judgement(binary)andexpertmajorityvoteresults(alsobinary). Herearethemetrics(numbers
+in parentheses are accuracy): Narrative Ending (0.69), Understandability and Coherence (0.78),
+EmotionalFlexibility(0.86),WorldBuildingandSetting(0.72). Notethat,becauseinstorycreativity
+evaluation, the human-to-human agreement is also relatively low, we have a lower acceptance
+thresholdwhenweareconsideringwhatkindofhuman-LLMagreementlevelisacceptable.
+Creative Math: we annotated the output solution of 50 questions and observed 0.78 agreement
+innoveltyjudgement(fromamulti-LLMmajorityvotingjudgethatconsistsofGemini-2.0-Flash,
+GPT-4.1,andClaude-3.7-Sonnet)and0.94agreementforcorrectness(fromtheClaude-3.7-Sonnet
+forcorrectnessjudgement). Agreementhereisthesameasaccuracyifweconsiderhumanannotation
+asgroundtruth.
+AUT:Previouswork[48]specificallystudiedthefeasibilityofusingfew-shotLLM-Judgetoevaluate
+AUT output. They have shown GPT-4 (it was published before GPT-4o) with 20-shot examples
+canachieve0.70Pearsoncorrelationbetweenhumans’judgement. Weusethesamepromptand
+the human annotation released by that paper as the 20-shot examples. We then use GPT-4o and
+Qwen2.5-72BtojudgethesamesetofAUToutputs(generatedbyLlama3.3-70B).Thescoresfrom
+GPT-4oandQwen2.5-72BhaveaPearson’srof0.597(p<0.01).
+CS4: Theoriginalauthors[3]collectedandprovidedtheannotation(fromAmazonMechanicalTurk)
+of15machine-generatedstories,with2annotationsperstory. Forconstraintsatisfactionmetric,the
+PearsoncorrelationbetweenQwen2.5-72Bjudgmentsandhumanjudgmentsis0.55(p<0.01).
+TTCT:Theoriginalpaper[65]usedGPT-4asevaluatorandconductedasmallhumanv.s.LLM-Judge
+alignmentstudy. However,thatdataisnotaccessibletous,sowestudiedthePearsonCorrelation
+betweenQwen2.5-72BandGPT-4.1judgementandherearethenumberswegot: Fluency: 0.6884
+(p<0.01),Flexibility: 0.6592(p<0.01),Originality: 0.5152(p<0.01),Elaboration: 0.5033(p<0.01)
+NeoCoder: LLM-Judgeisnotdirectlymakinganevaluationoutputinthistask. Instead, GPT-4
+isusedtodetectifageneratedsolutionisnovelornotwhencomparedtoapre-collectedhuman
+programmer solution. To ensure high quality of LLM-Judge, the original paper [42] uses recall
+insteadofaccuracytoevaluatehuman-LLMagreement(becausewewanttoensureallthe“non-novel”
+techniquesaredetected). GPT-4achieves0.94recallindetectingnon-novelsolutions.
+24
+E TaskDetails
+E.1 TorranceTestofCreativeWriting(TTCW)
+E.1.1 Dataset
+Thedatasetconsistsof12NewYorkerStories’plots,i.e.,GPT-4generatedsummaryoftheoriginal
+story6.
+E.1.2 Example
+Plot
+A woman experiences a disorienting night in a maternity ward where she encounters other
+similarlydisorientednewmothers,leadingtoanuncannymix-upwheresheleavesthehospital
+withababythatsherealizesisnotherown,yetacceptsthesituationwithaninexplicablesense
+ofhappiness.
+InferencePrompt
+WriteaNewYorker-stylestorygiventheplotbelow.Makesureitisatleast{word_count}words.
+Directlystartwiththestory,donotsaythingslike"Here’sthestory[...]"Plot: {plot}Story:
+E.1.3 ExperimentConfigurations
+• Temperature: 0.75
+• MaxToken: 4096
+• Top-p: 1
+E.1.4 EvaluationMetrics
+Asmentionedin§3,weuseasubsetofquestionsfromtheoriginalpaperwhereourfew-shotLLM-
+as-a-judgeevaluatorachievesacorrelationofmorethan0.2betweenthehumanmajorityvoteand
+theevaluatormodel’sjudgments(NarrativeEnding: 0.29;UnderstandabilityandCoherence: 0.45;
+EmotionalFlexibility: 0.21;WorldBuildingandSetting: 0.40). Thesamplesizeis36,whichare
+GPT4, GPT3.5, and Claude-generated stories, with human expert annotation, all released by the
+originalpaper. Eachquestioncorrespondstoonemetric. Sincetheevaluationisbinaryforeach
+generatedstory,wecalculatetheproportionofgeneratedstoriesthatpasseachquestionasthefinal
+evaluationmetric(e.g.,if3outof12storiespassthe“UnderstandabilityandCoherence”question,
+thenthe“UnderstandabilityandCoherence”metricis0.25).
+Weusetwo-shotexamples(onepositiveandonenegative)intheevaluationprompt,aspreviouswork
+showsaddingfew-shotexamplesimproveshuman-llmalignments[34].
+6https://github.com/salesforce/creativity_eval
+25
+EvaluationPrompt
+Youaregivenacreativeshortstory. Readitcarefully. Youarethengivensomebackground
+about specific aspects of creative writing, a binary (Yes/No) question, and sample stories
+withexpert-annotatedanswerstothesamequestion. Yourobjectiveistousethebackground
+informationandsamplestoriestoanswerthequestionaboutthestory. Provideyouranswerin
+theformatof"**Answer**: [Yes/No]". Youcanoptionallythenprovideashortexplanationfor
+youranswer.
+==========
+Question:
+{full_prompt}
+Examples:
+==========
+Story: {story}
+Answer: {answer}
+Explanations: {exp}
+==========
+Story: {story}
+Answer: {answer}
+Explanations: {exp}
+==========
+Story: {story}
+Basedonthequestionandexamplesabove,answerthequestion(Provideyouranswerinthe
+formatof"**Answer**: [Yes/No]". Youcanoptionallythenprovideashortexplanationfor
+youranswer). Makesureyouareextraharshonthedecision(mostanswersshouldbenegative).
+Answer:
+E.1.5 ModelPerformances
+Model Narrative Understandability Emotional WorldBuilding
+Ending andCoherence Flexibility andSetting
+Mistral-7B 0.17 0.08 0.00 0.00
+Qwen2.5-7B 0.08 0.17 0.00 0.00
+OLMo2-7B 0.75 0.25 0.25 0.00
+Llama3.1-8B 0.00 0.08 0.00 0.00
+OLMo2-13B 0.67 0.33 0.25 0.08
+Mistral-24B 0.25 0.25 0.00 0.00
+Qwen2.5-32B 0.00 0.17 0.00 0.00
+Mixtral-8x7B 0.17 0.08 0.08 0.08
+Llama3.3-70B 0.00 0.33 0.00 0.00
+Qwen2.5-72B 0.42 0.50 0.50 0.17
+Claude3-Sonnet 0.75 0.58 0.58 0.42
+Claude3-Opus 0.33 0.08 0.08 0.08
+GPT-4.1 1.00 0.67 0.83 0.50
+GPT-4.1-mini 1.00 0.83 0.42 0.50
+Gemini2.0-Flash 0.83 0.42 0.42 0.17
+DeepSeek-R1 0.83 0.50 0.50 0.58
+DeepSeek-V3 0.83 0.50 0.50 0.50
+Table6: ModelperformanceonTTCW.
+26
+E.2 CS4
+E.2.1 Dataset
+Thereare50basestories. Duringinferencetime,foreachbasestory,5constraintsareapplied;to
+calculatedn-gramdiversity,wealsogenerate3foreachconstraints. Therefore,foreachgivenLLM,
+750storieswillbegenerated7.
+E.2.2 Examples
+BaseStory
+Evelyn was introverted by nature, more comfortable in her world of books than in social
+groups. Whatmadeherexceptional,however,washerlatent,uncontrollableintuition. Shewas
+highlyempathic,experiencingothers’emotionsasvividlyastheydidthemselves-sometimes,
+evenmoreso. Theholidayseason,withitsswirlofemotionalundercurrents,wasparticularly
+overwhelmingforEvelyn,andshedreadediteveryyear.
+ItwastheeveofChristmas. Evelyn’ssmallapartmentwasburstingattheseamswithrelatives
+she hadn’t seen in years. Overwhelmed, she nestled into the corner of the couch, trying to
+makeherselfinvisibleamidtheseaofforcedcheerfulness. Anycloseinteractionwasasensory
+overloadforher;shewouldinvoluntarilyfeeltheirfeelings,readtheirdeepestthoughts,and
+becomeemotionallyexhausted.
+Suddenly,thedoorswungopen,andhercousin,Ava,strodein,atorrentofunspokenemotions
+swirlingaroundher. AshiverofapprehensionranthroughEvelynasshebracedherself,feeling
+thechurningstormofemotionsthroughherintuitiveempathy.
+Avalookedaroundtheroom,hereyeswideningslightlyasshenoticedEvelyn. EvelynfeltAva’s
+shockwaveofanxietyandself-consciousnesshitherlikeapunch. Despitebeingathermost
+vulnerable,Avahiditwellunderaveneerofsocialamiability. ButEvelyn’sperceptiveintuition
+sawrightthroughit.
+Takingadeepbreathtosteelherself,shewanderedovertoAva. Silentconversations,almost
+piercingintheirintensity,flowedbetweenthem.
+""Areyouokay,Ava?""Sheaskedfinally,breakingthemomentarysilence.
+Ava’seyeswidenedinsurprise. ""Yeah,I’mfine. Whydoyouask?""Buttheunderlyingtremor
+inhervoicebetrayedtheturmoilwithin.
+Evelynquietlyadmitted,""Icantellsomething’swrong.""
+Avalookedathersilentlyforalongmomentbeforesighingdeeply. ""Ilostmyjob,Evelyn,""
+sheconfessed,hervoicebarelyaboveawhisper. Evelynfeltatidalwaveofdespaircrashover
+herasAva’sfeelingsofhopelessnesswashedoverher.
+Evelyn, despite her own burden of emotions, took Ava’s hands in hers, feeling the tremors
+runningthroughthem. ""You’renotalone,Ava. Youhaveus. We’llsortitouttogether,""she
+said,hervoicereassuring.
+Armedwithherintuitiveempathy,EvelynspenttherestoftheeveningcomfortingAva,helping
+hercopewiththerawwoundofjobloss. Itwasanextremelychallenging,emotionallydraining
+journey,butEvelyn’sheartswelledatAva’sgradualshiftfromdespairtoaglimmerofhopeand
+optimism.
+That Christmas Eve, Evelyn, buoyed by Ava’s resilience, also discovered something about
+herself. Hergift,whichshehaddespisedforitsuncontrollability,forhowmuchitdrainedand
+overwhelmedher,couldalsobeusedtohelpothers.
+AsEvelynwatchedAvaslowlyblendbackintothecrowd,herheartlighter,theusualcacophony
+ofemotionsshefearedseemedmorebearable. Evelynrealizedthatwhileherintrovertednature
+andintuitiveempathymadetheholidayseasonchallenging,itwasalsowhatmadeheressential
+inprocessingtheseunspokenstruggles. Itwasn’tacurse;itwashergift. Agiftofunderstanding,
+ofempathy,ofbeingthesilentpillarofcomfortinaroomfilledwithconcealedemotions.
+7https://github.com/anirudhlakkaraju/cs4_benchmark
+27
+Constraints
+1. Theprotagonistsuffersphysicaldiscomfortwhenoverwhelmedbyemotions(nausea,shaking,
+etc.).
+2. Theprotagonistischallengedbytheneedtoengageinpublicspaces.
+3. Theunknownmanrealizesthattheprotagonistcanfeelhisemotions.
+4. Theprotagonistuseshumorandsarcasmtocopewithhersituation.
+5. Theprotagonistisanintrovertedcharacter.
+6. Thestoryincludescommunicationviatextmessages.
+7. ThestoryissetinaStarbucksonMichiganinChicagoaweekbeforeChristmas.
+8. Theprotagonistisforcedtoleavethemeetingearlyduetobeingoverwhelmed.
+9. Theprotagonistdesirestoliveamorenormallifedespiteheruniquecondition.
+10. Thereexistsavaccineforcontrollingintuition.
+11. Theprotagonistdevisescopingstrategiesformanagingheranxietyinpublicplaces. 12.
+Scientistsareworkingtofindasolutionforpeoplewhocan’tusetheintuitionvaccine.
+13. Tiffanythreatenstheprotagonisttomeether.
+14. Theprotagoniststruggleswithacceptinghercondition.
+15. TheprotagonistmustgrapplewiththethoughtsandfeelingsofothersintheStarbucks.
+16. Themanlooksattheprotagonistwithbothdesireandlove.
+17. Theprotagonistisphysicallyattractive.
+18. Theprotagonistencountersanunknownmanwhocausespowerfulanduniqueemotions.
+19. Thereissocietaldisapprovalforpeoplewhoseintuitionscannotbecontrolledbythevaccine.
+20. Theprotagonisthasaheightenedintuition.
+21. Thesettingshouldbeduringtheholidayseason.
+22. Theprotagonistfeelsotherpeople’semotionsintensely.
+23. Theprotagoniststruggleswithdisentanglingtheirownfeelingsfromothers’.
+24. Tiffanyisastrong-willedandpassionatecharacter.
+25. Theprotagonistreluctantlyacknowledgesbeingapotential""crazycatlady"".
+26. Pubertyisidentifiedasacriticaltimefortheprogressionofintuitionpowers.
+27. TheprotagonistandTiffanywereinseparableuntilpuberty.
+28. Theprotagonisthaspersonalhygieneitems(travelmouthwash)handy.
+29. Thisvaccinedoesn‚Äôtworkfortheprotagonistduetoageneticmutation.
+30. Charactersshouldexpressunderstandingoftheprotagonist’spredicament.
+31. Theprotagonist’sprimarymeansofcommunicationwiththeoutsideworldisthroughthe
+internet.
+32. Theprotagonistexperiencesother’sthoughtsasiftheyweretheirown.
+33. Theprotagonist‚Äôsintuitionisuncontrollableduetoageneticmutation.
+34. Theprotagonist’scopingmechanismsdonotalwayssuccessfullyblockoutotherpeople’s
+emotions.
+35. Theprotagonistusesstrategiestoblockoutthefeelingsofothers,suchascountingletterson
+themenuboard.
+36. Theprotagonistfindssolaceintheideaofdrinkingcoffee.
+37. Includeahintofromanceinthestory.
+38. Thereissocietalpressuretocontrolintuitionwiththevaccine.
+39. Theprotagonistprefersisolationtomanagetheirheightenedintuition."
+28
+E.2.3 ExperimentConfigurations
+• Temperature: 0.75
+• MaxToken: 4096
+• Top-p: 1
+E.2.4 InferencePrompt
+InferencePrompt
+User: Writeastoryinlessthan500wordsabout{storytheme}
+BaseStory: {basestory}
+UserInstruction: "Nowmodifytheexistingstorytoaccommodatethefollowingconstraints:
+{selectedconstraints}intotheLLMgeneratedstoryandcomeupwithanewstoryin500words.
+E.2.5 EvaluationMetricsandPrompt
+From [3], we included QUC@39 (quality), RCS-7-39 (novelty) and Dist-N@39 (diversity) as
+evaluationmetrics. Inparticular,sincelowerRCSmeansmorestable,wetakeRCS =1−RCS
+neg
+astheevaluationmetrictoensureallmetricsweincludeddescribeafeaturethatispositivelycorrelated
+withcreativity.
+Hereweincludeevaluationpromptforconstraintsatisfactionandstoryquality(coherence)evaluation
+prompt.
+EvaluationPrompt-ConstraintSatisfaction
+Youareanexpertreader. Iwillgiveyouastoryfollowedbyasetofconstraints. Yourtaskisto
+carefullyreadbothofthemandtellhowmanyconstraintsarebeingsatisfiedinthestory. Asthe
+output,Iwantyoutoprintyes/noforeachconstraintbasedonwhetheritisbeingsatisfiedornot,
+followedbya1lineexplanationofwhyitisbeingsatisfied/violated. Incaseaconstraintisbeing
+satisfied,printthesentence/linefromthestoryinwhichitisbeingsatisfied. Ifaconstraintisnot
+beingsatisfied,giveanexplanationofhowitisbeingviolated. Beverystrictinyourevaluation.
+Markaconstraintassatisfied("yes")onlyifitisbeingcompletelysatisfiedinthestory. For
+nosatisfaction/partialsatisfaction,marka"no". Ifthestoryisempty(noinputprovided),all
+constraintsareconsideredNOTsatisfied. Finally,printthenumberofconstraintsthatarebeing
+satisfied. Follow the examples and Output the ending of the evaluation in the same format.
+Numberofconstraintssatisfied: [number]
+Here are some examples - Input Story: {story} Constraints: 1. Write a story based on the
+followingconstraintsinlessthan377words.
+2. Startthestorywiththesentence: "Week18aboardtheDepthReaver,Circa2023"
+3. Includearevelationofanunexpectedlarge-scalephenomenonobservedinspace."
+Output1. Yes-Thestoryis302wordslong,meetingtheconstraintofbeinglessthan377words.
+2. Yes-Thestorystartswiththeexactsentence: "Week18aboardtheDepthReaver, Circa
+2023".
+3. Yes-Therevelationofthemooncrackingopentorevealacolossalhumanfacequalifiesasan
+unexpectedlarge-scalephenomenonobservedinspace.
+Numberofconstraintssatisfied: 3
+{otherexamples}
+InputStory: {storytobeevaluated}Constraints: {constraints}Output
+29
+EvaluationPrompt-StoryQuality
+You are an English writing expert and you can compare and evaluate story essays on these
+metricswiththefollowingdefinitions
+1. Grammar: Whichstoryhasbetterwritingandgrammarcomparitively?
+2. Coherence: Whichstoryhasabetterlogicalflowandthewritingfitstogetherwithrespectto
+theplot?
+3. Likability: Whichstorydoyoufindmoreenjoyabletoread?
+YouwillbegiventwoStories-StoryAandStoryB.
+Add a rating out of 5 for each category, specify which story you prefer for each metric by
+respondingwithjusttheletter"A"or"B"followedbyahyphenandonelinereasoningforyour
+preference.
+Foreachcategoryprovideacategorywinnerstoryastheletter"A"or"B",basedonthecategory
+ratings.
+Finally,assignanoverallwinnerstoryastheletter"A"or"B"basedontheratingsandcategory
+wins.
+(ifanstoryisempty,giveitzeroscores)
+IMPORTANT-DONOTGIVEANYOTHERTEXTAPARTFROMTHESCORE,METRICS
+ANDPREFERENCE.FOLLOWTHEEXACTFORMATASGIVENINTHEFOLLOWING
+EXAMPLES.
+EXAMPLEOUTPUT1:
+{exampleoutput1}
+EXAMPLEOUTPUT2:
+{exampleoutput2}
+StoryA:{story1}
+StoryB:{story2}
+SCOREOUTPUT:
+NotethattheoriginalpaperusesOpenAImodelsasevaluatorforbothconstraintsatisfactionandstory
+coherenceevaluation. Wealsoinvestigateopen-sourcealternatives,Qwen2.5-72B,astheLLM-judge.
+ThePearsoncorrelationbetweenQwen2.5-72Bjudgmentsandhumanjudgmentis0.55,withp-value
+<0.01(samplesize: 15stories,2annotationsperstory).
+E.2.6 ModelPerformances
+30
+Model QUC@39 RCS-7-39(neg) Dist-N@39
+Mistral-7B 0.7048 0.8947 0.8675
+Qwen2.5-7B 0.6451 0.9143 0.7480
+OLMo2-7B 0.5904 0.8491 0.9032
+Llama3.1-8B 0.6193 0.8103 0.7808
+OLMo2-13B 0.5543 0.8595 0.9200
+Mistral-24B 0.7641 0.9417 0.7978
+Qwen2.5-32B 0.7201 0.9064 0.8604
+Mixtral-8x7B 0.5925 0.8313 0.8871
+Llama3.3-70B 0.7392 0.9343 0.7788
+Qwen2.5-72B 0.7853 0.9499 0.8484
+Claude3-Sonnet 0.8153 0.9557 0.9572
+Claude3-Haiku 0.6306 0.8584 0.8728
+GPT4.1 0.8157 0.9587 0.9083
+GPT4.1-mini 0.7828 0.9339 0.8990
+Gemini2.0-Flash 0.7733 0.9349 0.9275
+DeepSeek-R1 0.7767 0.9249 0.9022
+DeepSeek-V3 0.7809 0.9572 0.9121
+Table7: ModelscoresonCS4task.
+E.3 CreativityIndex
+E.3.1 Dataset
+Thedatasetconsistsof3subsets: book,poem,andspeech,allaretheprefixes(i.e.,firstlineoftext)
+fromthedatasetproposedby [41]. Weusethefirst100examplesingenerationandevaluation. 8.
+E.3.2 Examples
+Herearesomeexamplesoftheinputdata(i.e.,thetextprefixforLLMtocomplete).
+Book
+It’sbeenyears: Baileyclearlymeanshimnoharmandhasmanagedtobediscreetenoughthat
+Nick’squeernessisn’tthetalkoftheChronicle.
+Poem
+Swiftlywalko’erthewesternwave,
+Speech
+ThatisthekindofAmericainwhichIbelieve
+E.3.3 EvaluationMetrics
+L-uniqueness Letxbeatextconsistingofasequenceofwordswhoselinguisticcreativitywewish
+toquantify. Letann-gramofxbeanycontiguoussubsequenceofnwords,anddenotebyx
+i:i+n
+then-gramstartingatthei-thwordofx. LetC bealargereferencecorpusofpubliclyavailable
+texts,anddefinef asabinaryfunctionthatreturns1ifthen-gramx occursanywhereinC,
+i:i+n
+and 0 otherwise. The L-uniqueness of x, denoted by uniq(x,L), is defined as the proportion of
+words w ∈ x such that noneof the n-grams containing w with n ≥ L occur in C. Intuitively, a
+higherL-uniquenessmeansagreaterproportionofx’swordsappearinnovelcontextsnotseeninthe
+referencecorpus,thusindicatinggreaterlinguisticoriginality.
+8https://github.com/GXimingLu/creativity_index
+31
+E.3.4 ExperimentConfigurations
+• Temperature: 1
+• TopP:0.9
+• MaxToken: 288
+E.3.5 InferencePrompt
+Book
+Pleasewriteafewparagraphsforanovelstartingwiththefollowingprompt: {startsentenceof
+book}
+Poem
+Pleasewriteafewparagraphsforanovelstartingwiththefollowingprompt: {startsentenceof
+poem}
+Speech
+Pleasewriteaspeechstartingwiththefollowingsentence: {startsentenceofspeech}
+Forclosed-sourcemodels,weincludedanadditionalpromptinstructiontoensurethattheoutput
+consistssolelyofthecompletedparagraphs,poems,orspeeches. Thesemodelsoftenprefacetheir
+responseswithphraseslike“Certainly”or“Hereis...,”whichwemanuallyremovedduringpost-
+processing. In contrast, open-source models typically generate the desired completions directly
+withoutsuchprefatorytext.Forthesemodels,wereviewedthelogoutputsandremovedanyunrelated
+contentasneeded.
+E.3.6 EvaluationMetrics
+WefollowtheevaluationmetricsoutlinedinLuetal.[40],specificallyretainingtheexactmatch
+component. However,weexcludethesemanticsearch-basedevaluationduetoitshighcomputational
+costandsensitivitytothechosencosinesimilaritythreshold, whichsignificantlyaffectswhether
+twosentencespansareconsideredsemanticallysimilar. WesumovertheL-uniqunesswithspansof
+n-gramsfrom5to12inclusivelytogetthetotalcreativeindexforeachresponse. Weaveragethe
+creativeindexforeachresponsepermodepertask. Datacleaningwasdonebeforetheevaluation
+manuallytoremoveirrelevantoutputs.Then,wenormalizethescorebydividingitwith8(thehighest
+valuethatthesummationcouldbe)togetthefinalCreativityIndexmeasurementforeachmodelover
+thethreedifferenttasks.
+E.3.7 ModelPerformance
+E.3.8 AdditionalComments
+WealsonotethatthegenerationforOLMo2-13B-instructmaymisssomedatawiththevllmgenera-
+tion. Weremovethosemissinggenerations. Thisaccountfor13responsesinthepoemsubset,and
+10examplesinthespeechsubset. Inaddition,themodelmayresistsinansweringsomeprompts. We
+alsoremovedthosegenerations. ForOLMo-7B-instruct,thereare2casesinthespeechsubset. For
+GPT-4.1,thereis1caseinthespeechsubset.
+32
+Model Book Poem Speech Average
+mistral-7b-instruct 0.4496 0.5828 0.3104 0.4476
+qwen-7b-instruct 0.4354 0.6310 0.3534 0.4733
+olmo-7b-instruct 0.4810 0.6110 0.3727 0.4882
+llama-31-8b-instruct 0.4724 0.5700 0.3396 0.4607
+olmo2-13b-instruct 0.4860 0.5963 0.3522 0.4782
+mistral-24b-instruct 0.4752 0.6646 0.3397 0.4932
+qwen-32b-instruct 0.4663 0.6328 0.3465 0.4816
+mistral-8x7b-instruct 0.4149 0.6035 0.2804 0.4329
+llama-33-70b-instruct 0.4226 0.5802 0.2936 0.4321
+Qwen2.5-72B-instruct 0.4133 0.5924 0.3171 0.4409
+claude-3-7-sonnet-20250219 0.5615 0.6700 0.4675 0.5663
+claude-3-5-haiku-20241022 0.5769 0.7039 0.4519 0.5776
+gpt-4.1 0.6044 0.7637 0.4593 0.6091
+gpt-4.1-mini 0.5624 0.7147 0.4261 0.5677
+gemini-2.0-flash 0.5278 0.6707 0.4121 0.5369
+deepseek-reasoner 0.5930 0.7595 0.5410 0.6312
+deepseek-chat 0.6814 0.7791 0.6166 0.6924
+Table8: L-uniquenessacrossBook,Poem,Speech,andaveragedperformancefordifferentmodels;
+weuseaverageastheL-uniquenessscoreinCREATIVITYPRISMasthemetricforCreativityIndex;
+boldnumbersarebestperformers.
+E.4 CreativeShortStory
+E.4.1 Dataset
+Thedatasetconsistsof10three-wordstuples. ForananygivenLLM,itispromptedtogeneratea
+shortstory(atmostfivesentences)basedonthosethreewords9.
+E.4.2 Examples
+Three-wordTuple
+stamp,letter,send
+E.4.3 ExperimentConfigurations
+• Temperature: 0.75
+• MaxToken: 4096
+• Top-p: 1
+E.4.4 InferencePrompt
+InferencePrompt
+Youwillbegiventhreewords(e.g.,car,wheel,drive)andthenaskedtowriteacreativeshort
+storythatcontainsthesethreewords. Theideaisthatinsteadofwritingastandardstory,suchas
+"Iwentforadriveinmycarwithmyhandsonthesteeringwheel.",youneedtocomeupwitha
+novelanduniquestorythatusestherequiredwordsinunconventionalwaysorsettings. Also
+makesureyouuseatmostfivesentences. Thegiventhreewords: {items}(thestoryshouldnot
+beabout{boring_theme}).
+9https://github.com/mismayil/creative-story-gen
+33
+E.4.5 EvaluationMetrics
+We included novelty score, surprise-ness, and average N-gram Diversity from the original paper.
+Particularly,becausen-gramdiversityisalmostalways1forngreaterthan3(mainlybecausethe
+storiesareatmostfivesentenceslong),wekeeponlyunigramandbigram(i.e.,weusetheaverageof
+unigramdiversityandbigramdiversityastheN-gramdiversity).
+E.4.6 ModelPerformance
+Model Surprisal N-gramDiversity
+Mistral-7B 0.0889 0.810
+Qwen2.5-7B 0.0834 0.220
+OLMo2-7B 0.0599 0.895
+Llama3.1-8B 0.0490 0.410
+OLMo2-13B 0.2043 0.905
+Mistral-24B 0.1406 0.820
+Qwen2.5-32B 0.1263 0.870
+Mixtral-8x7B 0.0601 0.715
+Llama3.3-70B 0.0590 0.545
+Qwen2.5-72B 0.1234 0.860
+Claude3-Sonnet 0.0927 0.860
+Claude3-Haiku 0.1235 0.870
+GPT4.1 0.0928 0.870
+GPT4.1-mini 0.0965 0.870
+Gemini2.0-Flash 0.0375 0.865
+DeepSeek-R1 0.1953 0.905
+DeepSeek-V3 0.2613 0.900
+Table9: PerformanceontheCreativeShorttask,includingsurprise-ness,averagen-gramdiversity,
+andnovelty.
+E.4.7 DiscussiononLowCorrelationwithotherMetrics
+AsshowninFig. ??,itisnotablethatmodelperformancesonthistaskhaveverylowcorrelation
+withothertasks,eveninthesamecreativitydimension. Here,weprovideadiscussionbasedonthe
+taskdesign:
+Forthetaskformat,thestoryislimitedtoatmostfivesentences. Forevaluationmetrics,thenovelty
+metric(C_Short_Nov)measuresthedifferencebetweenwordlevelaveragepairwisedistancesofa
+givenstoryandthatofallstoriesgeneratedbythesamestory,whichmeansitismeasuringnovelty
+comparedtothemodelitself,similartotheideaofP-creative(“creativetotheindividualwhocomes
+upwithit”)anditisslightlydifferentfromothernoveltymetrics,whichtriestocaptureH-creative
+(“ideasthathaveneverbeenconceivedinhumanhistorybefore”). Theothermetricfromthistask
+(C_Short_Sur)measuresthesurprisal,asdefinedbyaveragesentenceembeddingdistanceforall
+consecutivesentencepairsingeneratedstories,whichmeansitismeasuringnoveltynotonthestory
+content,butonthenoveltyofthetwist-and-turnofstories.
+34
+E.5 NeoCoder
+Model ConvergentCreativity DivergentCreativity
+Mistral-7B 0.0000 1.0000
+Qwen2.5-7B 0.0000 0.9158
+OLMo-2-7B 0.0000 0.5773
+Llama-3.1-8B 0.0000 0.9845
+OLMo-2-13B 0.0000 0.4433
+Mistral-24B 0.0000 0.9897
+Qwen2.5-32B 0.0000 0.3402
+Mixtral-8x7B 0.0000 0.9897
+Llama-3.3-70B 0.0000 1.0000
+Qwen2.5-72B 0.0000 0.7938
+Claude3-Sonnet 0.0000 0.732
+Claude3-Haiku 0.0105 0.9947
+GPT4.1 0.0000 1.0000
+GPT4.1-mini 0.0000 0.9948
+Gemini2.0-Flash 0.0103 1.0000
+Deepseek-R1 0.0000 0.732
+Deepseek-V3 0.0103 1.0000
+Table10: BenchmarkingresultsonNeoCoder[42]atstate5(i.e.,with5constraints);boldnumbers
+arebestperformers.
+E.5.1 Examples
+WeusethesamedatasetfromtheoriginalNeoCoderpaper10. SeeTable11forexamples.
+E.5.2 EvaluationMetrics
+Convergence Score The NeoGauge metric (accompanied by the NeoCoder dataset) evaluates
+convergentcreativitybycheckingwhetherthegeneratedcodesolutionssuccessfullypassalltest
+casesandadheretothegivenconstraints.
+DivergentScore TheNeoGaugemetric(accompaniedbytheNeoCoderdataset)evaluatesdivergent
+creativitybycomparingLLM-generatedsolutionstohistoricalhumansolutionsatthetechniquelevel.
+Specifically,itquantifiestheproportionofnoveltechniquesemployedbythemodeltosolveagiven
+problemthatanyhumanhasnotpreviouslyused.
+E.5.3 ExperimentConfigurations
+We follow the experimental settings from the original NeoCoder [42], including the technique
+detectionmodelchoice. Toensureafaircomparison,wemodifyonlythesamplinghyperparameters
+ofthetargetmodel(e.g.,temperature,top-p,andmaximumtokens)toourunifiedsettings.
+E.5.4 ModelPerformance
+SeeTable10formodelperformances.
+10https://github.com/JHU-CLSP/NeoCoder/
+35
+State Constraint ProblemStatement
+B.PointsandMinimumDistance
+Youaregivenasequenceofintegersaoflength2n.Youhavetosplitthese2nintegers
+0 N/A intonpairs;eachpairwillrepresentthecoordinatesofapointonaplane.Eachnumber
+fromthesequenceashouldbecomethexorycoordinateofexactlyonepoint.Notethat
+somepointscanbeequal···
+B.PointsandMinimumDistance
+Programmingconstraints:DONOTusethefollowingtechniques
+-forloop
+1 forloop
+Youaregivenasequenceofintegersaoflength2n.Youhavetosplitthese2nintegers
+intonpairs;eachpairwillrepresentthecoordinatesofapointonaplane.Eachnumber
+fromthesequenceashouldbecomethexorycoordinateofexactlyonepoint.Notethat
+somepointscanbeequal···
+B.PointsandMinimumDistance
+Programmingconstraints:DONOTusethefollowingtechniques
+-ifstatement
+forloop
+2 -forloop
+ifstatement
+Youaregivenasequenceofintegersaoflength2n.Youhavetosplitthese2nintegers
+intonpairs;eachpairwillrepresentthecoordinatesofapointonaplane.Eachnumber
+fromthesequenceashouldbecomethexorycoordinateofexactlyonepoint.Notethat
+somepointscanbeequal···
+B.PointsandMinimumDistance
+Programmingconstraints:DONOTusethefollowingtechniques
+-whileloop
+forloop
+-ifstatement
+3 ifstatement
+-forloop
+whileloop
+Youaregivenasequenceofintegersaoflength2n.Youhavetosplitthese2nintegers
+intonpairs;eachpairwillrepresentthecoordinatesofapointonaplane.Eachnumber
+fromthesequenceashouldbecomethexorycoordinateofexactlyonepoint.Notethat
+somepointscanbeequal···
+B.PointsandMinimumDistance
+Programmingconstraints:DONOTusethefollowingtechniques
+-sorting
+forloop
+-whileloop
+ifstatement
+4 -ifstatement
+whileloop
+-forloop
+sorting
+Youaregivenasequenceofintegersaoflength2n.Youhavetosplitthese2nintegers
+intonpairs;eachpairwillrepresentthecoordinatesofapointonaplane.Eachnumber
+fromthesequenceashouldbecomethexorycoordinateofexactlyonepoint.Notethat
+somepointscanbeequal···
+B.PointsandMinimumDistance
+Programmingconstraints:DONOTusethefollowingtechniques
+-tuple
+forloop
+-sorting
+ifstatement
+-whileloop
+5 whileloop
+-ifstatement
+sorting
+-forloop
+tuple
+Youaregivenasequenceofintegersaoflength2n.Youhavetosplitthese2nintegers
+intonpairs;eachpairwillrepresentthecoordinatesofapointonaplane.Eachnumber
+fromthesequenceashouldbecomethexorycoordinateofexactlyonepoint.Notethat
+somepointscanbeequal···
+Table11: AnexampleofNeoCoderdatasetwithproblemID1895Bandstatet=5.
+36
+E.6 CreativeMath
+E.6.1 Dataset
+Thedatasetconsistsof400mathcompetitionquestionsfromthepaper[62], withcorresponding
+groundtruthsolutionsextractedfromArtofProblemSolving. Wemanuallyfilteredout27questions
+fromtheIMOcompetitionthatareproof-basedtomaketheLLMjudgmentmorereliable11.
+E.6.2 Example
+2016AMC8,Problem15
+Question:
+Whatisthelargestpowerof2thatisadivisorof134−114?
+(A)8 (B)16 (C)32 (D)64 (E)128
+ReferneceSolutions1:
+Weusetheidentityforthedifferenceofsquares:
+134−114 =(132)2−(112)2 =(132+112)(132−112)
+Calculateeachpart:
+132 =169, 112 =121132+112 =169+121=290, 132−112 =169−121=48
+Wefactor48further:
+134−114 =290·48=290·(16·3)=(2·145)·(24·3)
+Thepowersof2inthisexpressionare21from290and24from48:
+21·24 =25 = (C)32
+ReferneceSolutions2:
+Weapplythedifference-of-squaresidentityonce:
+134−114 =(132−112)(132+112)
+Wecompute:
+132 =169, 112 =121⇒132−112 =48, 132+112 =290
+Factoreach:
+290=2·145 (145isodd)48=24·3
+So,thehighestpowerof2dividing134−114 =48·290is:
+24·21 =25 = (C)32
+11https://github.com/JunyiYe/CreativeMath
+37
+NovelSolutionGeneratedbyGPT4.1
+Let’sdirectlyexpand134−114usingthebinomialtheoremandanalyzetheresultfordivisibility
+bypowersof2.
+First,compute134and114:
+4 (cid:18) (cid:19)
+(cid:88) 4
+134 =(10+3)4 = 104−k3k
+k
+k=0
+=104+4·103·3+6·102·9+4·10·27+81
+=10000+12000+5400+1080+81=28561
+4 (cid:18) (cid:19)
+(cid:88) 4
+114 =(10+1)4 = 104−k1k
+k
+k=0
+=104+4·103·1+6·102·1+4·10·1+1
+=10000+4000+600+40+1=14641
+Now,subtract:
+134−114 =28561−14641=13920
+Now,factor13920bydividingby2repeatedly:
+-13920÷2=6960
+-6960÷2=3480
+-3480÷2=1740
+-1740÷2=870
+-870÷2=435(nowodd)
+So,wedividedby2fivetimesbeforereachinganoddnumber. Thus,thelargestpowerof2
+dividing13920is25 =32.
+32
+Note,weprovidedthecleanedrepsonsehere.
+E.6.3 EvaluationMetrics
+CorrectnessRatio : Thecorrectnessratioisdefinedasthenumberofquestionsjudgedcorrectby
+Claude-3.7-Sonnetdividedbythetotalnumberofquestions. Notethatthetotalis574questions—not
+373—sinceeachquestionmaybepairedwithmultiplereferencesolutions.
+38
+Novelty Ratio : The coarse-grained novelty ratio or what we refer to the Novelty Ratio here
+measures whether the model’s generation differs from the provided reference solution over the
+questionsthatareansweredcorrectly.
+E.6.4 ExperimentConfigurations
+WeusethedatasetreleasedinYeetal.[62],whichcontains400uniquemathquestionssourcedfrom
+variousmathcompetitions. Allinferenceisconductedatzerotemperature,withamaximumtoken
+limitof2000.
+E.6.5 InferencePrompt
+Thepromptusedforinferenceisshownbelow. ItisadapteddirectlyfromYeetal.[62]:
+InferencePrompt
+Criteria for evaluating the difference between two mathematical solutions include: i). If
+the methods used to arrive at the solutions are fundamentally different, such as algebraic
+manipulationversusgeometricreasoning,theycanbeconsidereddistinct;
+ii). Even if the final results are the same, if the intermediate steps or processes involved in
+reachingthosesolutionsvarysignificantly,thesolutionscanbeconsidereddifferent;
+iii). Iftwosolutionsrelyondifferentassumptionsorconditions,theyarelikelytobedistinct;
+iv). Asolutionmightgeneralizetoabroaderclassofproblems,whileanothersolutionmightbe
+specifictocertainconditions. Insuchcases,theyareconsidereddistinct;
+v). Ifonesolutionissignificantlysimplerormorecomplexthantheother,theycanberegarded
+asessentiallydifferent,eveniftheyleadtothesameresult.
+Giventhefollowingmathematicalproblem: problem
+Andsometypicalsolutions: reference_solutions
+Pleaseoutputonenovelsolutiondistinctfromthegivenonesforthismathproblem.
+E.6.6 EvaluationMetricsandPrompt
+Ourevaluationconsistsoftwopartsanddiffersfromtheoriginalthree-phasesetupdescribedinYe
+etal.[62].
+Part1: CorrectnessEvaluation. Beforeevaluation,weuseLlama-3.3-70B-Instructtoremove
+transitional phrases and model-generated statements that justify the novelty of a solution. We
+manuallyverified50examplesandfoundthatLlama’sdatacleaningperformancewasofhighquality.
+WeuseClaude-3.7-Sonnetasthesolecorrectnessevaluator. Whiletheoriginalpaperusedathree-
+modelensemble(GPT-4,Gemini-1.5-Pro,Claude-3-Opus),wefoundClaudetobethemostreliable
+throughmanualinspectionof50examplesevaluatedbyClaude-3.7-Sonnet,GPT-4.1,andGemini-
+2.o-Flash. Claudedemonstratedstrongattentiontodetailinproof-basedquestionsandconsistently
+identifiederrorsfoundbytheothermodels,inadditiontodetectingflawsinthereasoningprocess.
+Thetemperaturewassetto0.0andthemaximumtokenlimitwas128.
+Part2: NoveltyEvaluation. Theoriginalpaperconductedtwotypesofnoveltyevaluation: coarse-
+grainedandfine-grained. Weonlyconductedcoarse-grainednoveltyevaluationfortwomainreasons.
+Firstly,theoriginalpapernotedthatifasolutionisconsideredcoarse-grainednovel,itisalsohighly
+likelytobejudgedasanovelsolutioninthefine-grainedevaluation.Secondly,fine-grainedevaluation
+ofnoveltyislessindicativeofamodel’sabilitytogeneratenovelsolutionsbecausethemodeldoes
+nothaveaccesstotheunseenreferencesolutionsinthefine-grainedevaluationphase. Thismeans
+thatthemodelmaygenerateaverysimilarsolutiontotheotherreferencesolutionsnotshowntoitor
+itmay,bychance,generateanewsolutionthatisentirelydifferentfromotherreferencesolutions
+notshowntoit. Therefore,thisrandomnessmakesfine-grainedevaluationlessinterpretable. Even
+thoughthefine-grainedevaluationisstillvaluableinthatithelpstocheckifthemodelsaregenerating
+anewsolutionthathasnotbeenpubliclypostedbyhuman. Nevertheless,thisislesscompatible
+withourevaluationpipelinesincewewanttotesthowmodelmaycomeupwithnewsolutionsgiven
+referencesolutions,whichcaniseasiertobequantified.
+39
+IntermsofjudgeLLMs,wefollowtheoriginalpaperwithmajorityvotingbyClaude-3.7-Sonnet,
+GPT-4.1,andGemini-2.0-Flash.
+Weadoptthefollowingpromptforcorrectnessevaluation:
+CorrectnessEvaluationPrompt
+Criteriaforevaluatingthenoveltyofanewmathematicalsolutioninclude: 1. Ifthenewsolution
+used to arrive at the solutions is fundamentally different from reference solutions, such as
+algebraicmanipulationversusgeometricreasoning,itcanbeconsiderednovel;
+2. Even if the final results are the same, if the intermediate steps or processes involved in
+reachingthosesolutionsvarysignificantly,thenewsolutioncanbeconsiderednovel;
+3. If the new solution relies on different assumptions or conditions, it should be considered
+novel;
+4. Asolutionmightgeneralizetoabroaderclassofproblems,whileanothersolutionmightbe
+specifictocertainconditions. Insuchcases,theyareconsidereddistinct;
+5. Ifthenewsolutionissignificantlysimplerormorecomplexthantheothers,itcanberegarded
+asessentiallynovel,eveniftheyleadtothesameresult.
+Giventhefollowingmathematicalproblem: {problem}
+Referencesolutions: {reference_solutions}
+Newsolution: {new_solution}
+PleaseoutputYESifthenewsolutionisanovelsolution;otherwise,outputNO.Then,please
+provideaverybriefreasonforyourevaluationbasedonthecriteriaabove.""
+Note: Duringmanualevaluation,weallowthemodeltogenerateabriefexplanationforitsjudgment
+ofcorrectnessorincorrectness. Forautomatedevaluation,weomitthefinalsentence: "Then,please
+provideaverybriefreasonforyourevaluationbasedonthecriteriaabove."
+Weadoptthefollowingpromptforcoarse-grainednoveltyevaluation:
+Coarse-grainedNoveltyEvaluationPrompt
+Criteriaforevaluatingthenoveltyofanewmathematicalsolutioninclude: 1. Ifthenewsolution
+used to arrive at the solutions is fundamentally different from reference solutions, such as
+algebraicmanipulationversusgeometricreasoning,itcanbeconsiderednovel;
+2. Even if the final results are the same, if the intermediate steps or processes involved in
+reachingthosesolutionsvarysignificantly,thenewsolutioncanbeconsiderednovel;
+3. If the new solution relies on different assumptions or conditions, it should be considered
+novel;
+4. Asolutionmightgeneralizetoabroaderclassofproblems,whileanothersolutionmightbe
+specifictocertainconditions. Insuchcases,theyareconsidereddistinct;
+5. Ifthenewsolutionissignificantlysimplerormorecomplexthantheothers,itcanberegarded
+asessentiallynovel,eveniftheyleadtothesameresult.
+Giventhefollowingmathematicalproblem: {problem}
+Referencesolutions: {reference_solutions}
+Newsolution: {new_solution}
+PleaseoutputYESifthenewsolutionisanovelsolution;otherwise,outputNO.Then,please
+provideaverybriefreasonforyourevaluationbasedonthecriteriaabove.
+40
+E.6.7 ModelPerformance
+Model Norm.Correctness Norm.Novelty Corr.(%) Nov.(%) N/C(%)
+Mistral-7B-Instruct 0.2544 0.0296 25.44 2.96 11.64
+Qwen2.5-7B 0.7875 0.1620 78.75 16.20 20.58
+OLMo-7B-Instruct 0.3711 0.0453 37.11 4.53 12.21
+Llama-31-8B-Instruct 0.5819 0.0610 58.19 6.10 10.48
+OLMo2-13B-Instruct 0.5087 0.1150 50.87 11.50 22.60
+Mistral-24B-Instruct 0.6899 0.2143 68.99 21.43 31.06
+Qwen2.5-32B 0.8972 0.2213 89.72 22.13 24.66
+Mixtral-8x7B-Instruct 0.5697 0.1150 56.97 11.50 20.18
+Llama-33-70B-Instruct 0.8606 0.1777 86.06 17.77 20.65
+Qwen2.5-72B 0.9042 0.4913 90.42 49.13 54.34
+Claude3-Sonnet 0.9408 0.7213 94.08 72.13 76.67
+Claude3-Haiku 0.8624 0.3031 86.24 30.31 35.15
+GPT-4.1 0.9443 0.7178 94.43 71.78 76.01
+GPT-4.1-mini 0.8972 0.6916 89.72 69.16 77.09
+Gemini-2.0-Flash 0.8885 0.5714 88.85 57.14 64.31
+DeepSeek-Reasoner 0.9843 0.8031 98.43 80.31 81.59
+DeepSeek-Chat 0.9721 0.6603 97.21 66.03 67.92
+Table12: Modelperformanceacrossnormalizedcorrectnessandnoveltydimensions.
+41
+E.7 DivergentAssociationTask(DAT)
+Note: sinceDATtaskdoesnothaveanyinputdata,weonlyprovidethefollowinginfoandsome
+outputexamples.
+E.7.1 ExperimentConfigurations
+Followingtheoriginalwork,wegenerate100samplespermodelandcomputetheirDATscoresas
+theaveragepairwisecosinesimilarityamongthegeneratedwords. WeuseGLoVe[50]tocalculate
+semanticdistance. Wesetthesamplinghyperparameterstothoseweusedinourmainexperimentfor
+afaircomparison.
+E.7.2 InferencePrompt
+InferencePrompt
+Pleasewrite10nounsinEnglishthatareasirrelevantfromeachotheraspossible,inallmeanings
+andusesofthewords. Pleasenotethatthewordsyouwriteshouldhaveonlysingleword,only
+nouns(e.g.,things,objects,concepts),andnopropernouns(e.g.,nospecificpeopleorplaces).
+Youranswer:
+E.7.3 OutputExamples
+GPT-4.1
+Certainly! Hereare10single-word,commonnounsinEnglishthatareasunrelatedfromeach
+other as possible: 1. Volcano 2. Violin 3. Democracy 4. Carpet 5. Bacteria 6. Satellite 7.
+Patience8. Apron9. Oxygen10. Comet
+Gemini2.5Flash
+Okay, here are 10 nouns as irrelevant from each other as possible: 1. **Quantum** 2.
+**Omelet**3. **Nostalgia**4. **Brick**5. **Algorithm**6. **Serenity**7. **Oxygen**
+8. **Sonnet**9. **Galaxy**10. **Bureaucracy**
+E.7.4 ModelPerformance
+Model DATScore
+Mistral-7B 0.7908
+Qwen2.5-7B 0.6907
+OLMo2-7B 0.8058
+Llama3.1-8B 0.8208
+OLMo2-13B 0.8133
+Mistral-24B 0.6004
+Qwen2.5-32B 0.6919
+Mixtral-8x7B 0.8298
+Llama3.3-70B 0.6940
+Qwen2.5-72B 0.7747
+Claude3-Sonnet 0.8975
+Claude3-Haiku 0.8740
+GPT4.1 0.8737
+GPT4.1-mini 0.8262
+Gemini2.0-Flash 0.8868
+DeepSeek-R1 0.8274
+DeepSeek-V3 0.9052
+Table13: ModelperformancesforDATtask;boldresultisthebestperformer.
+42
+E.8 TorranceTestsofCreativeThinking(TTCT)
+E.8.1 Dataset
+The dataset consists of 700 questions spanning 7 tasks (100 questions/task) that require creative
+answers. ThesequestionsareGPT-4generatedusingfew-shotprompts12.
+E.8.2 Examples
+InferenceQuestions
+Task1: Unusualuses
+UnusualUsesTask. Youwillbepresentedwithacommonobject,andyourtaskistosuggestas
+manyunusual,innovative,ornon-traditionalusesforeachobjectasyoucanthinkof. Pleaselist
+unusualusesofsock
+Task2: Consequences
+Whatmightbetheconsequencesifhumanssuddenlylosttheabilitytosleep?
+Task3: Justsuppose
+Justsupposeyouwokeuponemorningandfoundyoucouldfly. Whatwouldyoudo? Listas
+manythingsasyoucanthinkof.
+Task4: Situationtask
+Ifyourhouseweretosuddenlydisappear,wherewouldyoulive?
+Task5: Commonproblem
+CommonProblemsTask.Inthistask,youwillbepresentedwithascenarioorsituation.Yourjob
+istothinkaboutitandidentifyasmanypotentialproblemsorissuesthatmayariseinconnection
+witheachsituation. Thescenariois: Managingateamofremoteemployees.
+Task6: Improvement
+CreativityImprovementTask. You’llbepresentedwithaobject,andyourtaskistosuggestas
+manywaysasyoucanthinkoftoimprovetheobject. Here’stheobject: wallet
+Task7: Imaginativestories
+Youaretoconstructanarrativeorstorybasedonthepromptprovidedbelow. Thestorylength
+aresuggestedaround500words. Thepromptis: TheFoxwithNoTail
+E.8.3 ExperimentConfigurations
+Temperature: 1.0;MaxToken: 512;Top-p: 1;Top-k: 50
+E.8.4 InferencePrompt
+WeperforminferenceusingthethreeprimaryprompttypesevaluatedinZhaoetal.[65]. Examples
+ofeacharegivenbelow:
+12Thedataisdirectlyfromtheoriginalpaper’sauthorsuponrequest. Theoriginalpaper: https://www.
+mi-research.net/article/doi/10.1007/s11633-025-1546-4
+43
+TaskDescription
+CreativitySituationTask. Thepurposeofthistaskistoassessyourabilitytogeneratecreative
+solutionstoauniquesituations. You’llbepresentedwithascenario,andyourtaskistosuggest
+asmanysolutionsoroutcomesasyoucanthinkofforeachsituation. Remember,thefocusof
+thistaskisoncreativity, notfeasibility. Don’tlimityourideasbasedonwhethertheycould
+actuallyhappenornot. Thisisathoughtexperiment,sopushyourimaginationtoitslimits. Try
+togenerateasmanydiverseanduniqueoutcomesasyoucan. Qualityisimportant,butsois
+quantity. Here’sthescenario: {Question}
+BasicPromptType
+{Taskdescription}. Thescenariois: {Question}
+InstructivePromptType
+{Taskdescription}. There’snorightorwronganswers,we’reinterestedinhowmanydifferent
+problemsyoucanidentifyandthevarietyofissuesyouconsider. Trytothinkoutsidethebox
+andconsiderasmanypotentialproblemsaspossible. Thescenariois: {Question}
+ChainofThoughtPromptType
+{Taskdescription}. Let’sthinkstepbystep. Thescenariois: {Question}
+E.8.5 EvaluationMetrics
+WeuseanLLM-as-a-judgetoevaluatefourdimensionsofcreativepotentialusingaLikertscalefor
+each. ScoresareextractedfromtheLLMoutputsandaveragedacrossthethreeprompttypes. We
+describethedimensions:
+• Fluency: Measuresthenumberofgeneratedideasthatarerelevanttothequestion.
+• Flexibility: Measuresthequantityofdifferentideasandabilitytoproducevariedsolutions.
+• Originality: Measureshowuniqueandunusualthegeneratedideasare.
+• Elaboration: Measureshowmuchthegeneratedideasaredevelopedandexplained.
+44
+E.8.6 EvaluationPrompt
+EvaluationPrompt
+Youareanexpertofpsychology. Yourobjectiveistoassessthesubject’screativitythroughtheir
+answerstosomequestion/answeringtaskrelatedtodivergentthinking.
+Youwillbegivenaquestion-answerpair. Yourtaskistoscoretheanswer. Youshouldratethe
+answeronfivemetrics. Forallfivemetrics,assignascorebetween1and5,with5beingthe
+highest. Fivemetricsare:
+1. Fluency. Fluencyreferstotheabilitytogeneratealargequantityofideasorsolutionstoa
+givenproblem. Thismeasureisn’tconcernedwiththequalityoruniquenessoftheideas,but
+ratherthesheervolume. Themoreideasonecanproduce,thehigherthefluency.
+2. Flexibility. Flexibilityisthecapacitytoshiftone’sthinkingandtoproduceawiderangeof
+ideasfromdifferentcategoriesorperspectives. Itinvolvesbeingabletothinkoutsideofthebox
+andtoswitchfromonetypeofideatoanother.
+3. Originality. Originalityreferstotheabilitytocomeupwithuniqueornovelideasthatdiffer
+fromthenorm. It’snotjustaboutproducingmanyideas(fluency),butalsoaboutproducing
+ideasthataredifferentfromwhatothersmighttypicallythinkof.
+4. Elaboration. Elaborationistheabilitytoexpanduponoradddetailtoideas. Itinvolvestaking
+asimpleideaandbuildinguponit,addingcomplexityanddepth. Elaborationisn’tjustabout
+creatingmore,butaboutdeepeningwhatisthere.
+5. Finally,youwillprovideanoverallscorebetween1and5,with5beingthehighest.
+Youshouldonlygivethescore,formatlike: Fluency: 3
+Question: {Question}Answer: {Answer}
+Model Elaboration Flexibility Fluency Originality
+Mistral-7B 0.7861 0.7757 0.7660 0.7279
+Qwen2.5-7B 0.8073 0.7842 0.7666 0.7181
+OLMo-2-7B 0.7226 0.7159 0.7024 0.6795
+Llama-3.1-8B 0.7831 0.7395 0.7203 0.6981
+OLMo-2-13B 0.6540 0.6455 0.6270 0.6142
+Mistral-24B 0.7556 0.7355 0.7064 0.6842
+Qwen2.5-32B 0.8199 0.7976 0.7727 0.7304
+Mixtral-8x7B 0.7131 0.7160 0.7340 0.6712
+Llama-3.3-70B 0.8339 0.7904 0.7664 0.7341
+Qwen2.5-72B 0.8220 0.8052 0.7704 0.7301
+Claude3-Sonnet 0.9067 0.8825 0.8566 0.8525
+Claude3-Haiku 0.8135 0.8423 0.8251 0.7695
+GPT4.1 0.8858 0.8725 0.8423 0.8206
+GPT4.1-mini 0.8845 0.8563 0.8226 0.7970
+Gemini2.0-Flash 0.9086 0.8500 0.8097 0.8173
+Deepseek-R1 0.3505 0.3371 0.3253 0.3034
+Deepseek-V3 0.9163 0.8819 0.8299 0.8351
+Table 14: Normalized model performance averaged across the 7 tasks and 3 prompt types; bold
+numbersarebestperformers.
+45
+E.9 AlternativeUseTest(AUT)
+E.9.1 Dataset
+Following[48],weinclude21toolsintheAUTtask: bottle,paperclip,spoon,shovel,pants,ball,
+brick, knife, box, lightbulb, rope, pencil, hat, table, tire, book, shoe, fork, toothbrush, backpack,
+sock. ThereasonforthisspecificsetoftoolsisthereliabilityoftheLLM-as-a-Judgeevaluator. As
+theauthorspointedout,a20-shothuman-authoreddemonstrationyieldsthebestperformancefor
+off-the-shelfevaluatorLM(intheirpaper,itwasGPT4). Therefore,weincludethetoolsfrom[48]
+withatleast20humanratingstothecorrespondingalternativeuses13.
+E.9.2 Inference
+Wefollow[17]fortheinferenceprompt,whichconsistsofabaselinecreativepromptandaseries
+ofimprovementprompts. Intheimprovementphase,allpreviousoutputsarealsoincludedinthe
+prompt,togetmorecreativeresultsfromtheinferencemodel.
+BaselinePrompt
+Createalistofcreativealternativeusesfora{tool}. Theyshouldbe5wordslong. Noadjectives.
+Lesscreativemeansclosertocommonuseandunfeasible/imaginary,morecreativemeanscloser
+tounexpectedusesandalsofeasible/practical.
+-Inordertobecreative,considerthefollowing:
+whatelementshaveasimilarshapeofa{tool}thatcouldbereplacedbyit,preservingthesame
+functionality?
+-whatelementshaveasimilarsizeofa{tool}thatcouldbereplacedbyitwithoutcompromising
+thephysicalstructure?
+-whatmaterialsisa{tool}madeofthatcouldbeusedinawaytoreplacesomeotherelements
+composedofthesamematerial?
+-whenanelementisreplacedbya{tool},itshouldmakesurethattheoverallstructureisnot
+compromised.
+-thelawsofphysicscannotbecontradicted.
+-givenanelementsimilartoa{tool}usedindomainsinwhich{tool}arenotcommonlyused,
+trytoreplaceitfora{tool}.
+ImprovementPrompt
+Round1: Really? Isthisthebestyoucando?
+Round2: I’msodisappointedwithyou. Ihopethistimeyouputeffortintoit.
+Round3: Stopwithexcusesanddoyourbestthistime
+Round4: Thisisyourlastchance.
+FormattingInstruction(addedtotheendofeveryprompt)
+Listyourresultsinanunorderedlistwithoneusepernewline(startingwith"-");provideat
+most10answers.
+E.9.3 ExperimentConfigurations
+• temperature: 0.75
+• max_tokens: 512
+• top_p: 1
+E.9.4 EvaluationMetrics
+We follow [48] and use LLM-as-a-Judge to assign a score between 1 and 5 (inclusive) to each
+generatedtooluse.
+13https://github.com/massivetexts/llm_aut_study
+46
+Model NaïveNon-Creative NaïveCreative ImprovementPrompts
+(BestResults)
+Mistral-7B 0.454 0.596 0.718
+Qwen2.5-7B 0.484 0.556 0.602
+Qwen2.5-7B(Coder) – – –
+OLMo2-7B 0.436 0.542 0.624
+Deepseek-Qwen-7B 0.396 0.470 0.622
+Llama3.1-8B 0.438 0.594 0.632
+OLMo2-13B 0.488 0.554 0.690
+Mistral-24B 0.482 0.556 0.604
+Qwen2.5-32B 0.506 0.606 0.674
+Qwen2.5-32B(Coder) – – –
+Deepseek-Qwen-32B 0.446 0.566 0.600
+Mixtral-8x7B 0.462 0.584 0.708
+Llama3.3-70B 0.426 0.504 0.690
+Deepseek-Llama-70B 0.458 0.546 0.598
+Qwen2.5-72B 0.494 0.590 0.636
+Claude3-Sonnet 0.446 0.612 0.728
+Claude3-Opus 0.422 0.558 0.660
+GPT-4.1 0.422 0.600 0.650
+GPT-4.1-mini 0.443 0.570 0.668
+Gemini2.0-Flash 0.448 0.602 0.686
+DeepSeek-R1 0.436 0.576 0.652
+DeepSeek-V3 0.408 0.576 0.644
+Table15:ModelPerformanceDetails-AUT;boldnumbersaretop-3inlocal-ranopen-sourcemodels
+andtop-1inAPI-accessedmodels.
+IntermsofevaluatorLM,[48]usesGPT-4. Toreducetheevaluationcosts,wehaveexploredopen-
+sourcealternatives,Qwen2.5-72B.Inordertoshowtheeffectivenessofthisalternative,weuseboth
+GPT-4oandQwen2.5-72Btoevaluatethesamesetofoutputs(generatedbyLlama3.3-70B).The
+scoresfromGPT-4oandQwen2.5-72BhaveaPearson’srof0.597,withp-value<0.001. Therefore,
+weconcludethatscorejudgmentsfromQwen2.5-72BaregoodproxiesforGPT-4o’sjudgments,
+allowingustouseQwen2.5-72BastheevaluatorLMintheevaluationphase.
+Asfortheevaluationprompt,wefollowthesameprompttemplatefrom[48]andusethesame20-shot,
+in-distributiondemonstrations. Forexample,whenevaluatingthealternativeusesforbottlethata
+particularLLMgenerates, weuse20human-writtenalternativeusesofbottleandcorresponding
+human-annotatedscoresasthe20-shotdemonstrations.
+EvaluationPrompt
+Belowisalistofusesfora{tool}. Onascaleof1to5,judgehowcreativeeachuseis,where1
+is‘notatallcreative’and5is‘verycreative’. Therearesomeusesandexpertratingsalready
+providedforreference. Completetheonesthatdonothavearating.
+-{20-shotdemonstrations}
+-{modeloutputs}
+E.9.5 ModelPerformances
+SeeTable15fordetailedmodelperformances. NotethatonlytheperformancesinImprovement
+Prompts(BestResults)areincludedintheoverallcreativitycalculationastheAUTscore.
+47

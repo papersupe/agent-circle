@@ -20,14 +20,14 @@ practicalextensionofHC,willcontributetoadeeperunderstandingoftopologicalarchitec
 designandsuggestpromisingdirectionsfortheevolutionoffoundationalmodels.
 x x x
 !"# !"# !"#
-h’(&) h’(&)
+h'(&) h'(&)
 ! !
 Post Mapping Post Mapping
 ℋ
 !
-’(&) 𝒫 ℳ$%#&(ℋ
+'(&) 𝒫 ℳ$%#&(ℋ
 !
-’(&))
+'(&))
 h(,) h(,)
 ! !
 Layerℱ Layer ℱ Layer ℱ
@@ -38,11 +38,11 @@ Res Mapping Pre Mapping Res Mapping Pre Mapping
 !
 $%& ℋ
 !
-’$% 𝒫 ℳ!"#(ℋ
+'$% 𝒫 ℳ!"#(ℋ
 !
 $%&) 𝒫 ℳ$!"(ℋ
 !
-’$%)
+'$%)
 x
 ! x x
 ! !
@@ -703,12 +703,12 @@ device’sprocessingunits. Furthermore,therecomputationprocessisdecoupledfrompip
 communicationdependencies,astheinitialactivationofeachstagex𝑙 isalreadycachedlocally.
 0
 11
-ℱ! ) ’((B) ℱ! * "#$, ’(#(B) ℱ! * ’((B) ℱ! * ’((F) ℱ! * "#$, ’(#(F) ℱ! ) ’((F)
+ℱ! ) '((B) ℱ! * "#$, '(#(B) ℱ! * '((B) ℱ! * '((F) ℱ! * "#$, '(#(F) ℱ! ) '((F)
 Whole Stage
 Normal Compute Stream MLP (B) MLP (W) MLP (F) ATTN (B) ATTN (W) Recompute (B) ATTN (F)
 Communication Stream DISPATCH (F) DISPATCH (B) COMBINE (F) PP Send Recv (F) PP Send Recv(B) COMBINE (B)
 High Priority Compute Stream
-ℱ! ) "#$, ’(#(F) ℱ! ) "#$, ’(#(B)
+ℱ! ) "#$, '(#(F) ℱ! ) "#$, '(#(B)
 Figure 4 | Communication-Computation Overlapping for mHC. We extend the DualPipe
 scheduletohandletheoverheadintroducedbymHC.Lengthsofeachblockareillustrativeonly
 anddonotrepresentactualduration. (F),(B),(W)referstoforwardpass,backwardpass,weight

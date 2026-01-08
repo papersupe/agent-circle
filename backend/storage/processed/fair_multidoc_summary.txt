@@ -1,0 +1,821 @@
+Improving Fairness of Large Language Models in Multi-document
+Summarization
+HaoyuanLi1,RuiZhang2,SnigdhaChaturvedi1
+1UniversityofNorthCarolinaatChapelHill,2PennsylvaniaStateUniversity
+{haoyuanl,snigdha}@cs.unc.edu,{rmz5227}@psu.edu
+Abstract level. Summary-levelfairnessmeasureshowfairly
+a summary represents documents with different
+Fairness in multi-document summarization
+socialattributevalues. Corpus-levelfairnessmea-
+(MDS)iscrucialforprovidingcomprehensive
+sureshowfairlyacorpusofsummariesasawhole
+views across documents with diverse social
+representsdifferentsocialattributevalues.
+attributevalues,whichcansignificantlyimpact
+decision-making. Forexample,asummariza- Recent studies (Zhang et al., 2023; Li et al.,
+tionsystemthattendstooverrepresentnegative 2024) find that modern summarization methods
+reviews of products can mislead customers likeLLMsstrugglewithbothsummary-leveland
+into disregarding good products. Previous corpus-level fairness. To improve the summary-
+worksmeasurefairnessinMDSattwolevels:
+levelfairness,Zhangetal.(2023)promptLLMsto
+summary-level and corpus-level. While
+generatesummariesbasedonthedistributionofso-
+summary-levelfairnessfocusesonindividual
+cialattributesamongdocuments. However,itrelies
+summaries, corpus-level fairness focuses
+onusers’priorknowledgeoffairnessissuesandso-
+on a corpus of summaries. Recent methods
+primarily focus on summary-level fairness. cialattributes,limitingitseffectivenessinpractice.
+We propose FairPO, a preference tuning Huang et al. (2024) improve the summary-level
+method that focuses on both summary-level fairnessofT5(Raffeletal.,2020)bypolicygradi-
+andcorpus-levelfairnessinMDS.Toimprove ent,buttheirmethodmaynotgeneralizetomodern
+summary-levelfairness,weproposetogenerate
+models like LLMs. Furthermore, both methods
+preferencepairsbyperturbingdocumentsets.
+focusexclusivelyonsummary-levelfairness,over-
+Toimprovecorpus-levelfairness,wepropose
+lookingthecorpus-levelfairness.
+fairness-aware preference tuning by dynami-
+callyadjustingtheweightsofpreferencepairs. We propose FairPO (Fair Preference Optim-
+OurexperimentsshowthatFairPOoutperforms ization),apreferencetuning(Ziegleretal.,2019)
+strongbaselineswhilemaintainingthecritical method that focuses on both summary-level and
+qualitiesofsummaries.Thecodeisavailableat corpus-levelfairnessofLLMsinMDS.Whilepre-
+https://github.com/leehaoyuan/coverage_fairness.
+viousworks(Stiennonetal.,2020;Roitetal.,2023)
+usespreferencetuningtoimproveotherqualities
+1 Introduction
+ofsummaries,FairPOisthefirsttousepreference
+Multi-document summarization (MDS) aims to tuningforthefairnessinMDS.FairPOisbasedon
+summarize the salient information from multiple Direct Preference Optimization (DPO) (Rafailov
+documents about an entity, such as reviews of a etal.,2024). Tooptimizesummary-levelfairness,
+product. Eachofthesedocumentsisgenerallyas- FairPOgeneratespreferencepairsgivenperturbed
+sociatedwithasocialattributessuchassentiments input document sets by removing a small subset
+inreviews. Thesedocumentswithdifferentsocial of documents with certain social attribute values.
+attributevaluese.g. positivesentimentornegative To further improve corpus-level fairness, FairPO
+sentimenttendtohavediverseinformationorcon- performsfairness-awarepreferencetuningbydy-
+flicting opinions. It is crucial that the summary namicallyadjustingtheweightsofpreferencepairs.
+fairly represents conflicting information since it WeconductanempiricalevaluationofFairPO
+cansignificantlyimpactdecision-making. using three LLMs: Llama3.1 (AI@Meta, 2024),
+Previousworks(Shandilyaetal.,2018;Olabisi Mistral (Jiang et al., 2023), and Gemma2 (Team
+etal.,2022;Huangetal.,2024)measurefairness et al., 2024), on the Amazon (Ni et al., 2019),
+in MDS at two levels: summary-level or corpus- MITweet(Liuetal.,2023),andSemEvaldatasets
+1143
+Proceedingsofthe63rdAnnualMeetingoftheAssociationforComputationalLinguistics(Volume2:ShortPapers),pages1143–1154
+July27-August1,2025©2025AssociationforComputationalLinguistics
+(Mohammadetal.,2016). Ourexperimentsshow The average coverage probability, p(d,s), is
+that FairPO outperforms strong baselines while then calculated by averaging coverage probabil-
+maintainingothercriticalqualitiesofsummaries, ity, p(d ,s), across all documents in the docu-
+i
+suchasrelevanceandfactuality. ment set D. Using these values, Equal Cover-
+Ourcontributionsareasfollows: agecalculatesthecoverageprobabilitydifference
+• We propose FairPO to improve the fairness of c(d i ,S) = p(d i ,s) p(d,s). Equal Coverage
+−
+LLMsinMDS; valueEC(D,S)isthencalculatedastheaverage
+• We propose to improve summary-level and of the absolute average coverage probability dif-
+corpus-levelfairnessbyperturbation-basedpref- ference c(d i ,S) for documents with each social
+erencepairgenerationandfairness-awareprefer- attributevalue:
+encetuning;
+K
+1
+• Weperformcomprehensiveexperimentstoshow
+EC(D,S) = E( c(d
+i
+,S) a
+i
+= k ) (3)
+theeffectivenessofFairPO. K | { | } |
+k=1
+X
+AlowerEC(D,S)indicatesafairersummaryS.
+2 Background
+To evaluate the fairness of a system, we use the
+Inthissection,weprovidebackgroundknowledge averageEqualCoveragevalueacrossthecorpusG.
+onfairnessinMDS.LetGdenotealldocumentsets
+in a corpus for MDS. Each document set D G Coverage Parity examines whether certain so-
+∈
+contains multiple documents d ,...,d , where cial attribute values are systematically overrepre-
+1 n
+{ }
+eachdocumentd islabeledwithasocialattribute sented or underrepresented across the corpus G.
+i
+a 1,...,K . ForeachdocumentsetD,aMDS CoverageParitycollectsthesecoverageprobabil-
+i
+∈ { }
+systemissupposedtogenerateasummaryS. ity differences c(d i ,S) from all input documents
+ToevaluatefairnessinMDS,weuseEqualCov- of the dataset G whose social attribute value is k
+erage EC(D,S), a summary-level measure, and intoasetC k . ThecoverageParityvalueCP(G)is
+CoverageParityCP(G),acorpus-levelmeasure, then calculated as the average of the absolute av-
+proposedbyLietal.(2024). Below,wesummarize eragecoverageprobabilitydifferencec(d i ,S)for
+theseconceptsasintroducedintheoriginalpaper. documentswitheachsocialattributevalue:
+EqualCoverage examineswhethereachsocial 1 K
+attributevaluehasequalprobabilitiesofbeingcov-
+CP(G) =
+K |
+E(C
+k
+)
+|
+, (4)
+ered by the summary S for a document set D. X k=1
+AlowerCP(G)indicatesafairersystem. Formore
+Specifically,itfirstdefinescoverageprobability
+details,pleaserefertoLietal.(2024).
+difference c(d i ,S) as the difference between the
+coverageprobabilityforthedocumentd ,p(d ,s).
+i i
+3 FairPO
+It also defines the average coverage probability
+acrossalldocuments,p(d,s). Toestimatethecov- In this section, we describe our proposed prefer-
+erage probability for the document d i , p(d i ,s), encetuningmethod,FairPO.
+FairPO estimates the probability p(d ,s ) that a
+i j
+documentd iscoveredbyasummarysentences . 3.1 Perturbation-basedPreferencePair
+i j
+Specifically,theprobabilityp(d ,s )isestimated Generation
+i j
+asthemaximumentailmentprobabilityp(d i,l ,s j ) Inthissection,wedescribehowtogenerateprefer-
+betweenanydocumentchunkd i,l ofthedocument encepairsbasedonperturbation. Apreferencepair
+d i and the summary sentence s j using an entail- forFairPOcontainsachosensummaryS c andare-
+mentmodel: jectedsummaryS forthedocumentsetD. Ideally,
+r
+the chosen and rejected summaries should differ
+p(d ,s ) = max p(d ,s ) d d , (1)
+i j i,l j i,l i
+{ | ∈ } significantly in representing documents with dif-
+The coverage probability for the document d , ferentsocialattributevalues. Tothisend,FairPO
+i
+p(d ,s), is then estimated as the average of the generatessummariesforperturbedinputdocument
+i
+probabilityp(d ,s ): sets,wheresmallsubsets(α%)ofdocumentswith
+i j
+specificsocialattributevaluesareremoved.
+1
+p(d ,s) = p(d ,s ), (2) Specifically,FairPOfirstgeneratesasummaryS
+i i j
+S
+fortheinputdocumentsetDandidentifiesitsmost
+| | s Xj∈ S
+1144
+overrepresented,k+,andunderrepresented,k ,so- Domain Soci.Attr. Soci.Attr.Val. Doc.SetSize Doc.Len
+−
+cialattributevalue. Forthecompletenessofinfor- negative,neutral,
+Amazon Review Sentiment 8 40
+positive
+mation,FairPOonlyconsiderssocialattributeval- left,center,
+MiTweet Tweet Ideology 20 34
+right
+uesthatappearinmorethanα%ofthedocuments
+SemEval Tweet Stance support,against 30 17
+(detailsinApp. A.4). Thesearedeterminedbased
+Table 1: Dataset statistics. Doc. Set Size means size
+on the highest or lowest average coverage prob-
+ofdocumentsets. Doc. Len. meansaveragelengthof
+ability differences, E( c(d
+i
+,S) a
+i
+= k ). Then,
+{ | } documents.
+FairPOgeneratessummaryS+ andS fortheper-
+−
+turbedinputdocumentsetwhereα%ofrandomly
+sampleddocumentswithsocialattributevaluea thesocialattributevaluek ifthesumofcoverage
+i
+of k+ and k are removed. Among summaries probability differences, C (D,S ), is greater or
+− k
+S, S+, S , FairPOselectsthesummarywiththe less than zero respectively. In ea ∗ ch training step,
+−
+lowest Equal Coverage value, indicating the best FairPO estimates the overrepresentation O(k) of
+summary-level fairness, as the chosen summary socialattributevaluek:
+v S a c l . u T e h i e ss s e u l m ec m te a d ry as w t i h th e t r h e e je h c i t g e h d e s s u t m Eq m u a a r l y C S ov . erage O(k) = (D,S) ∈ T k + | C k (D,S) |· π θ (S | D)/ | S |
+r π (S D)/ S
+P (D,S) ∈ T k + θ | | |
+3.2 Fairness-awarePreferenceTuning (7)
+P
+whereT+ isthesetofdocumentsetsD andcorre-
+In this section, we describe fairness-aware pref- k
+spondingchosenorrejectedsummariesthatover-
+erence tuning that optimizes summary-level and
+representsocialattributevaluek (C (D,S ) > 0)
+k
+corpus-levelfairness. Toachievethis,FairPOdy- ∗
+inrecenttrainingsteps. Similarly,FairPOestimates
+namicallyassignsseparateweightsforthechosen
+summary S and the rejected summary S based
+theunderrepresentationU(k)usingthesetT k− of
+c r documentsetsandsummariesthatunderrepresent
+onestimatedcorpus-levelfairnessduringtraining.
+socialattributevaluek (C (D,S ) < 0)asEq. 7.
+k
+FairPO modifies the DPO objective (more ex- ∗
+UsingtheoverrepresentationO(k)andunderrep-
+planations in App. A.3) and introduces separate
+resentation U(k), FairPO assigns weight w and
+c
+weights, w and w , for the chosen summary S
+c r c w . Chosensummariesthathelpbalanceoverrep-
+r
+andrejectedsummaryS respectively:
+r resentationO(k)andunderrepresentationU(k)re-
+π (S D) π (S D) ceive higher weights and vice versa for rejected
+θ r θ c
+σ( m)β(w log | w log | )
+− r π ref (S r D)− c π ref (S c D) summaries. Forexample,theweightw c shouldbe
+| |
+(5) higherifasystematicallyunderrepresentedsocial
+where σ is the sigmoid function, π is the policy attributevaluek(U(k) > O(k))isoverrepresented
+θ
+model, π ref is the reference model, and m is the bythechosensummaryS (C (D,S ) > 0). For
+c k c
+rewardmarginasinDPO: socialattributevaluek,FairPOcomputesaninter-
+π (S D) π (S D) mediate weight w for the chosen summary S :
+θ c θ r c,k c
+m = βlog | βlog | (6)
+π (S D) − π (S D)
+ref c ref r 2
+| |
+w = (8)
+c,k
+Thetermσ( m)inEq. 5servesasascalingfactor
+1+(O(k)/(U(k))Ck(D,Sc)/τ
+−
+andFairPOdoesnotconsideritsgradient. whereτ isthetemperature. Theweightw forcho-
+c
+FairPOassignsweightsw andw tosummaries sensummariesistheaverageintermediateweight
+c r
+basedontheirimpactoncorpus-levelfairness. Itas- w c,k acrossallsocialattributevalues. Theweight
+signshighweightsw c tochosensummariesthatim- w r fortherejectedsummaryS r iscomputedsimi-
+provecorpus-levelfairnessbybalancingtheover- larlywiththeintermediateweightw r,k :
+representationandunderrepresentationofsocialat-
+2
+tributevalues. Conversely,itassignshighweights w r,k = (9)
+1+(U(k)/(O(k))Ck(D,Sr)/τ
+w to rejected summaries that hurt corpus-level
+r
+fairness. Toestimatecorpus-levelfairness,FairPO The design ensures that summaries improving
+corpus-levelfairnessareprioritized.
+computes the sum of coverage probability differ-
+ences for documents with social attribute values
+4 Experiments
+ofk,C (D,S ) = c(d,S )foreach
+chosen k orrejec ∗ tedsum d m∈{a d r i y| a , i S =k .}Asum ∗ maryS is Inthissection,wedescribeexperimentsoffinetun-
+P ∗ ∗
+consideredoverrepresentingorunderrepresenting ingmodelswithFairPO.
+1145
+Amazon MITweet SemEval Overall ueslikeFairPOforafaircomparison;(ii)OPTune
+EC CP EC CP EC CP EC CP
+↓ ↓ ↓ ↓ ↓ ↓ ↓ (Chenetal.,2024),whichselectsthechosenandre-
+Llama3.1 7.95 1.89 4.50 0.59 2.98 1.41 5.14 1.30
++DPO 7.23 1.27 4.25 0.47 2.66 1.09 4.72 0.94 jectedsummariesasDPOandweightspreference
++OPTune 6.70 0.62 4.33 0.51 2.60 0.95 4.54 0.69 pairs based on EC value differences; (iii) Policy
++Prompt 7.42 1.64 4.36 0.45 2.62 0.29 4.80 0.79
+gradients (Lei et al., 2024) and (iv) a prompting
++PolicyG. 7.73 1.88 4.51 0.55 2.97 1.38 5.07 1.27
++FairPO 6.87 0.42 4.24 0.42 2.49 0.66 4.53 0.50 method (Zhang et al., 2023). Implementation de-
+Mistral 8.36 2.83 4.16 0.61 2.83 1.27 5.12 1.57
+tailsofthesebaselinesareinAppA.5. Forevalua-
++DPO 7.20 1.82 3.55 0.34 2.41 0.93 4.39 1.03
++OPTune 6.85 0.88 3.58 0.51 2.07 0.57 4.17 0.65 tion,weconsidersummary-levelandcorpus-level
++Prompt 7.74 1.92 3.97 0.37 2.35 0.36 4.68 0.88 fairnessusingEqualCoverage(EC)andCoverage
++FairPO 6.32 0.46 3.70 0.40 2.10 0.43 4.04 0.43
+Parity(CP)(Lietal.,2024). Alowervalueisbetter
+Gemma2 8.32 2.48 4.20 0.60 2.81 0.96 5.11 1.35
++DPO 6.90 0.91 4.04 0.40 2.44 0.56 4.46 0.62 forthesemeasures. Wereporttheaverageresults
++OPTune 6.84 0.88 3.89 0.57 2.32 0.49 4.35 0.65 onthreesplittingsoftraining,validationandtest-
++Prompt 7.28 1.16 4.33 0.32 2.73 0.48 4.78 0.65
++FairPO 6.18 0.44 3.76 0.48 2.50 0.45 4.15 0.46 inginTab. 2.Weadditionallyreporttheresultsfor
+eachsplittinginApp. A.6. WeobservethatFairPO
+Table 2: Summary-level fairness (EC) and corpus-
+outperformsothermethodsformostLLMsonall
+levelfairness(CP)ofsummariesgeneratedbydifferent
+datasetsandyieldsthebestoverallperformancefor
+methods. Thebestperformingmethodisinbold. The
+allLLMs. TheresultsshowthatFairPOimproves
+second-bestperformingmethodisunderlined. FairPO
+hasthebestoverallperformance. bothsummary-levelandcorpus-levelfairness.
+4.4 AblationStudy
+4.1 Datasets
+Tovalidatetheeffectofperturbation-basedprefer-
+Weexperimentonthreedatasets: Amazon(Nietal., encepairgenerationandfairness-awarepreference
+2019),MITweet(Liuetal.,2023),SemEval(Mo- tuning, we compare FairPO with its ablated ver-
+hammad et al., 2016) datasets. Each dataset in- sions. Weconsiderthefollowingablatedversions:
+cludes1000samplesfortraining,300samplesfor (i)(w/opert.),wherethechosenandrejectedsum-
+validation, and 300 samples for testing. The di- mariesareselectedamongthreerandomlysampled
+vision of training, validation, and testing sets is summaries based on Equal coverage values; (ii)
+basedonstratifiedsamplingofsocialattributeval- (w/o fair.) that performs preference tuning using
+uesandtopics. Tab. 1showsthestatisticsofthese the DPO objective instead of the fairness-aware
+datasets. Thesummarylengthis50words. Details preferencetuning;(iii)(w/orew.) thatdirectlyas-
+ofpreprocessingareinApp. A.1. signsweightsw andw intheDPOobjective(Eq.
+c r
+13),whichunderminestheeffectivenessofreward
+4.2 ImplementationDetails
+margin (more explanations in App. A.3). Tab.3
+We perform experiments with three LLMs: reports the results for each dataset, and Overall
+Llama3.1-8b-Instruct(AI@Meta,2024),Mistral- scores,whichistheaverageacrossalldatasets. A
+7B-Instruct-v0.3(Jiangetal.,2023),Gemma-2-9b- lowervalueindicatesbetterfairness.
+it(Teametal.,2024). EachLLMistrainedfor2 From the table, we observe that FairPO yields
+epochsusingLoRA(Huetal.,2021)withalearn- the best overall performance compared to its ab-
+ingrateof5e 5andbatchsizeof16. Togenerate latedversions. Theresultsshowtheeffectiveness
+−
+preferencepairs,FairPOremovesα = 10%ofdoc- of perturbation-based preference pair generation
+uments. The temperature τ is 1 on the MITweet andfairness-awarepreferencetuning. Italsopro-
+dataset, 2 for Mistral and 1 for other LLMs on videsempiricalevidencesforthedesignchoiceof
+theAmazondataset,3forMistraland2forother objectiveofFairPO.
+LLMsontheSemEvaldataset. Allhyperparame-
+4.5 HumanEvaluationofFairPO
+ters are tuned on the validation set. More details
+areinApp. A.4. Weperformahumanevaluationtocomparethefair-
+nessofsummariesgeneratedbyLLMstunedwith
+4.3 AutomaticEvaluationofFairPO
+DPOandFairPO.ForeachLLM,werandomlyse-
+WecompareFairPOwiththefollowingbaselines: lect10pairsofsummariesgeneratedbytheLLM
+(i)DPO(Rafailovetal.,2024),wherethechosen tunedwithDPOorFairPO,yieldingatotalof30
+andrejectedsummariesareselectedamongthree pairs. Each pair is annotated by three annotators
+randomly sampled summaries based on EC val- recruitedfromAmazonMechanicalTurk. Annota-
+1146
+Amazon MITweet SemEval Overall forapairofsummaries,weinstructPrometheus2
+EC CP EC CP EC CP EC CP
+↓ ↓ ↓ ↓ ↓ ↓ ↓ (7B)(Kimetal.,2024)toselectthebettersummary
+Llama3.1
+FariPO 6.57 0.37 4.20 0.26 2.39 0.56 4.39 0.39 inthreedimensions: fluency,relevance,andfactu-
+w/opert. 7.01 0.48 4.07 0.34 2.54 0.81 4.54 0.54 ality. Tomitigatepositionbias(Huangetal.,2023),
+w/ofair. 6.70 0.95 4.26 0.31 2.29 0.65 4.42 0.64
+we perform the pairwise comparison twice with
+w/orew 6.48 0.79 4.19 0.27 2.60 0.86 4.42 0.64
+Mistral different orders of summaries and only consider
+FariPO 6.98 0.89 3.56 0.21 1.97 0.36 4.17 0.49 consistent results. Tab. 4 reports the differences
+w/opert. 7.29 1.64 3.81 0.21 2.30 0.26 4.47 0.71
+betweenthewinningandlosingratesofdifferent
+w/ofair. 7.31 1.36 3.57 0.25 2.21 0.66 4.37 0.76
+w/orew 7.05 1.26 3.65 0.14 2.06 0.55 4.25 0.65 methods. Apositivevalueindicatessummaryqual-
+Gemma2 ityisbettercomparedtooriginalLLMs.
+FariPO 6.09 0.33 3.84 0.47 2.53 0.59 4.15 0.46
+w/opert. 6.18 0.19 4.17 0.21 2.43 0.53 4.26 0.31 From the table, we observe that the quaility of
+w/ofair. 6.77 1.11 3.84 0.51 2.39 0.59 4.34 0.74 summariesgeneratedbyLLMstunedwithFairPO
+w/orew 6.89 0.90 3.94 0.40 2.49 0.44 4.44 0.58
+iscomparablewithsummariesgeneratedbyorigi-
+Table3: Summary-levelfairness(EC)andcorpus-level nalLLMs. Contrarily,promptingsignificantlyhurt
+fairness(CP)ofsummariesgeneratedbyablatedver- the quality of summaries. The results show that
+sionsofFairPO.Thebestperformingmethodisinbold. FairPOimprovesthefairnessofsummarieswhile
+FairPOhasthebestoverallperformance. maintainingtheirquality.
+Llama3.1 Mistral Gemma2
+flu. rel. fac. flu. rel. fac. flu. rel. fac. 5 Conclusion
+↑ ↑ ↑ ↑ ↑ ↑ ↑ ↑ ↑
+DPO 7.56 8.33 2.78 5.11 11.5611.56 5.11 1.11 8.67
+OPTune 1.00 0.44 -6.89 -0.78 6.78 8.89 7.00 11.67 11.67
+Prompt -15.33-19.22-24.44-0.44 -6.00 -5.56 -42.67-50.78-51.44 We propose FairPO, a preference tuning method
+FairPO 5.78 3.11 2.89 2.11 5.33 9.11 11.44 16.11 9.44
+thatoptimizessummary-levelfairnessandcorpus-
+Table4: Pairwisecomparisonofqualitybetweensum- level fairness in MDS. Specifically, FairPO gen-
+mariesgeneratebyLLMsbeforeandaftertuning. Sta- eratespreferencepairsusingperturbeddocument
+tisticalsignificantdifferences(p<0.05)accordingto sets to improve summary-level fairness and per-
+pairedbootstrapresampling(Koehn,2004)areunder- formsfairness-awarepreferencetuningtoimprove
+lined. FairPOdoesnotaffectsummaryquality.
+corpus-levelfairness. Ourexperimentsshowthat
+FairPOoutperformsstrongbaselineswhilemain-
+tainingcriticalqualitiesofsummaries.
+torsareaskedtoreadallcorrespondingdocuments
+andselectthefairersummary. WechoosetheAma-
+zondatasetsinceeachdocumentsetonlycontains 6 Limitation
+eightreviews(Tab. 1)andjudgingthesentimentof
+anopinionisrelativelyeasyforcommonusers. The Our experiments demonstrate FairPO’s effective-
+Randolph’sKappa(Randolph,2005)betweenan- nessinimprovingbothsummary-levelandcorpus-
+notationsofthreeannotatorsis0.40,whichshows level fairness of summaries within individual do-
+amoderatecorrelation. Thecorrelationisexpected mains. Whilethisworkfocusesonoptimizingfair-
+consideringthesubjectivityofthetask. Morede- nesswithinasingledomain,extendingFairPOto
+tailsareinApp. A.2. improve fairness simultaneously across multiple
+Outof30pairs,summariesgeneratedbyFairPO- domains with diverse social attributes presents a
+tunedLLMsarefairerin18pairsandsummaries promising future direction. Besides, FairPO cur-
+generated by DPO-tuned LLMs are fairer in 9 rently selects the two summaries with the largest
+pairs.Thedifferenceisstatisticallysignificant(p < fairnessdifferencesamongthethreegeneratedsum-
+0.05)usingbootstrap(Koehn,2004). Theresults mariesforpreferencetuning,followingcommonly
+showthatFairPOperformsbetterthanDPOinim- used practices of DPO. Exploring approaches to
+proving fairness. We additionally show example utilize all three summaries generated by FairPO
+summariesgeneratedbyFairPOinApp. A.7. canbeanotherinterestingfuturedirection.
+4.6 EvaluationofSummaryQuality
+7 Acknowledgment
+ToevaluateFairPO’simpactonsummaryquality,
+wecomparesummariesgeneratedbyLLMsbefore This work was supported by NSF grant DRL-
+andaftertuningtoimprovefairness. Specifically, 2112635and2338418.
+1147
+8 EthicalConsideration YuanyuanLei,KaiqiangSong,SangwooCho,Xiaoyang
+Wang, Ruihong Huang, and Dong Yu. 2024. Po-
+Thedatasetsweuseareallpubliclyavailable. We laritycalibrationforopinionsummarization. arXiv
+donotannotateanydataonourown. Allthemod- preprintarXiv:2404.01706.
+elsusedinthispaperarepubliclyaccessible. The
+Haoyuan Li, Yusen Zhang, Rui Zhang, and Snigdha
+inferenceandfinetuningofmodelsareperformed Chaturvedi. 2024. Coverage-based fairness
+ononeNvidiaA6000orNvidiaA100GPU. in multi-document summarization. Preprint,
+arXiv:2412.08795.
+We perform human evaluation experiments on
+Amazon Mechanical Turk. The annotators were Songtao Liu, Ziling Luo, Minghua Xu, LiXiao Wei,
+compensatedatarateof$20perhour. Duringthe Ziyao Wei, Han Yu, Wei Xiang, and Bang Wang.
+2023. Ideologytakesmultiplelooks: Ahigh-quality
+evaluation,humanannotatorswerenotexposedto
+datasetformultifacetedideologydetection. InThe
+anysensitiveorexplicitcontent.
+2023ConferenceonEmpiricalMethodsinNatural
+LanguageProcessing.
+Saif Mohammad, Svetlana Kiritchenko, Parinaz Sob-
+References
+hani, Xiaodan Zhu, and Colin Cherry. 2016.
+AI@Meta.2024. Llama3modelcard. SemEval-2016 task 6: Detecting stance in tweets.
+InProceedingsofthe10thInternationalWorkshop
+LichangChen,JiuhaiChen,ChenxiLiu,JohnKirchen-
+onSemanticEvaluation(SemEval-2016),pages31–
+bauer, Davit Soselia, Chen Zhu, Tom Goldstein, 41,SanDiego,California.AssociationforComputa-
+TianyiZhou, andHengHuang.2024. Optune: Ef- tionalLinguistics.
+ficient online preference tuning. arXiv preprint
+Jianmo Ni, Jiacheng Li, and Julian McAuley. 2019.
+arXiv:2406.07657.
+Justifyingrecommendationsusingdistantly-labeled
+reviews and fine-grained aspects. In Proceedings
+Edward J Hu, Phillip Wallis, Zeyuan Allen-Zhu,
+of the 2019 Conference on Empirical Methods in
+YuanzhiLi, SheanWang, LuWang, WeizhuChen,
+Natural Language Processing and the 9th Interna-
+etal.2021. Lora: Low-rankadaptationoflargelan-
+tional Joint Conference on Natural Language Pro-
+guagemodels. InInternationalConferenceonLearn-
+cessing (EMNLP-IJCNLP), pages 188–197, Hong
+ingRepresentations.
+Kong, China. Association for Computational Lin-
+guistics.
+Kung-HsiangHuang,PhilippeLaban,AlexanderRFab-
+bri,PrafullaKumarChoubey,ShafiqJoty,Caiming OlubusayoOlabisi,AaronHudson,AntonieJetter,and
+Xiong,andChien-ShengWu.2023. Embracediver- AmeetaAgrawal.2022. Analyzingthedialectdiver-
+genceforricherinsights: Amulti-documentsumma- sityinmulti-documentsummaries. InProceedingsof
+rizationbenchmarkandacasestudyonsummariz- the29thInternationalConferenceonComputational
+ing diverse information from news articles. arXiv Linguistics,pages6208–6221,Gyeongju,Republic
+preprintarXiv:2309.09369. ofKorea.InternationalCommitteeonComputational
+Linguistics.
+NannanHuang,HaythamFayek,andXiuzhenZhang.
+2024. Bias in opinion summarisation from pre- LongOuyang,JeffreyWu,XuJiang,DiogoAlmeida,
+trainingtoadaptation: Acasestudyinpoliticalbias. CarrollWainwright,PamelaMishkin,ChongZhang,
+arXivpreprintarXiv:2402.00322. SandhiniAgarwal,KatarinaSlama,AlexRay,etal.
+2022. Training languagemodelsto followinstruc-
+Albert Q Jiang, Alexandre Sablayrolles, Arthur Men- tions with human feedback. Advances in Neural
+sch,ChrisBamford,DevendraSinghChaplot,Diego InformationProcessingSystems,35:27730–27744.
+delasCasas,FlorianBressand,GiannaLengyel,Guil-
+RafaelRafailov,ArchitSharma,EricMitchell,Christo-
+laumeLample,LucileSaulnier,etal.2023. Mistral
+pherDManning,StefanoErmon,andChelseaFinn.
+7b. arXivpreprintarXiv:2310.06825.
+2024. Directpreferenceoptimization:Yourlanguage
+modelissecretlyarewardmodel. AdvancesinNeu-
+Seungone Kim, Juyoung Suk, Shayne Longpre,
+ralInformationProcessingSystems,36.
+BillYuchenLin,JaminShin,SeanWelleck,Graham
+Neubig,MoontaeLee,KyungjaeLee,andMinjoon
+ColinRaffel,NoamShazeer,AdamRoberts,Katherine
+Seo.2024. Prometheus2: Anopensourcelanguage
+Lee,SharanNarang,MichaelMatena,YanqiZhou,
+modelspecializedinevaluatingotherlanguagemod-
+Wei Li, and Peter J Liu. 2020. Exploring the lim-
+els. Preprint,arXiv:2405.01535.
+its of transfer learning with a unified text-to-text
+transformer. Journalofmachinelearningresearch,
+PhilippKoehn.2004. Statisticalsignificancetestsfor 21(140):1–67.
+machinetranslationevaluation. InProceedingsofthe
+2004ConferenceonEmpiricalMethodsinNatural Justus J Randolph. 2005. Free-marginal multirater
+Language Processing, pages 388–395, Barcelona, kappa(multiraterk[free]): Analternativetofleiss’
+Spain.AssociationforComputationalLinguistics. fixed-marginalmultiraterkappa. Onlinesubmission.
+1148
+PaulRoit,JohanFerret,LiorShani,RoeeAharoni,Ge- sethasequalproportionsofdocumentsetsD dom-
+offreyCideron,RobertDadashi,MatthieuGeist,Ser- inatedbyeachsocialattributevalues. Wesample
+tanGirgin,LeonardHussenot,OrgadKeller,Nikola
+1000productsandtheircorrespondingreviewsfor
+Momchev, Sabela Ramos Garea, Piotr Stanczyk,
+training,300productsforvalidation,and300prod-
+NinoVieillard,OlivierBachem,GalElidan,Avinatan
+Hassidim,OlivierPietquin,andIdanSzpektor.2023. uctsfortesting.
+Factually consistent summarization via reinforce-
+mentlearningwithtextualentailmentfeedback. In MITweet (Liu et al., 2023) consists of tweets
+Proceedings of the 61st Annual Meeting of the As- withlabelsofpoliticalideologiesondifferentfacets
+sociationforComputationalLinguistics(Volume1: about different topics. The social attribute of a
+Long Papers), pages 6252–6272, Toronto, Canada.
+tweetwillbeleftifitisleftonmostfacets,rightif
+AssociationforComputationalLinguistics.
+itisrightonmostfacets,otherwiseneutral. First,
+AnuragShandilya,KripabandhuGhosh,andSaptarshi weevenlydividealltweetsofeachtopicintotwo
+Ghosh.2018. Fairnessofextractivetextsummariza-
+partssothatthedistributionoftopicsisthesame
+tion. In Companion Proceedings of the The Web
+betweentwoparts. Foreachpart,weclustertweets
+Conference2018,pages97–98.
+aboutthesametopicbasedontheirTFIDFsimilar-
+Nisan Stiennon, Long Ouyang, Jeffrey Wu, Daniel ityintoclusters. Wethendividetheseclustersinto
+Ziegler, Ryan Lowe, Chelsea Voss, Alec Radford,
+input document sets of 20 tweets about the same
+DarioAmodei,andPaulFChristiano.2020. Learn-
+topic. We generate 1000 input document sets for
+ingtosummarizewithhumanfeedback. Advances
+inNeuralInformationProcessingSystems,33:3008– trainingfromthefirstpartofthetweets. Similarly,
+3021. wegenerate300inputdocumentsetsforvalidation
+and 300 input document sets for testing from the
+Gemma Team, Thomas Mesnard, Cassidy Hardin,
+secondpartofthetweets. Whengeneratinginput
+RobertDadashi,SuryaBhupatiraju,ShreyaPathak,
+LaurentSifre,MorganeRivière,MihirSanjayKale, document sets of training, validation, and testing
+Juliette Love, et al. 2024. Gemma: Open models sets,wealsoperformstratifiedsamplingbasedon
+based on gemini research and technology. arXiv
+the distribution of social attribute values so that
+preprintarXiv:2403.08295.
+eachsethasequalproportionsofdocumentsetsD
+YusenZhang, NanZhang, YixinLiu, AlexanderFab- dominatedbyeachsocialattributevalue.
+bri, Junru Liu, Ryo Kamoi, Xiaoxin Lu, Caiming
+Xiong,JieyuZhao,DragomirRadev,etal.2023. Fair TweetStance (Mohammadetal.,2016)consists
+abstractive summarization of diverse perspectives. of tweets with labels of stance toward a target
+arXivpreprintarXiv:2311.07884. phrasesuchasClimateChangeorHillaryClinton.
+First,weevenlydividealltweetsofeachtopicinto
+DanielMZiegler,NisanStiennon,JeffreyWu,TomB
+Brown, Alec Radford, Dario Amodei, Paul Chris- two parts so that the distribution of target phrase
+tiano, and Geoffrey Irving. 2019. Fine-tuning lan- isthesamebetweentwoparts. Weclustertweets
+guage models from human preferences. arXiv aboutthesametargetphrasebasedontheirTFIDF
+preprintarXiv:1909.08593.
+similarityintoclusters. Wethendividetheseclus-
+ters into input document sets of 30 tweets about
+A Appendix
+the same target phrase. We generate 1000 input
+A.1 Datasets document sets for training from the first part of
+thetweets. Similarly,wegenerate300inputdoc-
+Inthissection,wedescribehowwepreprocessthe
+umentsetsforvalidationand300inputdocument
+datasets.
+setsfortestingfromthesecondpartofthetweets.
+Amazon (Nietal.,2019)consistsofreviewswith Whengeneratinginputdocumentsetsoftraining,
+labelsoftheirratingsofdifferentproducts. Wefil- validation,andtestingsets,wealsoperformstrat-
+teroutreviewsthatarenon-Englishorwithoutrat- ified sampling based on the distribution of social
+ings. Weobtainthesocialattributeofeachreview attributevaluessothateachsethasequalpropor-
+basedonitsratingprovidedinthedataset. Theso- tionsofdocumentsetsDdominatedbyeachsocial
+cialattributeofareviewwillbepositiveifitsrating attributevalue.
+is 4 or 5, neutral if its rating is 3, and negative if
+itsratingis1or2. Toconstructtraining,validation A.2 HumanEvaluation
+and testing sets, we perform stratified sampling Weperformahumanevaluationtocomparethefair-
+basedonthedistributionofsocialattributevalues nessofsummariesgeneratedbyLLMstunedwith
+amongdocumentsetsforeachset. Therefore,each DPOandFairPO.ForeachLLM,werandomlyse-
+1149
+lect10pairsofsummariesgeneratedbytheLLM Comparing with the derivative of DPO objective
+tunedwithDPOorFairPO,yieldingatotalof30 (Eq. 10), the term σ( m) remains consistent in
+−
+pairs. Tofurthersimplifytheevaluation, wecon- thederivativeofFairPOobjective.
+siderdocumentsetswithonlynegativeandpositive Suppose we directly add seperate weights w
+c
+reviews. Each pair is annotated by three annota- andw forchosenandrejectedsummariestoDPO
+r
+torsrecruitedfromAmazonMechanicalTurk. The objective. The corresponding objective is as fol-
+annotatorsshouldbefromEnglish-speakingcoun- lows:
+tries and have HIT Approval Rates greater than
+π (S D)
+98%. For each pair, annotators are first asked to logσ(βw log θ c |
+c
+− π (S D)−
+read corresponding reviews and unique opinions ref c
+| (13)
+automaticallyextractedbyGPT-4o-mini(Ouyang π θ (S r D)
+βw log | )
+r
+et al., 2022). They then evaluate whether each π ref (S r D)
+|
+summary reflects these opinions and classify the
+Thecorrespondingderivativeisasfollows:
+summaryasleaningnegative,fair,orleaningposi-
+tive. Eventually,theyareaskedtoselectthefairer
+∂π (S D)
+summary in each pair. The interface of human σ( m ′ )β(w r π θ (S r D) − 1 θ r |
+− | ∂θ
+evaluationisshowninFig. 1. (14)
+∂π (S D)
+w c π θ (S c D) − 1 θ c | )
+A.3 RelationbetweenFairPOandDPO − | ∂θ
+TheFairPOobjective(Eq. 5)ismotivatedbythe wherem isaweightedrewardmargin:
+′
+derivateoftheDPOobjectivewithrespecttothe
+modelparametersθ: π θ (S c D) π θ (S r D)
+βw log | βw log | (15)
+c r
+π (S D) − π (S D)
+∂π (S D) ref c ref r
+σ( m)β(π θ (S r D) − 1 θ r | | |
+− | ∂θ
+(10) Comparingwithm, m islesseffectiveasamea-
+∂π (S D) ′
+π θ (S c D) − 1 θ c | ) sureofthemodel’sabilitytodistinguishbetween
+− | ∂θ
+thechosensummaryS andtherejectedsummary
+c
+w m h o e d r e e l, σ π i r s ef th i e s t s h ig e m re o f i e d re f n u c n e ct m io o n d , e π l θ , a is nd th m e p i o s l t i h cy e S r sincethetermlog π π re θ f (S (S c | c D | D ) ) andlog π π re θ f (S (S r r | D | D ) )
+have different weights. We additionally provide
+rewardmargininDPO:
+empiricalevidencesinApp.4.4.
+π (S D) π (S D)
+θ c θ r
+βlog | βlog | (11)
+π (S D) − π (S D) A.4 ImplementationDetails
+ref c ref r
+| |
+Therewardmarginmcanbeviewedasameasure To reduce training cost, we perform LoRA (Hu
+of the model’s ability to distinguish between the etal.,2021)tuning. Specifically,therankforLoRA
+chosensummaryS andtherejectedsummaryS . tuning is16 and thescaling factor isalso 16. All
+c r
+Alargervalueofmindicatesthatthemodelisal- modelsarequantizedin8-bittoadditionallyreduc-
+readyproficientatdifferentiatingS fromS . Con- ingtrainingcost.
+c r
+sequently,DPOassignslowerweights,σ( m),to When performing perturbation on each docu-
+−
+chosenandrejectedsummarieswherethemodelis mentsettogeneratepreferencepairs,weobserve
+confident in their differences and higher weights that certain social attribute values are extremely
+tochosenandrejectedsummarieswherethediffer- rare in some document sets. If FairPO removes
+ences is more challenging. The term σ( m) can α percent of documents with these rare social at-
+−
+helpthemodelfocusesmoreondifficultcases. tributevalues,thosesocialattributevalueswilldis-
+TheobjectiveofFairPOisdesignedsothatcho- appearentirelyfromthedocumentset. Therefore,
+senandrejectedsummarieshaveseparateweight when performing perturbation, we only consider
+whilepreservingtheeffectofthetermσ( m)in socialattributevaluesthatappearinmorethanα
+−
+Eq.10. The derivative of FariPO objective with percent of the documents. In the most extreme
+respecttothemodelparametersθ isasfollows: case, if only one social attribute value meets this
+requirement,FairPOwillsampledifferentsubsets
+∂π (S D)
+σ( m)β(w r π θ (S r D) − 1 θ r | ofαpercentofdocumentswiththatsocialattribute
+− | ∂θ
+(12)
+value. Bydoingthis,weassurethecompleteness
+∂π (S D)
+w c π θ (S c D) − 1 θ c | ) ofsocialattributevaluesafterperturbation.
+− | ∂θ
+1150
+Figure1: InterfaceforHumanEvaluation
+1151
+Below is a list of product reviews:
+1.This is a card reader that does everything I needed it to . My adapters for the micro SD cards were defective
+so I have no complaints only praise . It reads any Compact Flash , Memory Stick , SD , and XD cards . Well that
+is all I wanted to say except this is a great product overall , and thank you .
+2.The pins in the CF slot are very flimsy and get bent out of alignment easily , making it impossible to insert
+the card ( until you perform delicate surgery on the pins with small tweezers ) . Do not buy this product if you
+will ever use the CompactFlash slot . It will just lead to frustration .
+3.So far I only use this for SM and SD cards , but it installed ( USB ) quickly , easily and reads the cards I need
+read .
+4.Initially it worked great but after the 5th time it stopped working . It also helped fry my SD-card will all my
+pictures and video clips . Not happy at all with this product .
+5.Reads 64 cards is quite deceiving . It only reads four types of cards made by 64 different manufacturers .
+Also , the connector port is difficult to plug in .
+6.good product , reads quite fast. only issue is that the card reader does not have a satisfying ' click ' when
+the card is inserted. you kinda have to stick the card in the slot and hope it is lodged properly .
+7.I can get it to read SD cards , but I bought it to read my CF 's and it won 't read a single one . My experience
+is in line with others . Go check out similar reviews on newegg.com.
+8.The card reader comes in retail packaging and totally lacks instructions on how best to put 68 types of cards
+into 4 slots . It did read an SD card successfully . The micro usb plug on the usb cord broke after 1 use .
+Please write a single summary around 50 words for all the above reviews.
+Figure2: SummarizationpromptfortheAmazonDataset.
+WeprompttheseLLMstogeneratesummaries Amazon MITweet SemEval Overall
+EC CP EC CP EC CP EC CP
+for the input document sets of different datasets. ↓ ↓ ↓ ↓ ↓ ↓ ↓
+Llama3.1 7.90 1.92 4.43 0.26 2.94 1.33 5.09 1.17
+Thepromptaretunedsothattheaveragelengthof +DPO 6.87 1.04 4.03 0.31 2.55 0.91 4.49 0.75
+generatedsummariesare50words. Weshowthe +OPTune 6.58 0.75 4.22 0.23 2.50 0.81 4.43 0.60
++Prompt 7.71 1.84 4.33 0.38 2.53 0.26 4.86 0.83
+summarizationpromptsfortheAmazondatasetin
++PolicyG. 7.71 2.10 4.46 0.31 2.95 1.32 5.04 1.24
+Fig. 2. The temperature for generation is 0.6 for +FairPO 6.57 0.37 4.20 0.26 2.39 0.56 4.39 0.39
+Mistral 8.18 2.98 3.98 0.42 2.67 1.07 4.94 1.49
+allLLMs.
++DPO 7.17 1.55 3.60 0.28 2.21 0.64 4.33 0.82
+The set T+ in Eq.7 is updated so that recent +OPTune 7.48 1.56 3.60 0.25 2.00 0.67 4.36 0.83
+k
++Prompt 7.67 1.93 4.02 0.23 2.38 0.38 4.69 0.85
+trainingstepshavehigherimpacts. Specifically,at
++FairPO 6.98 0.89 3.56 0.21 1.97 0.36 4.17 0.49
+theendofeachtrainingstep,theimpactsofallthe Gemma2 8.44 2.75 4.17 0.34 2.74 0.91 5.12 1.33
+samplesalreadyinthesetT+ arereducedwitha +DPO 6.87 1.04 4.04 0.29 2.42 0.70 4.44 0.68
+k
++OPTune 6.90 1.15 3.86 0.45 2.40 0.65 4.39 0.75
+discountfactorγ. Then,allthesamplesthatover-
++Prompt 7.21 1.13 4.28 0.24 2.62 0.30 4.70 0.56
+representssocialattributevaluek (C k (D,S )>0) +FairPO 6.09 0.33 3.84 0.47 2.53 0.59 4.15 0.46
+in current training steps are added to the se ∗ t T+.
+k Table 5: Summary-level fairness (EC) and corpus-
+Thediscountfactorγ is0.75forLlama3.1and0.5
+levelfairness(CP)ofsummariesgeneratedbydifferent
+forotherLLMs.
+methodsonthefirstsplittingoftraining,validationand
+The goal of the exponent, C k (D,S ), of testing.. Thebestperformingmethodisinbold. The
+∗
+O(k)/(U(k)orU(k)/(O(k)inEq. 8andEq. 9is second-bestperformingmethodisunderlined. FairPO
+toadjusttheweightsw andw suchthatitmore hasthebestoverallperformanceonthefirstsplitting.
+c r
+deviatesfrom1asC (D,S )moredeviatesfrom
+k
+∗
+0. Therefore,FairPOdoesnotdirectlyusetheraw
+consider the policy gradients. Besides, for a fair
+value of the sum of coverage probability differ-
+comparisonwithothermethods,weimplementthe
+encesC (D,S )astheexponent. Instead,FairPO
+k policy gradient method in an offline setting. The
+∗
+separatelynormalizesC (D,S )amongalltrain-
+k learningrateforthepolicygradeintis1e 6fol-
+∗
+ingsampleswhereC (D,S )isgreaterthanzero −
+k lowingtheoriginalpaper. Weonlyimplementthe
+∗
+orlessthanzero.
+policygradientmethodforLlama3.1sincethetrain-
+ingisveryunstableevenifwelowerthelearning
+A.5 ImplementationofBaseline
+rate to 1e 9 for Mistral and Gemma2. For OP-
+−
+Weimplementthepolicygradientmethodproposed TuneandDPO,theyusethesamehyperparameters
+by Lei et al. (2024) as a baseline. In the original asFairPO.
+implementation,thereisalossthatmaximizethe
+A.6 ResultsusingDifferentDatasetSplitting
+probability for reference summary in addition to
+the policy gradients. Since datasets used in this TovalidatethestabilityofFairPOonthreedifferent
+paperdonotcontainreferencesummary,weonly splittingsofdatasets,wegeneratethetraining,vali-
+1152
+Amazon MITweet SemEval Overall in Fig. 3. From the figure, we observe that sum-
+EC CP EC CP EC CP EC CP
+↓ ↓ ↓ ↓ ↓ ↓ ↓ maries generated by LLMs tuned FairPO tend to
+Llama3.1 7.90 2.05 4.50 0.63 2.90 1.41 5.10 1.36
++DPO 7.27 1.37 4.30 0.37 2.70 1.12 4.76 0.95 morebalancelypresentnegativeandpositiveinfor-
++OPTune 6.92 0.40 4.30 0.52 2.82 1.00 4.68 0.64 mation.
++Prompt 7.28 1.67 4.41 0.44 2.74 0.51 4.81 0.87
++PolicyG. 7.75 1.85 4.47 0.48 2.80 1.30 5.02 1.21
++FairPO 6.96 0.44 4.26 0.29 2.69 0.59 4.64 0.44
+Mistral 8.60 2.74 4.18 0.73 2.91 1.28 5.23 1.58
++DPO 7.24 1.79 3.39 0.26 2.70 1.15 4.44 1.07
++OPTune 6.59 0.52 3.57 0.53 2.04 0.58 4.07 0.54
++Prompt 7.90 1.76 3.74 0.51 2.43 0.52 4.69 0.93
++FairPO 6.06 0.11 3.83 0.39 2.13 0.33 4.01 0.28
+Gemma2 8.31 2.33 4.30 0.80 2.97 1.03 5.19 1.38
++DPO 7.04 0.98 4.07 0.44 2.43 0.48 4.51 0.63
++OPTune 6.91 0.56 3.94 0.86 2.35 0.56 4.40 0.66
++Prompt 7.33 1.26 4.49 0.44 2.91 0.85 4.91 0.85
++FairPO 6.09 0.44 3.82 0.65 2.70 0.32 4.20 0.47
+Table 6: Summary-level fairness (EC) and corpus-
+levelfairness(CP)ofsummariesgeneratedbydifferent
+methodsonthesecondsplittingoftraining,validation
+andtesting.Thebestperformingmethodisinbold.The
+second-bestperformingmethodisunderlined. FairPO
+hasthebestoverallperformanceonthesecondsplitting.
+Amazon MITweet SemEval Overall
+EC CP EC CP EC CP EC CP
+↓ ↓ ↓ ↓ ↓ ↓ ↓
+Llama3.1 8.06 1.70 4.57 0.87 3.11 1.51 5.25 1.36
++DPO 7.55 1.39 4.43 0.74 2.73 1.24 4.90 1.12
++OPTune 6.61 0.72 4.47 0.79 2.48 1.03 4.52 0.85
++Prompt 7.26 1.42 4.35 0.53 2.59 0.11 4.74 0.69
++PolicyG. 7.72 1.69 4.60 0.85 3.16 1.53 5.16 1.36
++FairPO 7.07 0.44 4.25 0.71 2.38 0.82 4.57 0.66
+Mistral 8.29 2.76 4.32 0.67 2.90 1.46 5.17 1.63
++DPO 7.20 2.11 3.65 0.48 2.32 0.99 4.39 1.19
++OPTune 6.47 0.55 3.58 0.76 2.18 0.46 4.08 0.59
++Prompt 7.66 2.07 4.14 0.36 2.23 0.19 4.68 0.87
++FairPO 5.92 0.38 3.71 0.61 2.21 0.59 3.95 0.53
+Gemma2 8.21 2.36 4.14 0.67 2.72 0.96 5.02 1.33
++DPO 6.80 0.70 4.01 0.49 2.46 0.49 4.42 0.56
++OPTune 6.72 0.94 3.86 0.41 2.21 0.25 4.27 0.53
++Prompt 7.29 1.09 4.21 0.28 2.66 0.28 4.72 0.55
++FairPO 6.35 0.56 3.64 0.32 2.29 0.43 4.09 0.44
+Table 7: Summary-level fairness (EC) and corpus-
+levelfairness(CP)ofsummariesgeneratedbydifferent
+methodsonthethirdsplittingoftraining,validationand
+testing. The best performing method is in bold. The
+second-bestperformingmethodisunderlined. FairPO
+hasthebestoverallperformanceonthethirdsplitting.
+dationandtestingsetusingdifferentrandomseeds
+andruntheautomaticevaluationonthesesplittings.
+TheresultsforeachsplittingareshowninTab. 5,
+6,7respectively. Fromthetable,weobservethat
+FairPO still shows the best overall performance,
+which shows the stability of FairPO on different
+splittingsofdatasets.
+A.7 QualiativeExample
+We show sample summaries generated by LLMs
+tunedwithDPOandFairPOontheAmazondataset
+1153
+Llama3.1 Mistral Gemma2
+DPO: The product reviews are mixed, DPO: This tablet receives generally DPO: This plush bed topper is
+with some customers expressing positive reviews, praised for its generally well-received for its comfort
+satisfaction with the quality and price, portability, picture quality, speed, and and ability to stay in place thanks to
+while others find it flimsy, useless, and features like USB and HDMI ports. its straps. Many users praise its cloud-
+painful to use. Issues include bending, Some users found the battery life like softness and how it elevates their
+crookedness, and difficulty with hair lacking, while one experienced a sleep quality. However, some users
+removal, leading to disappointment defective product. Overall, it's found it loses its fluffiness over time
+and a recommendation to avoid the considered a good value for the price and requires manual plumping.
+product. and user-friendly, with a few noting
+its similarity to Android phones.
+FairPO: The product reviews are FairPO: This Toshiba tablet receives FairPO: This plush bed topper
+mixed, with some users praising its mixed reviews. Users praise its receives rave reviews for its comfort,
+availability and quality, while others lightweight design, fast speed, great fluffiness, and stay-in-place straps.
+criticize its flimsiness, uselessness, and picture quality, and affordability. Some users find it a dream come true,
+high price. Some users find the tips Some highlight its functionality similar while others experience flattening
+too long, weak, or hard to use, while to laptops and its ease of use. over time. It's praised for its luxurious
+others appreciate its effectiveness, but However, concerns arise regarding feel, comparable to a feather bed
+note that it may not be suitable for all battery life and a negative experience without the prickliness. While some
+purposes. with a damaged, non-functional find it ideal for air mattresses and
+product. adding height, others note back pain
+issues.
+Figure3: SamplesummariesgeneratedbyDPOandFairPO.
+1154

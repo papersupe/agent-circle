@@ -1,0 +1,917 @@
+Plot Twist: Multimodal Models Don’t Comprehend Simple Chart Details
+YasamanRazeghi IshitaDasgupta FangyuLiu
+♢ ♠ ♠
+VinayRamasesh SameerSingh
+♠ ♢
+UniversityofCalifornia,Irvine GoogleDeepmind
+♢ ♠
+{yrazeghi,sameer}@uci.edu
+Abstract Previous work has showed that real world
+datasets–whileveryusefulforensuringtheprac-
+Recentadvancesinmultimodalmodelsshow
+ticalapplication–canoftencontainstatisticalpat-
+remarkableperformanceinreal-worldbench-
+terns such that model can do well without fully
+marksforchartandfigureunderstandinglike
+understandingtherelevantcapability(Goyaletal.,
+ChartQAthatinvolveinterpretingtrends,com-
+paringdatapoints,andextractinginsightsfrom 2017;McCoyetal.,2019). Moreover,testingba-
+visuals. In this paper, we investigate the ex- siccapabilitiescanhighlightimportantlimitations
+tenttowhichthesemodelstrulycomprehend of models that do not appear in complex bench-
+the underlying information in charts by pos- marks(Ribeiroetal.,2020). Complexcapabilities
+ingdirect,elementaryquestionsaboutsimple
+examined in these real-world benchmarks, such
+featuressuchasaxesrangesandvaluestoex-
+asobtaininginsightsfromvisualizations,arealso
+aminetheirfundamentalvisualunderstanding
+madeupofmanysteps: understandingtheimage,
+abilitiesinthecontextofcharts. Ourquestions
+domainknowledge,andreasoning. Thismakesit
+areappliedtotwosetsoffigures: syntheticand
+real-world. Theempiricalevaluationof5pop- hardertodiagnosethecauseforfailures.
+ularmultimodalmodelsonourdatasetreveals Inthiswork,weprobemultimodalmodelstoun-
+shortfallsinunderstandingchartsandfigures, derstandwhethertheycananswerelementaryques-
+contrarytowhattheirperformanceoncomplex tions about the specific visual content in charts.
+benchmarksmightsuggest. Forinstance,Gem-
+This is a core capability that is essential for any
+iniProVisiononlyachieves57.9%accuracyon
+model claiming proficiency in chart comprehen-
+ourelementarysetofquestionsonreal-world
+sion. Weevaluatethisunderstandingbyconstruct-
+plots,whileotherpopularmultimodalmodels
+showedsimilarorlessperformance. Thiswork ingelementaryprobingquestions. Theseelemen-
+highlights an important limitation of current tary questions include straightforward questions
+multimodalmodels,andcautionsagainstoverly that measure fundamental skills like identifying
+optimisticinterpretationsoftheirabilitiesbased axis extremes and extracting plot values on syn-
+onresultsofcanonicalevaluations.
+thetic plots. We first pose these elementary ques-
+tions on basic, synthetic plots. Then, we select a
+1 Introduction
+subsetofreal-worldChartQAtestplotsandpose
+Assessingchartunderstandingcapabilitiesoffersa our simple questions to them. This allows us to
+crucialbenchmarkforevaluatingfoundationalmod- directlycomparemodelperformancesoncomplex
+els’reasoningskillsbeyondtext. Significantefforts ChartQA queries versus performance on our ele-
+havebeenmadetodevelopbenchmarksforchart mentaryones(examplesinFigure1).
+understanding,suchasChartQA,thatfeaturescom- Ourfindingsuncovershortcomingsinthesemod-
+plex,human-writtenquestionsreflectingreal-world elsregardingfundamentalaspectsofchartunder-
+applications (Methani et al., 2019; Masry et al., standing. For example, PaLI-3 only gets 37.7%
+2022). Multimodalmodelshaverecentlymadesig- accuracyonourstraightforwardquestionsonthe
+nificantprogressontheseevaluationbenchmarks real-worldplots. Moreover,othermodelssuchas
+(Gemini-Teametal.,2023;Chenetal.,2023;Ope- GeminiProVisionandGPT-4Valsogetlessthan
+nAIetal.,2023). Whilethesemodelsperformwell 60%performance. Wefurtherevaluatetherobust-
+oncomplextasks,howdotheyfarewithmoreele- nessofthesemodelsandfindthatmorepowerful
+mentaryaspectsofchartunderstanding? Canthey models, suchasGeminiProVisionandGPT-4V,
+reliablyanswerbasicquestionsaboutthechart? areoftensusceptibletothepresenceoftextanno-
+5922
+FindingsoftheAssociationforComputationalLinguistics:EMNLP2024,pages5922–5937
+November12-16,2024©2024AssociationforComputationalLinguistics
+modes in a cost-effective manner. Subsequently,
+weneedtodeterminewhetherthesefailuremodes
+propagatetoreal-worldscenariosandapplications.
+Tofacilitatethis,wecreateaprobingdatasetcon-
+tainingtwodistinctsubsetsofplot-questionpairs.
+Thefirstsubset,thebasicsyntheticplots,andele-
+mentaryquestionsoffersacontrolledenvironment
+toscrutinizespecificaspectsofmodelperformance.
+Whatistheminimumxvalueamongthe 4✗ The second subset, the real-world plots, and the
+setofpointsinthefigure? same elementary questions consist of real-world
+Whatistheminimumvaluefortherange 0✗ figures,forwhichwehaverandomlyselectedaset
+onthexaxis?
+of plots from real-world images in the ChartQA
+(a)Syntheticplot testset,supplementingthemwithourstraightfor-
+ward elementary questions. While the synthetic
+subset is ideal for in-depth analysis and straight-
+forward to expand, the real-world subset allows
+us to test whether our findings generalize to real-
+world charts, even though creating this subset re-
+quiresmoreeffortandresourcesduetothemanual
+processinvolved. Notethateventhoughournew
+datasetishuman-generated,itwasgeneratedtoex-
+plicitlycontainsimplequestionsthatonlyrequire
+visual understanding. This controls for the bias
+(chartQAquestion)Whendoesthe 2014✓ thatcreepsintoveryopen-endedhuman-generated
+linereachthepeak?
+datasets. Detailsontheseprobingplotsandques-
+(Ourquestion)Whatistheminimum 0✗ tionsareprovidedintheAppendixA.
+valuefortherangeonthexaxis?
+Models We evaluate multimodal models that
+(b)Real-worldplot(fromChartQA)
+demonstratedreasonableperformanceonalready
+Figure1:AnexampleofourevaluationmethodonPaLI- establishedchartunderstandingbenchmarkssuch
+3. ItshowsaquestioninourSyntheticset(top)anda as ChartQA. We include Gemini Pro Vision
+questionintheChartQAdatasetwithitscorresponding (Gemini-Team et al., 2023), GPT-4V (OpenAI
+questioninourreal-worldsubsetbelow
+et al., 2023), PaLI-3 (Chen et al., 2023), ChartL-
+lama(Hanetal.,2023)andCogVLM(Wangetal.,
+tationsovertheactualdatapresentedintheplots,
+2024)modelsinourempiricalanalysis.
+whichnegativelyaffectstheiraccuracy. Thisstudy
+highlightscriticallimitationsofcurrentmultimodal Metrics Inourevaluationframework,weemploy
+models and underscores the importance of rigor- arelaxedaccuracymeasurefornumericanswersto
+ousandthoroughtestingespeciallygivenlimited accommodateminorinaccuraciesfollowingprevi-
+publicknowledgeofthedatausedtotrainthem. 1 ouswork(Methanietal.,2020;Masryetal.,2022;
+Liuetal.,2022,2023a). Specifically,wedeemanu-
+2 Setup mericalanswercorrectifitfallswithin5%relative
+range of the “gold standard” answer and for non-
+In the following section, we introduce our evalu-
+numericalanswerweuseexactmatching. However,
+ation method, designed specifically to assess the
+thisaccuracymetricdoesnothaveasymmetricer-
+understandingofelementaryfeaturesinbothsyn-
+rorrangeforsmallvslargevalues–forexample,it
+theticandreal-worldchartandfigureunderstand-
+ismuchmorerestrictiveforquestionqueryingthe
+ingbymultimodalmodels.
+minimumvaluesincomparisontothosequerying
+the maximum values. Recognizing that many of
+EvaluationMethod Weproposeatwo-pronged
+our simple questions often pertain to ranges, we
+evaluation approach. Using synthetic data for el-
+adoptarange-basedmetrictoevaluatemodels’an-
+ementary questions allows us to identify failure
+swers. This metric, which we term “range-based
+1ThedatasetusedinthispaperisavailableatChart101. accuracy,” allows for a margin of error up to 5%
+5923
+Standard Range-Based
+Models
+↓
+Acc CollectiveAcc Acc CollectiveAcc
+GeminiProVision 52.6 0.8% 25.9 1.7% 73.7 0.7% 36.5 1.8%
+± ± ± ±
+GPT-4V 50.0 0.8% 23.8 1.6% 68.4 0.8% 33.4 1.8%
+± ± ± ±
+PaLI-3 31.0 0.8% 8.0 1.0% 43.1 0.8% 21.6 1.7%
+± ± ± ±
+ChartLlama 10.6 0.5% 0.1 0.1% 21.3 0.7% 6.8 0.9%
+± ± ± ±
+CogVLM 30.3 0.7% 5.5 0.9% 47.7 0.8% 19.0 1.5%
+± ± ± ±
+Table1: ElementaryQuestionsonSyntheticPlots: Thetabledisplaysaccuracyratesusingstandardmetricsinthe
+leftcolumnsandRange-BasedAccuracyintherightcolumns. Theseresultshighlighttheoveralllowperformance
+ofmodelswithsimplechartunderstandingquestions.
+PlotType Models ChartQAQs ElementaryQs
+Model ↓
+bar pie scatter GeminiProV 67.4 2.5% 57.9 1.5%
+± ±
+GPT-4V 64.0 2.6% 58.0 1.5%
+GeminiProVision 53.2 88.5 37.1 ± ±
+PaLI-3 69.7 2.5% 37.7 1.5%
+GPT-4V 42.2 87.2 40.3 ± ±
+ChartLlama 30.3 2.4% 25.8 1.3%
+CogVLM 27.3 51.9 23.4 ± ±
+CogVLM 64.0 2.6% 49.8 1.5%
+PaLI-3 26.5 65.8 38.1 ± ±
+ChartLlama 9.8 26.9 4.2
+Table 3: Questions on Real Plots: Overall standard
+accuracyonChartQAPlotscomparingoriginalvs. our
+Table 2: Breakdown by Plot Types: Range-Based
+simplequestions. Thelowperformanceofmodelson
+accuracyonthedifferentforsyntheticplots.
+ourelementaryquestionsvs. complexquestionsonthe
+sameplotsrevealsthattheystruggletoanswersimple
+questions on the same visual data. This discrepancy
+of the entire range under consideration. We also
+highlightsacriticalgapintheirabilitytoconsistently
+definecollectiveaccuracy;thismetricassessesthe
+interpretvisualinformation.
+correctnessofresponsestoafullsetofquestions
+associatedwithasinglefigureasasinglenumber.
+This metric underscores the model’s capacity for morechallengingthanpiechartquestions. Thisis
+acomprehensiveandaccurateinterpretationofall likelybecauseanswersforpiechartsareoftenex-
+thebasicvisualfeatureswemeasureforthatfigure. plicitinthefigures(seeFigure6),whereasscatter
+plots require models to interpret min/max values
+3 Results orrangesusinglessexplicitcueslikex-ticks. Fur-
+theranalysisofchallengingquestiontypesforeach
+Modelsstruggletoanswerbasicsyntheticchart
+modelisinAppendixC
+questionsreliably. Weinitiallyassessmodelper-
+formanceonoursyntheticsubset. Asdemonstrated Accuracy gap between elementary and com-
+in Table 1, all of our models show poor perfor- plex questions on the same plots. We explore
+mance on both versions of our accuracy metric; whetherthedifficultiesmodelsfacewithbasicchart
+with the best model Gemini Pro Vision getting understanding questions in synthetic settings are
+52.6%accuracy. However,evenforthismodel,the also evident in real-world scenarios. We ask our
+collective accuracy of 25.9% indicates a limited elementaryquestionsonasubsetoftheChartQA
+comprehensiveunderstandingofthesebasicchart test sets. The ChartQA images are chosen inde-
+questions on the whole chart. Public models per- pendentlyofthequestionspairedwiththeminthe
+formconsiderablyworse,evenChartLlama,which originaldataset. IntherighttwocolumnsofTable
+isspecializedexplicitlyforcharts. Thesefindings 3, we compare model performance on these sim-
+highlight the significance of our straightforward plequestionstotheirperformanceontheoriginal
+benchmarkinpinpointingthelimitationsofcurrent ChartQAquestions,whichinvolvemorecomplex
+models. Weanalyzemodelaccuracybyplottypeto reasoning. Asshown,thereisoftenahighdropin
+investigatethechallengeswithdifferentplots. As performance,suchasaround10%forGeminiPro
+Table2shows,modelsfindscatterplotquestions Vision. Thelowperformanceonelementaryques-
+5924
+TypeofTitle GeminiProVision GPT-4V Category RangeBasedAcc.
+CorrectTitle 77.7% 79.4% Original 29.5%
+NoTitle 37.1% 40.3%
+x 25.5%
+Misleading 32.4% 32.5%
+D 28.8%
+Marker
+O 31.5%
+Table 4: Changing Titles in Plots: Range-Based ac-
++ 26.9%
+curacyacrossdifferenttitles. Theresultshighlightthe
+impactoftextualinformationonmodelperformance. Grid 21.3%
+JS-plotly 36.9%
+tionsparticularlyhighlightsconcernsregardingthe Plot JS-highchart 39.7%
+ability of models to answer simple questions on JS-amchart 43.7%
+non-synthetic plots. This is problematic because
+itsuggeststhatthesemodelsmaystruggletohan- Table5: VisualChangesinPlots: PaLI-3Performance
+dlebasictaskseveninreal-worldscenarios,where onfigureswithsameinformationalcontentbutsmallvi-
+accuracyandreliabilityarecrucial. sualchanges. Thevariabilityinperformancehighlights
+alackofrobustnessinchartunderstanding.
+4 RobustnessTests
+tions include altering scatter plot markers, intro-
+Onekeyaspectofchartunderstandingisthemod-
+ducing grids, or switching the data visualization
+els’resiliencetovisualchangesthatdonotaffect
+libraryfromMatplotlibtoJavaScript. Resultsare
+theinformationalcontentbutonlythevisualpresen-
+displayedinTable5. Thetoprowshowstherange-
+tation,suchasthechoiceoftheplottinglibraryor
+basedaccuracyforPaLI-3onthescatterplotsubset
+variationsinphrasing. Oursyntheticsubsetallows
+at29.5%. Thetablerevealsthatevenslightvisual
+ustocomprehensivelyevaluatemodelrobustness
+changeshighlyimpactthemodel’sperformancein
+against these changes. We make targeted visual
+answeringthesamequestion. Forinstance,adding
+modificationstochartstoassessthemodels’abil-
+grids to the figures reduces accuracy to 21.3%,
+ity to maintain accurate interpretation despite su-
+while changing the plot style from Matplotlib’s
+perficialalterations. Thisevaluationiscrucialfor
+default to JavaScript-amchart improves accuracy
+determining the real-world utility and robustness
+to43.7%. Thesefindingshighlightmodel’slackof
+ofmultimodalmodelsinchartcomprehension.
+robustness, as its performance is greatly affected
+Modeldependenceontextualcuesinplots. We bysuchsmallvisualizationchanges.
+compare three scenarios: 1) plots without any ti-
+tle (baseline), 2) plots with a title containing the 5 RelatedWork
+correctanswer,and3)plotswithatitleproviding
+Benchmarksformultimodalreasoning. With
+misleading,incorrectanswers. Inallcases,models
+recent advancements in foundation multimodal
+are instructed to base their answers on the figure
+models,extensiveeffortshavebeenmadetocreate
+itself. The results are presented in Table 4. Our
+valuableevaluationbenchmarksforassessingmul-
+findingsrevealthatincludingthecorrectanswerin
+timodal models in various domains such as math
+theplottitlelargelyenhancesmodelperformance
+reasoning (Lu et al., 2024; Cherian et al., 2022),
+onourdataset,withanimprovementofover15%
+geometricreasoning(Kazemietal.,2023;Luetal.,
+observed for both Gemini Pro Vision and GPT-
+2021), geometric reasoning for coding (Risman-
+4Vmodels. Whencomparingthemisleadingtitle
+chian et al., 2024), visual question answering on
+scenario to the no title scenario, we observe that
+natural images (Liu et al., 2023b; Agrawal et al.,
+GeminiProVision,inparticular,isswayedbythe
+2016;Gurarietal.,2018),medicalquestionanswer-
+presence of misleading textual information, sug-
+ing (Zhang et al., 2023), hallucination detection
+gesting a bias towards text in the figure over an
+(Guanetal.,2024;Lietal.,2023b)andcomprehen-
+accurateunderstandingoftheplotitself.
+sivemultimodalcapabilitiesonreal-worldimages
+Modeldependenceonvisualmodifications. We (Yuetal.,2023;AhoandUllman,1972;Fuetal.,
+make minor visual modifications to the synthetic 2024;Liuetal.,2023c;Lietal.,2023a;Xuetal.,
+figures while ensuring they convey the same in- 2023). Inthiswork,wedelveintothechartunder-
+formationandthenposeourquestions. Modifica- standing capabilities of foundational multimodal
+5925
+models,exploringacriticalandvaluableskillset. modes. Byexposingsubtlelimitations,ourmethod
+laysthegroundworkformoreeffectivebenchmarks
+Chart/Figurereasoningbenchmarks. Specifi-
+that accurately capture previously hidden model
+cally,therehavebeenvaluableeffortsindeveloping
+weaknesses. Webelievethisworkwillinspirefur-
+benchmarksforchartunderstanding,rangingfrom
+ther innovation in the field, promoting a holistic
+syntheticbenchmarks(Kafleetal.,2018;Singhand
+andnuancedapproachtomodelevaluation.
+Shekhar,2020)featuringyes/noquestions(Kahou
+et al., 2018), to those focusing on understanding 7 Limitations
+real-worldcharts(Masryetal.,2022;Methanietal.,
+This study emphasizes the value of using direct,
+2020; Xia et al., 2024). In this work, we show a
+unittestingwithreal-worldapplicationevaluations
+methodthatbridgesthegapbetweenthesynthetic
+formultimodalmodelsinthecontextofchartun-
+creation of benchmarks for figure understanding
+derstanding. Whileourapproacheffectivelyiden-
+andreal-worldapplicationswithinthebenchmark.
+tifiesclearlimitationsandchallengeswithinthese
+Our evaluation method demonstrates that assess-
+models,therearelimitationstoourstudy:
+ingmodelsonbasic,fundamentalquestionsabout
+Lack of Proposed Solutions: While we identify
+chart understanding can uncover crucial insights
+variousmodellimitations,ourstudydoesnotoffer
+into model vulnerabilities. These vulnerabilities
+specificsolutionstotheseissues. Ourinsightsare
+mightbeoverlookedifevaluationsareconducted
+pivotalforpinpointingeffectiveremedies.
+solelyonsyntheticorreal-worldimages.
+Causes of the Shortcomings: One limitation of
+Multimodalfoundationmodels. Recently,there this study is the ambiguity regarding the precise
+hasbeenasignificantemergenceofgeneralistfoun- causes behind the observed model shortcomings.
+dational multimodal models capable of answer- Althoughwehypothesizethatadistributionalshift
+ing questions about images and reasoning upon between the training data and our evaluation set
+them. Closed-sourcemodelssuchasGeminiPro might play a role, further investigation is needed
+Vision(Gemini-Teametal.,2023),GPT-4V(Ope- toconfirmthisandunderstandthis. Weencourage
+nAI et al., 2023) (OpenAI et al., 2023), PaLI-3 continued research and improvement in the field,
+(Chen et al., 2023) stand alongside open-source enhancingtherobustnessandapplicabilityofmul-
+counterparts like LLaVA-1.5 (Liu et al., 2023b), timodalmodelsacrossvariousreal-worldtasks.
+Mini-GPT4(Zhuetal.,2023),InstructBLIP(Dai
+8 Acknowledgment
+et al., 2023) and CogVLM (Wang et al., 2024).
+Additionally, there are models with a specific fo- We would like to thank the members of UCI-
+cusonchartunderstanding,suchasMatCha(Liu NLP, for valuable discussions and feedback on
+et al., 2022), ChartLlAMA(Han et al., 2023) and this work. This material is sponsored in part by
+ChartVLM (Xia et al., 2024). In this work, we the DARPA MCS program under Contract No.
+evaluatealltheaforementionedmodelsthatareac- N660011924033withtheUnitedStatesOfficeOf
+cessibletousandhavedemonstratedevenaslight Naval Research, the NSF CAREER award num-
+capabilityforchartunderstanding. berIIS-2046873andtheNSFawardIIS-2008956.
+Yasaman Razeghi has been doing a part-time in-
+6 Conclusion ternship at Google DeepMind while working on
+thispaper.
+Inthispaper, wepresentadiagnosticmethodfor
+evaluatingmultimodalfoundationmodels,witha
+focusonchartunderstandingcapabilities. Ourap- References
+proach combines the precision of controlled syn-
+AishwaryaAgrawal,JiasenLu,StanislawAntol,Mar-
+theticevaluationswiththereal-worldrelevanceof
+garet Mitchell, C. Lawrence Zitnick, Dhruv Batra,
+naturaldatascenarios. Thisdualstrategyisessen- andDeviParikh.2016. Vqa: Visualquestionanswer-
+tial in the current landscape, where models often ing. Preprint,arXiv:1505.00468.
+lacktransparencyregardingtrainingdataandoper-
+AlfredV.AhoandJeffreyD.Ullman.1972. TheTheory
+atebehindAPIs. Ourevaluationmethodcomple- of Parsing, Translation and Compiling, volume 1.
+mentsreal-worlddatasetslikeChartQA,emphasiz- Prentice-Hall,EnglewoodCliffs,NJ.
+ing the need to look beyond unified metrics and
+Xi Chen, Xiao Wang, Lucas Beyer, Alexander
+thoroughlyassessmodelstoidentifytheirfailure Kolesnikov, Jialin Wu, Paul Voigtlaender, Basil
+5926
+Mustafa, Sebastian Goodman, Ibrahim Alabdul- Nithya Attaluri, Jan Balaguer, Jackie Xiang, Pi-
+mohsin, Piotr Padlewski, Daniel Salz, Xi Xiong, dong Wang, Zoe Ashwood, Anton Briukhov, Al-
+DanielVlasic,FilipPavetic,KeranRong,TianliYu, bert Webson, Sanjay Ganapathy, Smit Sanghavi,
+Daniel Keysers, Xiaohua Zhai, and Radu Soricut. Ajay Kannan, Ming-Wei Chang, Axel Stjerngren,
+2023. Pali-3visionlanguagemodels: Smaller,faster, JosipDjolonga,YutingSun,AnkurBapna,Matthew
+stronger. Preprint,arXiv:2310.09199. Aitchison, Pedram Pejman, Henryk Michalewski,
+TianheYu,CindyWang,JulietteLove,JunwhanAhn,
+Anoop Cherian, Kuan-Chuan Peng, Suhas Lohit, Dawn Bloxwich, Kehang Han, Peter Humphreys,
+KSmith,andJoshuaBTenenbaum.2022. Aredeep Thibault Sellam, James Bradbury, Varun Godbole,
+neuralnetworkssmarterthansecondgraders?.arxiv. SinaSamangooei,BogdanDamoc,AlexKaskasoli,
+SébastienM.R.Arnold,VijayVasudevan,Shubham
+Wenliang Dai, Junnan Li, Dongxu Li, Anthony
+Agrawal,JasonRiesa,DmitryLepikhin,RichardTan-
+Meng Huat Tiong, Junqi Zhao, Weisheng Wang,
+burn, Srivatsan Srinivasan, Hyeontaek Lim, Sarah
+Boyang Li, Pascale Fung, and Steven Hoi.
+Hodkinson, Pranav Shyam, Johan Ferret, Steven
+2023. Instructblip: Towardsgeneral-purposevision-
+Hand, Ankush Garg, Tom Le Paine, Jian Li, Yu-
+languagemodelswithinstructiontuning. Preprint,
+jiaLi,MinhGiang,AlexanderNeitz,ZaheerAbbas,
+arXiv:2305.06500.
+SarahYork,MachelReid,ElizabethCole,Aakanksha
+Chowdhery, Dipanjan Das, Dominika Rogozin´ska,
+ChaoyouFu,PeixianChen,YunhangShen,YuleiQin,
+VitalyNikolaev,PabloSprechmann,ZacharyNado,
+MengdanZhang,XuLin,JinruiYang,XiawuZheng,
+Lukas Zilka, Flavien Prost, Luheng He, Marianne
+Ke Li, Xing Sun, Yunsheng Wu, and Rongrong Ji.
+Monteiro,GauravMishra,ChrisWelty,JoshNewlan,
+2024. Mme:Acomprehensiveevaluationbenchmark
+Dawei Jia, Miltiadis Allamanis, Clara Huiyi Hu,
+for multimodal large language models. Preprint,
+RaouldeLiedekerke,JustinGilmer,CarlSaroufim,
+arXiv:2306.13394.
+Shruti Rijhwani, Shaobo Hou, Disha Shrivastava,
+Gemini-Team, Rohan Anil, Sebastian Borgeaud, Anirudh Baddepudi, Alex Goldin, Adnan Ozturel,
+YonghuiWu,Jean-BaptisteAlayrac,JiahuiYu,Radu Albin Cassirer, Yunhan Xu, Daniel Sohn, Deven-
+Soricut, Johan Schalkwyk, Andrew M. Dai, Anja dra Sachan, Reinald Kim Amplayo, Craig Swan-
+Hauth, Katie Millican, David Silver, Slav Petrov, son,DessiePetrova,ShashiNarayan,ArthurGuez,
+MelvinJohnson,IoannisAntonoglou,JulianSchrit- SiddharthaBrahma,JessicaLandon,MiteyanPatel,
+twieser, Amelia Glaese, Jilin Chen, Emily Pitler, Ruizhe Zhao, Kevin Villela, Luyu Wang, Wenhao
+Timothy Lillicrap, Angeliki Lazaridou, Orhan Fi- Jia, Matthew Rahtz, Mai Giménez, Legg Yeung,
+rat, JamesMolloy, MichaelIsard, PaulR.Barham, Hanzhao Lin, James Keeling, Petko Georgiev, Di-
+TomHennigan,BenjaminLee,FabioViola,Malcolm anaMincu,BoxiWu,SalemHaykal,RachelSapu-
+Reynolds,YuanzhongXu,RyanDoherty,EliCollins, tro,KiranVodrahalli,JamesQin,ZeynepCankara,
+Clemens Meyer, Eliza Rutherford, Erica Moreira, Abhanshu Sharma, Nick Fernando, Will Hawkins,
+Kareem Ayoub, Megha Goel, George Tucker, En- Behnam Neyshabur, Solomon Kim, Adrian Hut-
+rique Piqueras, Maxim Krikun, Iain Barr, Nikolay ter, Priyanka Agrawal, Alex Castro-Ros, George
+Savinov,IvoDanihelka,BeccaRoelofs,AnaïsWhite, vandenDriessche,TaoWang,FanYang,Shuoyiin
+AndersAndreassen,TamaravonGlehn,Lakshman Chang,PaulKomarek,RossMcIlroy,MarioLucˇic´,
+Yagati, Mehran Kazemi, Lucas Gonzalez, Misha Guodong Zhang, Wael Farhan, Michael Sharman,
+Khalman, Jakub Sygnowski, Alexandre Frechette, Paul Natsev, Paul Michel, Yong Cheng, Yamini
+CharlotteSmith,LauraCulp,LevProleev,YiLuan, Bansal, Siyuan Qiao, Kris Cao, Siamak Shakeri,
+XiChen,JamesLottes,NathanSchucher,Federico Christina Butterfield, Justin Chung, Paul Kishan
+Lebron, AlbanRrustemi, NatalieClay, PhilCrone, Rubenstein,ShivaniAgrawal,ArthurMensch,Kedar
+TomasKocisky,JeffreyZhao,BartekPerz,DianYu, Soparkar,KarelLenc,TimothyChung,AedanPope,
+Heidi Howard, Adam Bloniarz, Jack W. Rae, Han Loren Maggiore, Jackie Kay, Priya Jhakra, Shibo
+Lu,LaurentSifre,MarcelloMaggioni,FredAlcober, Wang,JoshuaMaynez,MaryPhuong,TaylorTobin,
+DanGarrette,MeganBarnes,ShantanuThakoor,Ja- Andrea Tacchetti, Maja Trebacz, Kevin Robinson,
+cob Austin, Gabriel Barth-Maron, William Wong, Yash Katariya, Sebastian Riedel, Paige Bailey, Ke-
+Rishabh Joshi, Rahma Chaabouni, Deeni Fatiha, fan Xiao, Nimesh Ghelani, Lora Aroyo, Ambrose
+ArunAhuja,RuiboLiu,YunxuanLi,SarahCogan, Slone, Neil Houlsby, Xuehan Xiong, Zhen Yang,
+Jeremy Chen, Chao Jia, Chenjie Gu, Qiao Zhang, ElenaGribovskaya,JonasAdler,MateoWirth,Lisa
+JordanGrimstad,AleJakseHartman,MartinChad- Lee,MusicLi,ThaisKagohara,JayPavagadhi,So-
+wick, Gaurav Singh Tomar, Xavier Garcia, Evan phie Bridgers, Anna Bortsova, Sanjay Ghemawat,
+Senter, Emanuel Taropa, Thanumalayan Sankara- ZafaraliAhmed,TianqiLiu,RichardPowell,Vijay
+narayanaPillai,JacobDevlin,MichaelLaskin,Diego Bolina, Mariko Iinuma, Polina Zablotskaia, James
+de Las Casas, Dasha Valter, Connie Tao, Lorenzo Besley,Da-WoonChung,TimothyDozat,Ramona
+Blanco,AdriàPuigdomènechBadia,DavidReitter, Comanescu,XianceSi,JeremyGreer,GuolongSu,
+MiannaChen,JennyBrennan,ClaraRivera,Sergey Martin Polacek, Raphaël Lopez Kaufman, Simon
+Brin,ShariqIqbal,GabrielaSurita,JaneLabanowski, Tokumine,HexiangHu,ElenaBuchatskaya,Yingjie
+AbhiRao,StephanieWinkler,EmilioParisotto,Yim- Miao,MohamedElhawaty,AdityaSiddhant,Nenad
+ing Gu, Kate Olszewska, Yujing Zhang, Ravi Ad- Tomasev,JinweiXing,ChristinaGreer,HelenMiller,
+danki, Antoine Miech, Annie Louis, Laurent El ShereenAshraf,AurkoRoy,ZizhaoZhang,AdaMa,
+Shafey,DenisTeplyashin,GeoffBrown,ElliotCatt, AngelosFilos,MilosBesta,RoryBlevins,TedKli-
+5927
+menko,Chih-KuanYeh,SoravitChangpinyo,Jiaqi Goedeckemeyer,WilliGierke,MohsenJafari,Meenu
+Mu, Oscar Chang, Mantas Pajarskas, Carrie Muir, Gaba,JeremyWiesner,DianaGageWright,Yawen
+VeredCohen,CharlineLeLan,KrishnaHaridasan, Wei,HarshaVashisht,YanaKulizhskaya,JayHoover,
+AmitMarathe,StevenHansen,SholtoDouglas,Ra- Maigo Le, Lu Li, Chimezie Iwuanyanwu, Lu Liu,
+jkumar Samuel, Mingqiu Wang, Sophia Austin, Kevin Ramirez, Andrey Khorlin, Albert Cui, Tian
+ChangLan,JiepuJiang,JustinChiu,JaimeAlonso LIN,MarinGeorgiev,MarcusWu,RicardoAguilar,
+Lorenzo, Lars Lowe Sjösund, Sébastien Cevey, KeithPallo,AbhishekChakladar,AlenaRepina,Xi-
+Zach Gleicher, Thi Avrahami, Anudhyan Boral, huiWu,TomvanderWeide,PriyaPonnapalli,Car-
+Hansa Srinivasan, Vittorio Selo, Rhys May, Kon- oline Kaplan, Jiri Simsa, Shuangfeng Li, Olivier
+stantinosAisopos,LéonardHussenot,LivioBaldini Dousse, Fan Yang, Jeff Piper, Nathan Ie, Minnie
+Soares,KateBaumli,MichaelB.Chang,AdriàRe- Lui, Rama Pasumarthi, Nathan Lintz, Anitha Vi-
+casens,BenCaine,AlexanderPritzel,FilipPavetic, jayakumar,LamNguyenThiet,DanielAndor,Pedro
+Fabio Pardo, Anita Gergely, Justin Frye, Vinay Valenzuela, CosminPaduraru, DaiyiPeng, Kather-
+Ramasesh, Dan Horgan, Kartikeya Badola, Nora ineLee,ShuyuanZhang,SomerGreene,DucDung
+Kassner, Subhrajit Roy, Ethan Dyer, Víctor Cam- Nguyen, Paula Kurylowicz, Sarmishta Velury, Se-
+pos,AlexTomala,YunhaoTang,DaliaElBadawy, bastianKrause,CassidyHardin,LucasDixon,Lili
+Elspeth White, Basil Mustafa, Oran Lang, Ab- Janzer, Kiam Choo, Ziqiang Feng, Biao Zhang,
+hishek Jindal, Sharad Vikram, Zhitao Gong, Sergi AchintyaSinghal, TejasiLatkar, MingyangZhang,
+Caelles,RossHemsley,GregoryThornton,Fangxi- QuocLe,ElenaAllicaAbellan,DayouDu,DanMcK-
+aoyuFeng,WojciechStokowiec,CeZheng,Phoebe innon,NatashaAntropova,TolgaBolukbasi,Orgad
+Thacker, Çag˘lar Ünlü, Zhishuai Zhang, Moham- Keller,DavidReid,DanielFinchelstein,MariaAbi
+madSaleh,JamesSvensson,MaxBileschi,Piyush Raad,RemiCrocker,PeterHawkins,RobertDadashi,
+Patil,AnkeshAnand,RomanRing,KaterinaTsihlas, ColinGaffney,SidLall,KenFranko,EgorFilonov,
+ArpiVezer,MarcoSelvi,TobyShevlane,MikelRo- AnnaBulanova,RémiLeblond,VikasYadav,Shirley
+driguez, Tom Kwiatkowski, Samira Daruki, Keran Chung, Harry Askham, Luis C. Cobo, Kelvin Xu,
+Rong, Allan Dafoe, Nicholas FitzGerald, Keren FelixFischer,JunXu,ChristinaSorokin,ChrisAl-
+Gu-Lemberg, Mina Khan, Lisa Anne Hendricks, berti,Chu-ChengLin,ColinEvans,HaoZhou,Alek
+Marie Pellat, Vladimir Feinberg, James Cobon- Dimitriev, Hannah Forbes, Dylan Banarse, Zora
+Kerr, Tara Sainath, Maribeth Rauh, Sayed Hadi Tung,JeremiahLiu,MarkOmernick,ColtonBishop,
+Hashemi, Richard Ives, Yana Hasson, YaGuang ChintuKumar,RachelSterneck,RyanFoley,Rohan
+Li, Eric Noland, Yuan Cao, Nathan Byrd, Le Hou, Jain,SwaroopMishra,JiaweiXia,TaylorBos,Ge-
+QingzeWang,ThibaultSottiaux,MichelaPaganini, offrey Cideron, Ehsan Amid, Francesco Piccinno,
+Jean-BaptisteLespiau,AlexandreMoufarek,Samer Xingyu Wang, Praseem Banzal, Petru Gurita, Hila
+Hassan, Kaushik Shivakumar, Joost van Amers- Noga, Premal Shah, Daniel J. Mankowitz, Alex
+foort, Amol Mandhane, Pratik Joshi, Anirudh Polozov,NateKushman,VictoriaKrakovna,Sasha
+Goyal,MatthewTung,AndrewBrock,HannahShea- Brown, MohammadHossein Bateni, Dennis Duan,
+han, Vedant Misra, Cheng Li, Nemanja Rakic´evic´, Vlad Firoiu, Meghana Thotakuri, Tom Natan, An-
+MostafaDehghani,FangyuLiu,SidMittal,Junhyuk hadMohananey, MatthieuGeist, SidharthMudgal,
+Oh,SebNoury,ErenSezener,FantineHuot,Matthew SertanGirgin, HuiLi, JiayuYe, OfirRoval, Reiko
+Lamm, Nicola De Cao, Charlie Chen, Gamaleldin Tojo, Michael Kwong, James Lee-Thorp, Christo-
+Elsayed,EdChi,MahdisMahdieh,IanTenney,Nan pherYew,QuanYuan,SumitBagri,DanilaSinopal-
+Hua,IvanPetrychenko,PatrickKane,DylanScand- nikov,SabelaRamos,JohnMellor,AbhishekSharma,
+inaro,RishubJain,JonathanUesato,RominaDatta, Aliaksei Severyn, Jonathan Lai, Kathy Wu, Heng-
+Adam Sadovsky, Oskar Bunyan, Dominik Rabiej, TzeCheng, DavidMiller, NicolasSonnerat, Denis
+ShimuWu,JohnZhang,GautamVasudevan,Edouard Vnukov,RoryGreig,JenniferBeattie,EmilyCave-
+Leurent,MahmoudAlnahlawi,IonutGeorgescu,Nan ness,LibinBai,JulianEisenschlos,AlexKorchem-
+Wei, Ivy Zheng, Betty Chan, Pam G Rabinovitch, niy,TomyTsai,MimiJasarevic,WeizeKong,Phuong
+Piotr Stanczyk, Ye Zhang, David Steiner, Subhajit Dao, Zeyu Zheng, Frederick Liu, Fan Yang, Rui
+Naskar, MichaelAzzam, MatthewJohnson, Adam Zhu, Mark Geller, Tian Huey Teh, Jason Sanmiya,
+Paszke, Chung-Cheng Chiu, Jaume Sanchez Elias, EvgenyGladchenko,NejcTrdin,AndreiSozanschi,
+Afroz Mohiuddin, Faizan Muhammad, Jin Miao, DanielToyama,EvanRosen,SasanTavakkol,Lint-
+Andrew Lee, Nino Vieillard, Sahitya Potluri, Jane ingXue,ChenElkind,OliverWoodman,JohnCar-
+Park,ElnazDavoodi,JiagengZhang,JeffStanway, penter,GeorgePapamakarios,RupertKemp,Sushant
+DrewGarmon,AbhijitKarmarkar,ZheDong,Jong Kafle, Tanya Grunina, Rishika Sinha, Alice Tal-
+Lee,AviralKumar,LuoweiZhou,JonathanEvens, bert,AbhimanyuGoyal,DianeWu,DeneseOwusu-
+William Isaac, Zhe Chen, Johnson Jia, Anselm Afriyie, Cosmo Du, Chloe Thornton, Jordi Pont-
+Levskaya, Zhenkai Zhu, Chris Gorgolewski, Peter Tuset,PradyumnaNarayana,JingLi,SabaerFatehi,
+Grabowski,YuMao,AlbertoMagni,KaishengYao, JohnWieting,OmarAjmeri,BenignoUria,TaoZhu,
+Javier Snaider, Norman Casagrande, Paul Sugan- Yeongil Ko, Laura Knight, Amélie Héliou, Ning
+than,EvanPalmer,GeoffreyIrving,EdwardLoper, Niu,ShaneGu,ChenxiPang,DustinTran,Yeqing
+ManaalFaruqui,IshaArkatkar,NanxinChen,Izhak Li, Nir Levine, Ariel Stolovich, Norbert Kalb, Re-
+Shafran,MichaelFink,AlfonsoCastaño,IreneGian- becaSantamaria-Fernandez,SonamGoenka,Wenny
+noumis, WooyeolKim, MikołajRybin´ski, Ashwin Yustalim,RobinStrudel,AliElqursh,BalajiLaksh-
+Sreevatsa,JenniferPrendki,DavidSoergel,Adrian minarayanan,CharlieDeck,ShyamUpadhyay,Hyo
+5928
+Lee, Mike Dusenberry, Zonglin Li, Xuezhi Wang, YashGoyal,TejasKhot,DouglasSummers-Stay,Dhruv
+Kyle Levin, Raphael Hoffmann, Dan Holtmann- Batra,andDeviParikh.2017. Makingthevinvqa
+Rice, Olivier Bachem, Summer Yue, Sho Arora, matter: Elevating the role of image understanding
+Eric Malmi, Daniil Mirylenka, Qijun Tan, Christy invisualquestionanswering. InProceedingsofthe
+Koh, Soheil Hassas Yeganeh, Siim Põder, Steven IEEE conference on computer vision and pattern
+Zheng, Francesco Pongetti, Mukarram Tariq, Yan- recognition,pages6904–6913.
+hua Sun, Lucian Ionita, Mojtaba Seyedhosseini,
+Pouya Tafti, Ragha Kotikalapudi, Zhiyu Liu, An- Tianrui Guan, Fuxiao Liu, Xiyang Wu, Ruiqi Xian,
+molGulati,JasmineLiu,XinyuYe,BartChrzaszcz, ZongxiaLi,XiaoyuLiu,XijunWang,LichangChen,
+Lily Wang, Nikhil Sethi, Tianrun Li, Ben Brown, FurongHuang,YaserYacoob,DineshManocha,and
+Shreya Singh, Wei Fan, Aaron Parisi, Joe Stanton, TianyiZhou.2024. Hallusionbench: Anadvanced
+ChenkaiKuang,VinodKoverkathu,ChristopherA. diagnosticsuiteforentangledlanguagehallucination
+Choquette-Choo,YunjieLi,TJLu,AbeIttycheriah, andvisualillusioninlargevision-languagemodels.
+PrakashShroff,PeiSun,ManiVaradarajan,SanazBa- Preprint,arXiv:2310.14566.
+hargam,RobWilloughby,DavidGaddy,IshitaDas-
+gupta,GuillaumeDesjardins,MarcoCornero,Brona DannaGurari,QingLi,AbigaleJ.Stangl,AnhongGuo,
+Robenek, Bhavishya Mittal, Ben Albrecht, Ashish ChiLin,KristenGrauman,JieboLuo,andJeffreyP.
+Shenoy,FedorMoiseev,HenrikJacobsson,Alireza Bigham. 2018. Vizwiz grand challenge: Answer-
+Ghaffarkhah,MorganeRivière,AlannaWalton,Clé- ing visual questions from blind people. Preprint,
+ment Crepy, Alicia Parrish, Yuan Liu, Zongwei arXiv:1802.08218.
+Zhou,ClementFarabet,CareyRadebaugh,Praveen
+YuchengHan,ChiZhang,XinChen,XuYang,Zhibin
+Srinivasan, Claudia van der Salm, Andreas Fidje-
+Wang,GangYu,BinFu,andHanwangZhang.2023.
+land,SalvatoreScellato,EriLatorre-Chimoto,Hanna
+Chartllama: Amultimodalllmforchartunderstand-
+Klimczak-Plucin´ska, David Bridson, Dario de Ce-
+ingandgeneration. Preprint,arXiv:2311.16483.
+sare, Tom Hudson, Piermaria Mendolicchio, Lexi
+Walker,AlexMorris,IvoPenchev,MatthewMauger,
+Kushal Kafle, Brian Price, Scott Cohen, and Christo-
+AlexeyGuseynov,AlisonReid,SethOdoom,Lucia
+pher Kanan. 2018. Dvqa: Understanding data
+Loher,VictorCotruta,MadhaviYenugula,Dominik
+visualizations via question answering. Preprint,
+Grewe,AnastasiaPetrushkina,TomDuerig,Antonio
+arXiv:1801.08163.
+Sanchez,SteveYadlowsky,AmyShen,AmirGlober-
+son,AdamKurzrok,LynetteWebb,SahilDua,Dong
+Samira Ebrahimi Kahou, Vincent Michalski, Adam
+Li,PreethiLahoti,SuryaBhupatiraju,DanHurt,Ha-
+Atkinson,AkosKadar,AdamTrischler,andYoshua
+roonQureshi,AnanthAgarwal,TomerShani,Matan
+Bengio.2018. Figureqa: Anannotatedfiguredataset
+Eyal, Anuj Khare, Shreyas Rammohan Belle, Lei
+forvisualreasoning. Preprint,arXiv:1710.07300.
+Wang, Chetan Tekur, Mihir Sanjay Kale, Jinliang
+Wei, Ruoxin Sang, Brennan Saeta, Tyler Liechty,
+MehranKazemi,HamidrezaAlvari,AnkitAnand,Jialin
+YiSun,YaoZhao,StephanLee,PanduNayak,Doug
+Wu,XiChen,andRaduSoricut.2023. Geomverse:
+Fritz,ManishReddyVuyyuru,JohnAslanides,Nidhi
+Asystematicevaluationoflargemodelsforgeomet-
+Vyas, Martin Wicke, Xiao Ma, Taylan Bilal, Ev-
+ricreasoning. arXivpreprintarXiv:2312.12241.
+genii Eltyshev, Daniel Balle, Nina Martin, Hardie
+Cate, James Manyika, Keyvan Amiri, Yelin Kim,
+BohaoLi,RuiWang,GuangzhiWang,YuyingGe,Yix-
+XiXiong,KaiKang,FlorianLuisier,NileshTripu-
+iaoGe,andYingShan.2023a. Seed-bench: Bench-
+raneni,DavidMadras,MandyGuo,AustinWaters,
+marking multimodal llms with generative compre-
+OliverWang,JoshuaAinslie,JasonBaldridge,Han
+hension. Preprint,arXiv:2307.16125.
+Zhang,GarimaPruthi,JakobBauer,FengYang,Ri-
+ham Mansour, Jason Gelman, Yang Xu, George YifanLi,YifanDu,KunZhou,JinpengWang,XinZhao,
+Polovets, Ji Liu, Honglong Cai, Warren Chen, Xi- andJi-RongWen.2023b. Evaluatingobjecthalluci-
+angHaiSheng,EmilyXue,SherjilOzair,AdamsYu, nationinlargevision-languagemodels. InProceed-
+ChristofAngermueller,XiaoweiLi,WeirenWang,Ju- ingsofthe2023ConferenceonEmpiricalMethodsin
+liaWiesinger,EmmanouilKoukoumidis,YuanTian, NaturalLanguageProcessing,pages292–305,Sin-
+AnandIyer,MadhuGurumurthy,MarkGoldenson, gapore.AssociationforComputationalLinguistics.
+Parashar Shah, MK Blake, Hongkun Yu, Anthony
+Urbanowicz,JennimariaPalomaki,ChrisanthaFer- Fangyu Liu, Julian Eisenschlos, Francesco Piccinno,
+nando, Kevin Brooks, Ken Durden, Harsh Mehta, Syrine Krichene, Chenxi Pang, Kenton Lee, Man-
+NikolaMomchev,ElaheRahimtoroghi,MariaGeor- darJoshi,WenhuChen,NigelCollier,andYasemin
+gaki, Amit Raul, Sebastian Ruder, Morgan Red- Altun.2023a. DePlot: One-shotvisuallanguagerea-
+shaw,JinhyukLee,KomalJalan,DinghuaLi,Ginger soning by plot-to-table translation. In Findings of
+Perng,BlakeHechtman,ParkerSchuh,MiladNasr, theAssociationforComputationalLinguistics: ACL
+MiaChen,KieranMilan,VladimirMikulik,Trevor 2023,pages10381–10399,Toronto,Canada.Associ-
+Strohman, JulianaFranco,TimGreen, DemisHas- ationforComputationalLinguistics.
+sabis,KorayKavukcuoglu,JeffreyDean,andOriol
+Vinyals.2023. Gemini: Afamilyofhighlycapable Fangyu Liu, Francesco Piccinno, Syrine Krichene,
+multimodalmodels. Preprint,arXiv:2312.11805. ChenxiPang,KentonLee,MandarJoshi,Yasemin
+Altun,NigelCollier,andJulianMartinEisenschlos.
+5929
+2022. Matcha: Enhancingvisuallanguagepretrain- Cummings, Jeremiah Currier, Yunxing Dai, Cory
+ingwithmathreasoningandchartderendering. arXiv Decareaux,ThomasDegry,NoahDeutsch,Damien
+preprintarXiv:2212.09662. Deville, Arka Dhar, David Dohan, Steve Dowl-
+ing, Sheila Dunning, Adrien Ecoffet, Atty Eleti,
+Haotian Liu, Chunyuan Li, Yuheng Li, and Yong Jae Tyna Eloundou, David Farhi, Liam Fedus, Niko
+Lee.2023b. Improvedbaselineswithvisualinstruc- Felix, Simón Posada Fishman, Juston Forte, Is-
+tiontuning. Preprint,arXiv:2310.03744. abella Fulford, Leo Gao, Elie Georges, Christian
+Gibson, Vik Goel, Tarun Gogineni, Gabriel Goh,
+Yuan Liu, Haodong Duan, Yuanhan Zhang, Bo Li,
+Rapha Gontijo-Lopes, Jonathan Gordon, Morgan
+Songyang Zhang, Wangbo Zhao, Yike Yuan, Jiaqi
+Grafstein, ScottGray, RyanGreene, JoshuaGross,
+Wang,ConghuiHe,ZiweiLiu,KaiChen,andDahua
+ShixiangShaneGu,YufeiGuo,ChrisHallacy,Jesse
+Lin.2023c. Mmbench: Isyourmulti-modalmodel
+Han, Jeff Harris, Yuchen He, Mike Heaton, Jo-
+anall-aroundplayer? Preprint,arXiv:2307.06281.
+hannesHeidecke,ChrisHesse,AlanHickey,Wade
+Hickey,PeterHoeschele,BrandonHoughton,Kenny
+PanLu,HritikBansal,TonyXia,JiachengLiu,Chun-
+Hsu,ShengliHu,XinHu,JoostHuizinga,Shantanu
+yuan Li, Hannaneh Hajishirzi, Hao Cheng, Kai-
+Jain,ShawnJain,JoanneJang,AngelaJiang,Roger
+WeiChang,MichelGalley,andJianfengGao.2024.
+Jiang,HaozhunJin,DennyJin,ShinoJomoto,Billie
+Mathvista: Evaluating mathematical reasoning of
+Jonn, Heewoo Jun, Tomer Kaftan, Łukasz Kaiser,
+foundation models in visual contexts. In Inter-
+Ali Kamali, Ingmar Kanitscheider, Nitish Shirish
+national Conference on Learning Representations
+Keskar,TabarakKhan,LoganKilpatrick,JongWook
+(ICLR).
+Kim, ChristinaKim, YongjikKim, HendrikKirch-
+PanLu,RanGong,ShibiaoJiang,LiangQiu,Siyuan ner, Jamie Kiros, Matt Knight, Daniel Kokotajlo,
+Huang,XiaodanLiang,andSong-ChunZhu.2021. Łukasz Kondraciuk, Andrew Kondrich, Aris Kon-
+Inter-gps: Interpretable geometry problem solv- stantinidis, Kyle Kosic, Gretchen Krueger, Vishal
+ing with formal language and symbolic reasoning. Kuo, Michael Lampe, Ikai Lan, Teddy Lee, Jan
+Preprint,arXiv:2105.04165. Leike, Jade Leung, Daniel Levy, Chak Ming Li,
+Rachel Lim, Molly Lin, Stephanie Lin, Mateusz
+AhmedMasry,XuanLongDo,JiaQingTan,ShafiqJoty, Litwin, Theresa Lopez, Ryan Lowe, Patricia Lue,
+andEnamulHoque.2022. ChartQA:Abenchmark AnnaMakanju,KimMalfacini,SamManning,Todor
+forquestionansweringaboutchartswithvisualand Markov, Yaniv Markovski, Bianca Martin, Katie
+logicalreasoning. InFindingsoftheAssociationfor Mayer,AndrewMayne,BobMcGrew,ScottMayer
+ComputationalLinguistics: ACL2022,pages2263– McKinney, Christine McLeavey, Paul McMillan,
+2279,Dublin,Ireland.AssociationforComputational Jake McNeil, David Medina, Aalok Mehta, Jacob
+Linguistics. Menick, Luke Metz, Andrey Mishchenko, Pamela
+Mishkin, Vinnie Monaco, Evan Morikawa, Daniel
+RThomasMcCoy,ElliePavlick,andTalLinzen.2019.
+Mossing,TongMu,MiraMurati,OlegMurk,David
+Right for the wrong reasons: Diagnosing syntac-
+Mély,AshvinNair,ReiichiroNakano,RajeevNayak,
+tic heuristics in natural language inference. arXiv
+ArvindNeelakantan,RichardNgo,HyeonwooNoh,
+preprintarXiv:1902.01007.
+LongOuyang,CullenO’Keefe,JakubPachocki,Alex
+Paino, Joe Palermo, Ashley Pantuliano, Giambat-
+NiteshMethani,PrithaGanguly,MiteshM.Khapra,and
+tistaParascandolo,JoelParish,EmyParparita,Alex
+PratyushKumar.2019. Datainterpretationoverplots.
+Passos,MikhailPavlov,AndrewPeng,AdamPerel-
+CoRR,abs/1909.00997.
+man,FilipedeAvilaBelbutePeres,MichaelPetrov,
+NiteshMethani,PrithaGanguly,MiteshMKhapra,and Henrique Ponde de Oliveira Pinto, Michael, Poko-
+PratyushKumar.2020. Plotqa: Reasoningoversci- rny, Michelle Pokrass, Vitchyr Pong, Tolly Pow-
+entificplots. InProceedingsoftheIEEE/CVFWin- ell, Alethea Power, Boris Power, Elizabeth Proehl,
+terConferenceonApplicationsofComputerVision, RaulPuri,AlecRadford,JackRae,AdityaRamesh,
+pages1527–1536. CameronRaymond,FrancisReal,KendraRimbach,
+Carl Ross, Bob Rotsted, Henri Roussez, Nick Ry-
+OpenAI,:,JoshAchiam,StevenAdler,SandhiniAgar- der,MarioSaltarelli,TedSanders,ShibaniSanturkar,
+wal,LamaAhmad,IlgeAkkaya,FlorenciaLeoniAle- GirishSastry,HeatherSchmidt,DavidSchnurr,John
+man,DiogoAlmeida,JankoAltenschmidt,SamAlt- Schulman, Daniel Selsam, Kyla Sheppard, Toki
+man,ShyamalAnadkat,RedAvila,IgorBabuschkin, Sherbakov, Jessica Shieh, Sarah Shoker, Pranav
+SuchirBalaji,ValerieBalcom,PaulBaltescu,Haim- Shyam,SzymonSidor,EricSigler,MaddieSimens,
+ing Bao, Mo Bavarian, Jeff Belgum, Irwan Bello, JordanSitkin,KatarinaSlama,IanSohl,Benjamin
+Jake Berdine, Gabriel Bernadett-Shapiro, Christo- Sokolowsky, Yang Song, Natalie Staudacher, Fe-
+pherBerner,LennyBogdonoff,OlegBoiko,Made- lipePetroskiSuch,NatalieSummers,IlyaSutskever,
+laineBoyd,Anna-LuisaBrakman,GregBrockman, JieTang,NikolasTezak,MadeleineThompson,Phil
+TimBrooks,MilesBrundage,KevinButton,Trevor Tillet, Amin Tootoonchian, Elizabeth Tseng, Pre-
+Cai,RosieCampbell,AndrewCann,BrittanyCarey, ston Tuggle, Nick Turley, Jerry Tworek, Juan Fe-
+Chelsea Carlson, Rory Carmichael, Brooke Chan, lipeCerónUribe,AndreaVallone,ArunVijayvergiya,
+CheChang,FotisChantzis,DerekChen,SullyChen, ChelseaVoss,CarrollWainwright,JustinJayWang,
+Ruby Chen, Jason Chen, Mark Chen, Ben Chess, AlvinWang,BenWang,JonathanWard,JasonWei,
+ChesterCho,CaseyChu,HyungWonChung,Dave CJWeinmann,AkilaWelihinda,PeterWelinder,Ji-
+5930
+ayiWeng,LilianWeng,MattWiethoff,DaveWillner, A DataCreation
+Clemens Winter, Samuel Wolrich, Hannah Wong,
+Lauren Workman, Sherwin Wu, Jeff Wu, Michael SyntheticPlot-question Thissubsetcomprises
+Wu,KaiXiao,TaoXu,SarahYoo,KevinYu,Qim- a series of scatter plots, bar plots and pie charts
+ingYuan,WojciechZaremba,RowanZellers,Chong
+eachcreatedusingtheMatplotliborjavascriptli-
+Zhang, Marvin Zhang, Shengjia Zhao, Tianhao
+braries. These plot types are identical to those
+Zheng, Juntang Zhuang, William Zhuk, and Bar-
+ret Zoph. 2023. Gpt-4 technical report. Preprint, foundintheChartQAdataset,ensuringconsistency
+arXiv:2303.08774. andrelevanceinouranalysis. Theseincludescatter
+plots,barcharts,andpiecharts. Wehavethencare-
+MarcoTulioRibeiro,TongshuangWu,CarlosGuestrin,
+and Sameer Singh. 2020. Beyond accuracy: Be- fullyformulatedasetoffundamentalquestionsfor
+havioraltestingofNLPmodelswithCheckList. In eachplottypeaimedatbasicvisualunderstanding.
+Proceedingsofthe58thAnnualMeetingoftheAsso- Wecreateallprimarysubsetsofthesyntheticdata
+ciationforComputationalLinguistics,pages4902–
+usingtheMatplotliblibrary. Webeginbyautomat-
+4912, Online. Association for Computational Lin-
+icallygenerating50plotsforeachsubset,followed
+guistics.
+byamanualreviewofeachplottoensuretheymeet
+Sina Rismanchian, Yasaman Razeghi, Sameer Singh,
+ourqualitystandardsandarefreefromambiguity.
+andShayanDoroudi.2024. Turtlebench: Avisual
+ThenumberofquestionsforeachsubsetisinTable
+programmingbenchmarkinturtlegeometry. ArXiv
+preprint. 7.
+Hrituraj Singh and Sumit Shekhar. 2020. STL-CQA: ScatterPlots Wedepictstraightforwardmathe-
+Structure-based transformers with localization and
+maticalfunctions,suchasx = yx = 2x,etc.,each
+encodingforchartquestionanswering. InProceed-
+representedusing25defaultbluemarkerpointsin
+ingsofthe2020ConferenceonEmpiricalMethods
+in Natural Language Processing (EMNLP), pages scatter plots for the main subset. Each plot is ac-
+3275–3284,Online.AssociationforComputational companied by eight corresponding direct simple
+Linguistics. questionsfocusingontheminimumandmaximum
+valuesandrangesforthexandyaxes. Theseques-
+Weihan Wang, Qingsong Lv, Wenmeng Yu, Wenyi
+Hong, Ji Qi, Yan Wang, Junhui Ji, Zhuoyi Yang, tionsaredetailedinTable6.
+LeiZhao,XixuanSong,JiazhengXu,BinXu,Juanzi
+Li, Yuxiao Dong, Ming Ding, and Jie Tang. 2024. BarCharts Weautomaticallycreatebarcharts
+Cogvlm: Visualexpertforpretrainedlanguagemod- with the default blue Matplotlib library. We ran-
+els. Preprint,arXiv:2311.03079.
+domly sample the number of bars for each chart,
+RenqiuXia,BoZhang,HanchengYe,XiangchaoYan, rangingfrom1to5,andassignthevaluesofeach
+QiLiu, HongbinZhou, ZijunChen, MinDou, Bo- barrandomlywithintherangeof[-200,200]. Each
+tian Shi, Junchi Yan, and Yu Qiao. 2024. Chartx
+plot is accompanied by five corresponding direct
+&chartvlm: Aversatilebenchmarkandfoundation
+simple questions focusing on the minimum and
+model for complicated chart reasoning. Preprint,
+arXiv:2402.12185. maximumvaluesofthebarsandrangesforthey
+axes. ThesequestionsaredetailedinTable6.
+Peng Xu, Wenqi Shao, Kaipeng Zhang, Peng Gao,
+ShuoLiu,MengLei,FanqingMeng,SiyuanHuang, PieCharts Weautomaticallygeneratepiecharts
+YuQiao,andPingLuo.2023. Lvlm-ehub: Acom-
+withthenumberofcategoriesrandomlysampled
+prehensive evaluation benchmark for large vision-
+between 1 and 10. We ensure that each pie chart
+languagemodels. Preprint,arXiv:2306.09265.
+representsatotalsumvalueof100%,whichisthe
+WeihaoYu,ZhengyuanYang,LinjieLi,JianfengWang,
+mostcommonusecaseforpiecharts. Theactual
+Kevin Lin, Zicheng Liu, Xinchao Wang, and Li-
+valuesareexplicitlywrittenwithinthecategories.
+juan Wang. 2023. Mm-vet: Evaluating large mul-
+timodalmodelsforintegratedcapabilities. Preprint, ThesequestionsaredetailedinTable6.
+arXiv:2308.02490.
+Real World Plots In this subset, we randomly
+XiaomanZhang,ChaoyiWu,ZihengZhao,Weixiong
+sampled plots from the ChartQA test set and
+Lin,YaZhang,YanfengWang,andWeidiXie.2023.
+adaptedourquestionstotheseplots. Thequestions
+Pmc-vqa:Visualinstructiontuningformedicalvisual
+questionanswering. Preprint,arXiv:2305.10415. wereminimallyeditedtoensureeachquestion’srel-
+evancetothespecificcharttypeandcontext. The
+DeyaoZhu, JunChen, XiaoqianShen, XiangLi, and
+groundtruthanswerswerethenincluded. During
+MohamedElhoseiny.2023. Minigpt-4: Enhancing
+theannotationprocess,werandomlyselectedplots
+vision-languageunderstandingwithadvancedlarge
+languagemodels. Preprint,arXiv:2304.10592. from the ChartQA test sets and ensured that our
+5931
+addedquestionsmeettwocriteria: 1. Theyinvolve lama, we adjust the temperature to 0.7, based on
+minimal modifications from our set of questions preliminarytestsindicatingoptimizedperformance
+in the synthetic set, and 2. They are devoid of atthissetting. Thismethodensuresthatourevalua-
+ambiguity. Thissubsetiscreatedmanually,result- tionreflectsboththerobustnessandthereal-world
+ingin218questionson70differentplotsfromthe applicabilityofthesemultimodalmodels.
+ChartQA human-annotated test set. For compar-
+B.2 ModelSizes
+ison, examples of comparison between our addi-
+tional Questions and ChartQA test questions are WeincludeGeminiProVision(Gemini-Teametal.,
+presentedinFigure4. 2023), GPT-4V (OpenAI et al., 2023), PaLI-3
+(Chenetal.,2023),ChartLlama(Hanetal.,2023)
+RobustnessTestsSubsets Ourprimarydataset,
+andCogVLM(Wangetal.,2024)modelsinourem-
+aspreviouslyoutlined,consistsoftwodistinctsub-
+piricalanalysis. WeuseGemini1.0ProVision,and
+sets. These subsets bridge synthetic chart under-
+GPT-4V through their APIs. All experiments for
+standingquestionswithreal-worldscenarios,aim-
+thesetwo modelsareperformedin thefirstweek
+ing to evaluate models’ fundamental abilities to
+of April 2024 (mentioning the data as the mod-
+comprehend charts. Another fundamental aspect
+els behind APIs can change over time). We use
+ofimagecomprehension,especiallywithcharts,is
+ChartLlama-13BandCogVLM-17B.ThePaLI-3
+theresilienceofmodelstoinvariantvisualchanges
+modelisofsize5B.
+in the plots. These alterations do not modify the
+charts’informationalcontentbutsolelyaffecttheir B.3 Prompts
+visual presentation, such as the libraries used for For all our question-answering tasks, we use the
+plot creation or color variations. Our synthetic prompt"AnswerthequestionbasedontheFigure
+subsetspecificallyfacilitatesacomprehensiveeval- + [Question]." for PaLI-3, CogVLM and Chartl-
+uationofmodelrobustnessagainstthesechanges. Lamma. Fortherobustnesstestofexploringmod-
+Byintroducingtargetedmodificationstovisualas- els’dependenceontextualcuesintheplot,wefur-
+pectsofcharts,wecanassessmodelperformance theremphasizethefigurebychangingtheprompt
+in maintaining accurate interpretation despite su- to"Answerthequestiononlybasedonthefigure
+perficialalterations. Thisevaluationiscrucialfor +[Question]."Forautomatedextractionofthean-
+determining the real-world utility and robustness swers, we instruct Gemini Pro Vision and GPT
+ofmultimodalmodelsinchartcomprehension. To withanotherpromptaspresentedinFigure2.
+that end, we create multiple additions to the sub-
+set,changingonespecificvisualpartsofthecharts
+Pleaseanswerthefollowingquestionbasedonthe
+to study the models robustness to such changes. plot/figurewiththeresponseinthesameformat:
+Theseeditsincludechangingthechoiceofplotli- "The answer is ANS. I hope the answer
+is correct."InwhichtheANSrepresentsthe
+brary, changing the markers of the plots, adding
+correctanswer. Beconciseandaccurateinyour
+or removing grids, adding misleading text in the reply.
+chartsetc.
+B ExperimentalDetails Figure2: PromptforGeminiandGPTModels
+Alltheexperimentsinthispaperareperformedin
+April2024. B.4 AutomatedEvaluation
+Tofacilitateautomatedevaluation,weinstructall
+B.1 SamplingMethod
+modelstoformattheirrespon‘sesinaspecificstruc-
+Oursamplingmethodforassessingmodelperfor- ture: "The answer is ANSWER." While Gemini
+mance involves querying each model five times ProVisionandGPT-4Vconsistentlyadheretothis
+with the same set of questions and averaging the format, theothermodelsfrequentlydeviatefrom
+obtainedmetricstomitigatetheeffectsofnonde- it. To address this inconsistency, we employ the
+terminism inherent in model responses. For the GPT-3turbomodeltoreformattheresponsesinto
+modelsPaLI-3,GeminiProVision,andGPT-4V, therequiredstructurebeforeextractingtheanswers.
+weutilizethedefaulttemperaturesettingtoclosely Thisadditionalstepensuresuniformityinresponse
+mirrortheirtypicalusageinreal-worldapplications. formattingacrossalltestedmodels,enablingmore
+Conversely,forthemodelsCogVLMandChartL- accurateautomatedanalysis. PromptisinFigure3
+5932
+Syntheticsubset Questions
+scatterplots Whatisthemaximum/minimumvalueamongthesetofpointsplotted
+inthefigure?
+Whatistheapproximatemaximum/minimumvaluefortherangeon
+thex/y-axis?
+barchart Whatisthemaximum/minimumvalueamongthesetofbarsplotted
+inthefigure?
+Howmanybarsareinthefigure?
+Whatisthemaximum/minimumvaluefortherangeonthey-axis?
+piechart Whatisthemaximum/minimumvalueamongthesetofcategoriesin
+thefigure?
+Howmanycategoriesarepresented?
+Table6: Questiontemplatesforsyntheticdataset
+Synthetic Number of modelresponsesandguidingthedevelopmentof
+subset Questions effectivesolutions.
+scatter 336
+plots
+barchart 250
+piechart 141
+Table7: Questiontemplatesforsyntheticdataset
+C MoreAnalysis
+What type of questions are the hardest? Fol-
+lowingtheapproachofsegmentingmodelperfor-
+mancebyplottypes,ouruseofsyntheticdatafa-
+cilitatesasimilaranalysisbasedonquestiontypes.
+Thisapproachenablesustoevaluateandpinpoint
+theparticularperformancecharacteristicsofeach
+model,allowingforadetailedinvestigationintothe
+distinctbehavioralpatternsandchallengesmodels
+exhibitwhenrespondingtodifferentkindsofques-
+tions. Theoutcomesofthisquestion-type-specific
+performanceevaluationarepresentedinFigures9
+and8,whichdetailthedistinctrange-basedaccu-
+racy and response patterns of each model across
+the range of question types examined. For exam-
+ple,wefirstobservedistinctbehaviorsamongthe
+models: whileGPT-4Vdemonstratesitsstrongest
+performanceonquestionsconcerningtheminimum
+rangeonthex-axis,GeminiProVisionandPaLI-3
+strugglethemostwiththistypeofquestionwhen
+dealing with scatter plots. As discussed earlier,
+thesedetailedinsightsintomodels’specificlimita-
+tions are vital for understanding the reliability of
+5933
+Extracttheconciseanswerfromthemodel’sresponse
+as shown in the examples below, making sure the
+answerisinthisformat: "The answer is ANS. I
+hope the answer is correct."
+Example1:
+Question: "How many food items are
+showninthebargraph?"
+ModelAnswer:"<extra_id_0> 0"
+ExtractedAnswer: Theansweris0. I
+hopetheansweriscorrect.
+Example2:
+Question: "How many bars are in the
+figure?"
+ModelAnswer:"<extra_id_0> There
+are three bars in the figure."
+ExtractedAnswer:Theansweristhree.
+Ihopetheansweriscorrect.
+Example3:
+Question: "Findmissingdataofthese-
+quence24,_,32,33,42?"
+ModelAnswer:"<extra_id_0> 33"
+ExtractedAnswer:Theansweris33.I
+hopetheansweriscorrect.
+Example4:
+Question: "Which country has the
+highest secondary graduation rate in
+2018?"
+Model Answer: "<extra_id_0>
+Italy"
+ExtractedAnswer:TheanswerisItaly.
+Ihopetheansweriscorrect.
+YourTask:
+Giventhequestionandmodelanswerbe-
+low,extracttheconciseanswer.
+Question:"{question}"
+ModelAnswer:"{model_raw_output}"
+ExtractedAnswer:
+Figure3: PromptforExtractionofAnswersforAuto-
+matedEvaluation
+5934
+Figure 4: More examples of questions from our simplified dataset alongside those from the ChartQA dataset,
+withcorrespondingquestionsfromourset. ChartQAhuman-writtenquestionsvaryincomplexity,fromthemore
+straightforward at the bottom of the example to those requiring complex reasoning at the top. In contrast, our
+questionsareconsistentlystructuredtobesimple.
+Figure5: Examplesofquestionsfromoursyntheticdatasetforthebarcharts
+5935
+Figure6: Examplesofquestionsfromoursyntheticdatasetforthepiecharts
+Figure7: Examplesofquestionsfromoursyntheticdatasetforthescatterplot
+5936
+Figure8: Radarchartdepictingtherange-basedaccuracyofdifferentmodelsinresponsetovariousquestiontypes
+inourpiecharts.
+(a)SyntheticBarChartQuestions (b)SyntheticScatterPlotQuestions
+Figure9: Radarchartdepictingtherange-basedaccuracyofdifferentmodelsinresponsetovariousquestiontypes,
+highlightingthedistinctlimitationseachmodelexhibitswithrespecttospecifictypesofquestions. ,
+5937

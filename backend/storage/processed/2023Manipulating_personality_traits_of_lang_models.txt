@@ -1,0 +1,1001 @@
+Manipulating the Perceived Personality Traits of Language Models
+GrahamCaron ShashankSrivastava
+UNCChapelHill UNCChapelHill
+carongraham29@gmail.com ssrivastava@cs.unc.edu
+Abstract
+Psychologyresearchhaslongexploredaspects
+ofhumanpersonalitylikeextroversion,agree-
+ablenessandemotionalstability,threeofthe
+personalitytraitsthatmakeupthe‘BigFive’.
+Categorizations like the ‘Big Five’ are com-
+monlyusedtoassessanddiagnosepersonality
+types. In this work, we explore whether text
+generatedfromlargelanguagemodelsexhibits
+consistencyinit’sperceived‘BigFive’person-
+alitytraits. Forexample,isalanguagemodel
+suchasGPT2likelytorespondinaconsistent
+way if asked to go out to a party? We also
+showthatwhenexposedtodifferenttypesof
+contexts(suchaspersonalitydescriptions, or
+answerstodiagnosticquestionsaboutperson-
+ality traits), language models such as BERT
+andGPT2consistentlyidentifyandmirrorper-
+sonality markers in those contexts. This be-
+haviorillustratesanabilitytobemanipulated
+in a predictable way (with correlations up to
+0.84betweenintendedandrealizedchangesin Figure 1: The top frame (Panel A) shows how a per-
+personalitytraits),andframesthemastoolsfor sonalitytrait(here, opennesstoexperience)mightbe
+controllingpersonasinapplicationssuchasdi- expressedbyalanguagemodel,andhowtheresponse
+alogsystems. Wecontributetwodata-setsof canbemodifiedbyexposingthelanguagemodeltoa
+personalitydescriptionsofhumanssubjects. textualcontext. Weusepsychometricquestionnairesto
+evaluateperceivedpersonalitytraits(PanelB),andshow
+1 Introduction thattheycanbepredictablymanipulatedwithdifferent
+types of contexts (§5,§6). We also evaluate the text
+WiththemeteoricriseofAIsystemsbasedonlan- generatedfromthesecontextualizedlanguagemodels
+guagemodels,thereisanincreasingneedtounder- (PanelC),andshowthattheyreflectthesametraits(§7).
+standthe‘personalities’ofthesemodels. Ascom-
+municationwithAIsystemsincreases,sodoesthe
+tendencytoanthropomorphizethem (Sallesetal., usefulforamodeltomirrorthepersonalityofthe
+2020; Mueller, 2020; Kuzminykh et al., 2020). user. In contrast, for a dialog agent in a clinical
+Thus,eventhoughlanguagemodelsencodeprob- setting,itmaybedesirabletomanipulateamodel
+abilitydistributionsovertextandthetendencyto interactingwithadepressedindividualsuchthatit
+assign cognitive abilities to them has been criti- doesnotreinforcedepressivebehavior. Addition-
+cized (Bender and Koller, 2020), the way users ally,sincesuchmodelsaresubjecttobiasesinthe
+perceivethesesystemscanhavesignificantconse- texttheyaretrainedon,somemaybepronetoin-
+quences. Iftheperceivedpersonalitytraitsofthese teractwithusersinhostileways(Wolfetal.,2017).
+modelscanbebetterunderstood,theirbehaviorcan Manipulating these models can enable smoother
+betailoredforspecificapplications. Forinstance, andmoreamiableinteractionswithusers.
+whensuggestingemailauto-completes,itmaybe Language-basedquestionnaireshavelongbeen
+2370
+FindingsoftheAssociationforComputationalLinguistics:EMNLP2023,pages2370–2386
+December6-10,2023©2023AssociationforComputationalLinguistics
+usedinpsychologicalassessmentsformeasuring 2 RelatedWork
+personality traits in humans (John et al., 2008).
+In recent years, research has looked at multiple
+We apply the same principle to language models,
+forms of biases (i.e., racial, gender) in language
+andinvestigatethepersonalitytraitsofthesemod-
+models(BordiaandBowman,2019;Huangetal.,
+elsthroughthetextthattheygenerateinresponse
+2020; Abid et al., 2021). However, the issue of
+to such questions. As previously mentioned, we
+measuringandcontrollingforbiasesinpersonasof
+do not posit that these models have actual cogni-
+languagemodelsisunder-explored. Asubstantial
+tive abilities, but are focused on exploring how
+bodyofresearchhasexploredthewayslanguage
+their personality may be perceived through the
+modelscanbeusedtopredictpersonalitytraitsof
+lens of human psychology. Since language mod-
+humans. Mehta et al. (2020) and Christian et al.
+els are subject to influence from the context they
+(2021)applylanguagemodelstosuchpersonality
+see (O’Connor and Andreas, 2021), we also ex-
+predictiontasks. Similartoourmethodology,Ar-
+plore how specific context could be used to ma-
+gyleetal.(2022)contextualizelargelanguagemod-
+nipulate the perceived personality of the models
+elsonadata-setofsocio-economicback-storiesto
+without controlling sources of bias or the mod-
+show that they model socio-cultural attitudes in
+els themselves (i.e., pretraining, parameter fine-
+broad humanpopulations, andYang et al.(2021)
+tuning). Figure 1 shows an example illustrating
+developanewmodeldesignedtobetterdetectper-
+thisapproach.
+sonaltyinuserbasedcontext,usingquestionbased
+Our analysis reveals that personality traits of answering. Most relevant to our work are con-
+language models are influenced by ambient con- temporaneous unpublished works by Karra et al.
+text,andthatthisbehaviorcanbemanipulatedin (2022),Miottoetal.(2022),andJiangetal.(2022),
+a highly predictable way. In general, we observe whoalsoexploreaspectsofpersonalityinthelan-
+highcorrelations(medianPearsoncorrelationco- guagemodelsthemselves. However,theseworks
+efficients of up to 0.84 and 0.81 for BERT and substantiallydivergefromourapproachand,along
+GPT2)betweentheexpectedandobservedchanges withYangetal.(2021),donotattempttocharacter-
+inpersonalitytraitsacrossdifferentcontexts. The izeormanipulatetheperceivedpersonalityofthe
+models’affinitytobeaffectedbycontextpositions modelsaswedo.
+them as potential tools for characterizing person-
+alitytraitsinhumans. Infurtherexperiments,we 3 ‘BigFive’Preliminaries
+find that, when using context from self-reported
+The‘BigFive’isaseminalgroupingofpersonality
+textdescriptionsofhumansubjects,languagemod-
+traitsinpsychologicaltraittheory(Goldberg,1990,
+elscanpredictthesubject’spersonalitytraitstoa
+1993),andremainsthemostwidelyusedtaxonomy
+surprisingdegree(correlationupto0.48between
+of personality traits (John and Srivastava, 1999;
+predicted and actual human subject scores). We
+PureurandErder,2016). Thesetraitsare:
+also confirm that the measured personality of a
+• Extroversion(E):Peoplewithastrongtendency
+modelreflectsthepersonalityseeninthetextthat
+in this trait are outgoing and energetic. They
+themodelgenerates. Together,theseresultsframe
+obtainenergyfromthecompanyofothers.
+languagemodelsastoolsforidentifyingpersonal-
+• Agreeableness (A): People with a strong ten-
+itytraits andcontrolling personasin applications
+dency in this trait are compassionate and kind.
+suchasdialogsystems. Ourcontributionsare:
+Theyvaluegettingalongwithothers.
+• Weintroducetheuseofpsychometricquestion- • Conscientiousness(C):Peoplewithastrongten-
+nairesforprobingthepersonalitiesoflanguage dencyinthistraitaregoalfocusedandorganized.
+models. Theyfollowrulesandplantheiractions.
+• Wedemonstratethatthepersonalitytraitsofcom- • Emotional Stability (ES): People with a strong
+mon language models can be predictably con- tendencyinthistraitarenotanxiousorimpulsive.
+trolledusingtextualcontexts. Theyexperiencenegativeemotionslesseasily.
+• Wecontributetwodata-sets: 1)self-reportedper- • Openness to Experience (OE): People with a
+sonality descriptions of human subjects paired strongtendencyinthistraitareimaginativeand
+withtheirpsychometricassessmentdata,2)per- creative. Theyareopentonewideas.
+sonalitydescriptionscollatedfromReddit. Whilethereareotherpersonalitygroupingssuch
+(SeeprojectGitrepository) asMBTIandtheEnneagram(Bayne,1997;Wag-
+2371
+nerandWalker,1983),weusetheBigFiveasthe candidate answer choice was evaluated, and the
+basisofouranalyses,becausetheBigFiveremains answerchoicefromthesentencewiththehighest
+the most used taxonomy for personality assess- probabilitywasselected.
+ment,andhasbeenshowntobepredictiveofout- Finally, for each questionnaire (consisting of
+comessuchaseducationalattainment(O’Connor model responses to 50 questions), personality
+andPaunonen,2007),longevity(Masuietal.,2006) scoresforeachofthe‘BigFive’personalitytraits
+and relationship satisfaction (White et al., 2004). were calculated according to a standard scoring
+Further,itisrelativelynaturaltocastasanassess- proceduredefinedbytheInternationalPersonality
+mentforlanguagemodels. Item Pool (IPIP, 2022). Specifically, each of the
+five personality traits is associated with ten ques-
+4 ExperimentDesign tions in the questionnaire. The numerical values
+associatedwiththeresponsefortheseitemswere
+Weexperimentwithtwolanguagemodels,BERT-
+entered into a formula for the trait in which the
+base(Devlinetal.,2019)andGPT2(124Mparam-
+item was assigned, leading to an overall integer
+eters)(Radfordetal.,2019), toanswerquestions
+scoreforeachtrait. Tointerpretmodelscores,we
+fromastandard50-item‘BigFive’personalityas-
+estimated the distribution of ‘Big Five’ personal-
+sessment (IPIP, 2022) 1. Each item consists of a
+ity traits in the human population. For this, we
+statementbeginningwiththeprefix“I”or“Iam”
+used data from a large-scale survey of ‘Big Five’
+(e.g., I am the life of the party). Acceptable an-
+personalityscoresin 1,015,000individuals(Open-
+swers lie on a 5-point Likert scale where the an-
+Psychometrics, 2018). In the following sections,
+swer choices disagree, slightly disagree, neutral,
+wereportmodelscoresinpercentiletermsofthese
+slightlyagree,andagreecorrespondtonumerical
+humanpopulationdistributions. Statisticsforthe
+scores of 1, 2, 3, 4, and 5, respectively. To make
+humandistributionsanddetailsoftheIPIPscoring
+thequestionnairemoreconducivetoansweringby
+procedureareincludedinAppendixB.
+language models, items were modified to a sen-
+tence completion format. For instance, the item
+5 BaseModelTraitEvaluation
+“I am the life of the party” was changed to “I am
+{blank}thelifeoftheparty”,wherethemodelisex- Table 1 shows the results of the base personality
+pectedtoselecttheanswerchoicethatbestfitsthe assessmentforGPT2andBERTforeachofthefive
+blank(seeAppendixBforacompletelistofitems traits in terms of numeric values and correspond-
+andtheircorrespondingtraits). Toavoidcomplex- inghumanpopulationpercentiles. Inthetable,E
+ity due to variable number of tokens, the answer standsforextroversion,Aforagreeableness,Cfor
+choicesweremodifiedtotheadverbsnever,rarely, conscientiousness,ESforemotionalstabilityand
+sometimes,often,andalways,correspondingtonu- OEforopennesstoexperience. Noneofthebase
+mericalscores1,2,3,4,and5,respectively. Itis scoresfromBERTorGPT2,whichwerefertoas
+noteworthy that in this framing, an imbalance in X base , diverge from the spread of the population
+thenumberofoccurrencesofeachanswerchoice distributions(TOSTequivalencetestatα = 0.05).
+inthepretrainingdatamightcausenaturalbiases Allscoreswerewithin26percentilepointsofthe
+towardcertainanswerchoices. However,whilethis human population medians. This suggests that
+factormightaffecttheabsolutescoresofthemod- the pretraining data reflected the population dis-
+els,thisisunlikelytoaffecttheconsistentoverall tributionofthepersonalitymarkerstosomeextent.
+patternsofchangesinscoresthatweobserveinour However, percentiles for BERT’s openness to ex-
+experimentsbyincorporatingdifferentcontexts. perience(24)andGPT2’sagreeableness(25)are
+For assessment with BERT, the answer choice substantiallylowerandGPT2’sconscientiousness
+withthehighestprobabilityinplaceofthemasked (73)andemotionalstability(71)aresignificantly
+blanktokenwasselectedastheresponse. Foras- higherthanthepopulationmedian.
+sessmentwithGPT2,theprocedurewasmodified,
+6 ManipulatingPersonalityTraits
+sinceGPT2isanautoregressivemodel,andhence
+notdirectlyconducivetofill-in-the-blanktasks. In
+Inthissection,weexploremanipulatingthebase
+thiscase,theprobabilityofthesentencewitheach
+personalitytraitsoflanguagemodels. Ourexplo-
+rationfocusesonusingprefixcontextstoinfluence
+1BERT&GPT2wereselectedbecauseoftheiravailability
+asopen-source,pretrainedmodels. the personas of language models. For example,
+2372
+Trait X base P base(%) Trait Context/Modifier +/-
+BERT BERT
+E 18 42 E Iamneverthelifeoftheparty. -
+A 27 39 A Inevermakepeoplefeelatease. -
+C 25 54 C Iamalwaysprepared. +
+ES 22 60 ES Inevergetstressedouteasily. +
+OE 25 24 OE Ineverhavearichvocabulary. -
+GPT2 GPT2
+E 21 54 E Iamneverthelifeoftheparty. -
+A 24 25 A Ineverhaveasoftheart. -
+C 29 73 C Iamneverprepared. -
+ES 25 71 ES Ialwaysgetstressedouteasily. -
+OE 28 39 OE Ineverhavearichvocabulary. -
+Table1: Basemodelevaluationscores(X )andper- Table2: Listofcontextitems&modifiers(alongwith
+base
+centile(P )ofthesescoresinthehumanpopulation. thedirectionofchange)thatcausedthelargestmagni-
+base
+tudeofchange,∆ ,foreachpersonalitytrait.
+cm
+if we include a context where the first person is
+seen to engage in extroverted behavior, the idea 2 with -2 = never, -1 = rarely, 0 = sometimes, 1
+is that language models might pick up on such =oftenand2=always. Becausethisexperiment
+cuesandmodifytheirlanguagegeneration(e.g.,to examines correlation between models scores and
+generatelanguagethatalsoreflectsextrovertbehav- ratings,themagnitudeofthemodifierratingisar-
+ior). We investigate using three types of context: bitrary,solongastheratingsincreaselinearlyfrom
+(1) answers to personality assessment items, (2) never (strongest negative connotation) to always
+descriptions of personality from Reddit, and (3) (strongestpositiveconnotation). Contextitemsare
+self-reportedpersonalitydescriptionsfromhuman givenacontextratingof-1iftheitemnegatively
+users. In the following subsections, we describe affected the trait score based on the IPIP scoring
+theseexperimentsindetail. procedure, and 1 otherwise. The context ratings
+are multiplied by the modifier ratings to get the
+6.1 AnalysisWithAssessmentItemContext r . This value represents the expected relative
+cm
+changeintraitscore(expectedbehavior)whenthe
+Toinvestigatewhetherthepersonalitytraitsofmod-
+corresponding context/modifier pair was used as
+elscanbemanipulatedpredictably,themodelsare
+context.
+first evaluated on the ‘Big Five’ assessment (§4)
+withindividualquestionnaireitemsservingascon- Next, the differences, ∆ cm , between X cm and
+text. Whenusedascontext,werefertotheanswer X base values are calculated and the Pearson cor-
+choices as modifiers and the items themselves as relationwithther cm ratingsmeasured(seeTable
+contextitems. Forexample, forextroversion, the 2 for the context/modifier pairs with the largest
+context item “I am {blank} the life of the party" ∆ cm ). OnewouldexpectX cm evaluatedonmore
+pairedwiththemodifieralwaysyieldsthecontext positiver cm toincreaserelativetoX base andvice
+“Iamalwaysthelifeoftheparty",whichprecedes versa. ThisiswhatweobserveforBERT(seeFig-
+eachextroversionquestionnaireitem. ure2)andGPT2,bothofwhichshowsignificant
+To calculate the model scores, X , for each
+correlations(0.40and0.54)between∆
+cm
+andr
+cm
+cm
+(p < 0.01,t-test).
+trait,themodelsareevaluatedonalltenitemsas-
+signedtothetrait,witheachitemservingascontext Further, to examine at the effect of individ-
+once. This is done for each of the five modifiers, ual context items as the strength of the modifier
+resultingin10(contextitemspertrait) 5(mod- changes, we compute the correlation, ρ, between
+×
+ifierspercontextitem) 10(questionnaireitems ∆ andr forindividualcontextitems(correla-
+cm cm
+×
+tobeansweredbythemodel)=500responsesper tioncomputedfrom5datapointspercontextitem,
+traitand10(contextitemspertrait) 5(modifiers one for each modifier). Table 3 reports the mean
+×
+percontextitem)=50scores(X )pertrait(one andmedianvaluesofthesecorrelations. Thesere-
+cm
+for each context). Context/modifier ratings (r ) sults indicate a strong relationship between ∆
+cm cm
+are calculated to quantify the models’ expected and r . The mean values are significantly less
+cm
+behavior in response to context. First, each mod- thanthemedians,suggestingaleftskew. Forfur-
+ifierisassignedamodifierratingbetween-2and ther analysis, the data was broken down by trait.
+2373
+a language model could achieve a spurious cor-
+relation, simply by copying the modifier choice
+mentionedinthecontextitem. Weexperimented
+withadjustments2thatwouldaccountforthisissue
+andsawsimilartrends,withslightlylowerbutcon-
+sistentcorrelationnumbers(meancorrelationsof
+0.25and0.40forBERTandGPT2,comparedwith
+0.40and0.54,statisticallysignificantatp < 0.05,
+t-test).
+Figure 2: BERT ∆ cm vs r cm plots for data from all AlternateFraming: Anotherpossibleconcern
+traits. We observe a consistent change in personality is the altering of the Big Five personality assess-
+scores (∆ ) across context items as the strength of
+cm ment framing to involve quantifiers. We experi-
+quantifierschange.
+mentedwithanalternatefill-in-the-blankframing
+(e.g.,I{blank}thatIamthelifeoftheparty)that
+BERT GPT2
+usesthesameanswerchoicesastheoriginaltest.
+Meanρ 0.40 0.54
+Medρ 0.84 0.81 Notethatneutralwasexcludedbecauseitfailsto
+form a grammatical sentence. Despite the differ-
+Table3: Mean&medianρfrom∆ cm vsr cm plotsby ences in token count amongst these answers, the
+contextitem greaterfrequencyimbalanceoftheseanswersinthe
+pretrainingdatacomparedtothealteredanswers,
+and the added sentence complexity of the assess-
+The histograms in Figure 3 depict ρ by trait and
+mentitems,wesawsimilartrends. BERTextrover-
+includesummarystatisticsforthisdata.
+sionandemotionalstabilityhadmeancorrelations
+MeanandmedianρfromFigure3plotssuggest
+of0.22&0.29respectively,andGPT2agreeable-
+apositivelinearcorrelationbetween∆ andr
+cm cm ness, conscientiousness, emotional stability and
+amongstcontextitemplots,withconscientiousness
+openness to experience had mean correlations of
+andemotionalstabilityhavingthestrongestcorre-
+0.10,0.14,0.61&0.40. Theseresultssuggestthat
+lationforbothBERTandGPT2. Groupingsofρ
+our results are robust to our modification of the
+around1inconscientiousnessandemotionalstabil-
+wordingoftheanswerchoices.
+ityplotsfromFigure3demonstratethiscorrelation.
+GPT2extroversion,BERT&GPT2agreeableness
+6.2 AnalysisWithRedditContext
+andBERTopennesstoexperienceshowlargeleft
+Next, we qualitatively analyze how personality
+skews. A possible explanation for for this is that
+traits of language models react to user-specific
+modelsmayhavehaddifficultydistinguishingbe-
+contexts. To acquire such context data, we cu-
+tween the double negative statements created by
+rateddatafromRedditthreadsaskingindividuals
+somecontext/modifierpairs(i.e. item36withmod-
+ifier never: “I never don’t like to draw attention abouttheirpersonality(seeAppendixDforalist
+to myself."). This may have caused ∆ to be of sources). 1119 responses were collected, the
+cm
+negativelycorrelatedwithr ,leadingtoanaccu- majorityofwhichwerefirstperson. Table4shows
+cm
+mulationofρvaluesnear-1. twoexamples. 3 BecauseGPT2&BERTtokeniz-
+ers can’t accept more than 512 tokens, responses
+Table2showsthecontextsthatleadtothelargest
+longerthanthisweretruncated. Themodelswere
+changeforeachofthepersonalitytraitsforBERT
+evaluated on the ‘Big Five’ assessment (§4) us-
+andGPT2. Weobservethatall10contextsconsist
+ingeachofthe1119responsesascontext(Reddit
+of the high-polarity quantifiers (either always or
+never),whichisconsistentwiththecorrelationre-
+2Wereplacedthemodelresponseswherethequestionnaire
+sults. Further,wenotethatforfourofthefivetraits,
+andcontextitemsmatchedwiththebasemodel’sresponse
+theitemcontextthatleadstothelargestchangeis for the item. This means that the concerning context item
+cannolongercontributeto∆.However,thisalsomeansthat
+commonbetweenthetwomodels.
+numberswiththisadjustmentcannotbedirectlycompared
+Itisimportanttonoteapossibleweaknesswith withthosewithoutsincetherearefewersourcesofvariation.
+ourapproachofusingquestionnaireitemsascon- 3In qualitative analysis of a random sample of 200 re-
+sponses,3.5%ofsampledresponseswerefoundtobehostile,
+text. Since our evaluation includes a given ques-
+harmfullybiasedoroffensive,while71.5%werefoundtobe
+tionnaire item as context to itself during scoring, relevanttothetopicofpersonality.
+2374
+Figure3: Histogramsofρbytraitfor∆ vsr contextitemplots. Acrossalltenscenarios,apluralityofcontext
+cm cm
+itemsshowastrongcorrelation(peakcloseto1)betweenobservedchangesinpersonalitytraitsandstrengthsof
+quantifiersinthecontextitems.
+Context scientiousness. TherewerefewerphrasesforGPT2
+SubdueduntilIreallygettoknowsomeone.
+opennesstoexperience,GPT2negativelyweighted
+Iampolitebutnotfriendly.Idonotfeeltheneed
+tohangaroundwithothersandspendmostofmytime agreeableness,andGPT2negativelyweightedex-
+reading,listeningtomusic,gamingorwatchingfilms. troversionthatcausedshiftsintheexpecteddirec-
+GettingtoknowmewellisquiteachallengeIsuppose,
+tion. This was consistent with results from §6.1,
+butmyfewfriendsandIhavealotoffunwhenwe
+meet(usuallyatuniversityoronline,rarelyelsewhere where these traits exhibited the weakest relative
+irl).I’dsayIampatient,rationalandaguywitha positivecorrelations. AppendixDcontainsthefull
+bigheartfortheonesIcarefor.
+listsofhighlyweightedfeaturesforeachtrait.
+Table4: ExamplesofRedditdatacontext.
+Context
+UndirectedResponse
+Iamaveryopen-minded,politepersonandalwayscrave
+context). ForeachRedditcontext,scores,X , newexperiences.AtworkImanageateamofsoftware
+reddit
+developersandweoftenhavetocomeupwithnewideas.
+werecalculatedforall5traits. Thedifferencebe-
+Iwenttocollegeandmajoredincomputerscience...
+tweenX reddit andX base wascalculatedas∆ reddit . Itrytodosomethingfuneveryweek,evenifI’mbusy,
+likehavingaBBQorwatchingamovie.Ihaveawife
+Tointerpretwhatphrasesinthecontextsaffect
+whomIloveandwelivetogetherinasingle-familyhome.
+thelanguagemodels’personalitytraits,wetrainre- DirectedResponse
+gressionmodelsonbag-of-wordsandn-gram(with Iconsidermyselftobesomeonethatisquietand
+reserved.IdonotliketotalkthatmuchunlessIhave
+n = 2 and n = 3) representations of the Red-
+to.Iamfinewithbeingbymyselfandenjoyingthepeace
+ditcontextsasinput,and∆ reddit valuesaslabels. andquiet.Iusuallyagreewithpeoplemoreoftenthan
+Since the goal is to analyze attributes in the con- not.Iamapoliteandkindperson.Iammostlyhonest,
+butIwilllieifIfeelitisnecessaryorifitbenefitsme
+textsthatcausedsubstantialshiftsintraitscores,we
+inahugeway.IameasilyirritatedbythingsandIhave
+onlyconsidercontextswith ∆ 1. Next, anxietyissues...
+reddit
+∥ ∥ ≥
+we extract the ten most positive and most nega-
+Table5: Examplesofsurveydatacontexts.
+tive feature weights for each trait. We note that
+forextroversion,phrasessuchas‘friendly’,‘great’
+and‘noproblem’areamongthehighestpositively
+6.3 AnalysisWithPsychometricSurveyData
+weighted phrases, whereasphrases such as ‘stub-
+born’and‘don’tlikepeople’areamongthemost Theprevioussectionsindicatethatlanguagemod-
+negatively weighted. For agreeableness, phrases elscanpickuponpersonalitytraitsfromcontext.
+like ‘love’ and ‘loyal’ are positively weighted, This raises the question of whether they can be
+whereasphrasessuchas‘lazy’,‘asshole’andexple- usedtoestimateanindividual’spersonality. Inthe-
+tivesareweightedhighlynegative. Onthewhole, ory,thiswouldbedonebyevaluatingonthe‘Big
+changes in personality scores for most traits con- Five’personalityassessmentusingcontextdescrib-
+formed with a human understanding of the most ingtheindividual,whichcouldaidinpersonality
+highly weighted features. As further examples, characterization in cases where it is not feasible
+phrasessuchas‘hangoutwith’causedapositive forasubjecttomanuallyundergoapersonalityas-
+shiftintraitscoreforopennesstoexperience,while sessment. We investigate this with the following
+‘lackofmotivation’causesanegativeshiftforcon- experiment. Theexperimentaldesignforthisstudy
+2375
+wasvettedandapprovedbyanInstitutionalReview
+Board(IRB)attheauthors’homeinstitution.
+UsingAmazonMechanicalTurk,subjectswere
+askedtocompletethe50-item‘BigFive’personal-
+ityassessmentoutlinedin§4(theassessmentwas
+not modified to a sentence completion format as
+wasdoneformodeltesting)andprovidea75-150
+worddescriptionoftheirpersonality(seeAppendix
+E for survey instructions). Responses were man- Figure 4: The plot compares ρ from model evalua-
+ually filtered and low effort attempts discarded, tionwithitemcontext(§6.1)andsurveycontext(§6.3).
+SurveycontextρshownherearefromUndirectedRe-
+resultingin404retainedresponses. Twovariations
+sponses(c 100). Inbothcases,ρmeasuresthePear-
+ofthestudywereadopted: thesubjectsfor199of ≥
+son correlation between trait scores with context and
+theresponseswereprovidedabriefsummaryofthe
+expectedbehavior. Thevariablesusedtoquantifyex-
+‘BigFive’personalitytraitsandaskedtoconsider,
+pectedbehaviordifferbetweenexperiments.
+but not specifically reference, these traits in their
+descriptions. We refer to these responses as the Trait ρ no outlier ρ c 75 ρ c 100
+− ≥ ≥
+Directed Responses data set. The remaining 205 UndirectedResponses
+BERT 0.40 0.39 0.41
+subjectswerenotprovidedthissummaryandtheir
+GPT2 0.48 0.43 0.48
+responsesmakeuptheUndirectedResponsesdata DirectedResponses
+set. Table5showsexamplesofcollecteddescrip- BERT 0.44 0.42 0.39
+GPT2 0.48 0.43 0.42
+tions. Despiteaskingforpersonalitydescriptions
+upwards of 75 words, around a fourth of the re- Table6: ρforX vsX fordatafilteredby
+survey subject
+sponses fell below this limit. The concern was removingoutliersandenforcingwordcounts.
+that data with low word counts may not provide
+enoughcontext. Thus,weexperimentwithfiltering
+includescorrelationcoefficientsfrom§6.1. While
+theresponsesbyremovingoutliers(basedonthe
+the correlations from both sections are measured
+interquartilerangesofmeasuredcorrelations)and
+fordifferentvariables,theybothrepresentageneral
+includingminimumthresholdsonthedescription
+relationshipbetweenobservedpersonalitytraitsof
+length(75and100).
+languagemodelsandtheexpectedbehavior(from
+Humansubjectscores,X ,werecalculated
+subject two different types of contexts). While there are
+for each assessment, using the same scoring pro-
+positivecorrelationsforalltenscenarios,correla-
+cedureaspreviouslydescribedin§4. Themodels
+tionsfromsurveycontextsaresmallerthanthose
+weresubsequentlyevaluatedonthe‘BigFive’per-
+from item contexts. This is not surprising since
+sonalityassessmentusingthesubjects’personality
+item contexts are specifically handpicked by do-
+descriptions as context, yielding X scores
+survey mainexpertstoberelevanttospecificpersonality
+corresponding to each subject. Table 6 shows a
+traits, while survey contexts are free texts from
+summary of the correlation statistics for the two
+open-endedprompts.
+datasetsandthedifferentfilters. Therearestrong
+correlations (0.48 for GPT2 and 0.44 for BERT 6.4 ObservedRangesofPersonalityTraits
+forDirectedResponses)betweenpredictedscores
+Intheprevioussubsections,weinvestigatedprim-
+from personality descriptions and the actual psy-
+ing language models with different types of con-
+chometricassessmentscores. Wenotethatthereare
+textstomanipulatetheirpersonalitytraits. Figure5
+onlymarginaldifferencesincorrelationsbetween
+summarizestheobservedrangesofpersonalitytrait
+thetwodatasets,inspiteoftheirdifferentcharac-
+scores for different contexts, grouped by context
+teristics. While more specific testing is required
+type. Thefourcolumnsforeachtraitrepresentthe
+to determine causal factors that explain these ob-
+scores achieved by the base model (no context),
+servedcorrelationvalues,theysuggestthepotential
+andtherangesofscoresachievedbythedifferent
+forusinglanguagemodelsasprobesforpersonality
+typesofcontexts. Theminimum,medianandmax-
+traitsinfreetext.
+imum scores for each context type are indicated
+Figure 4 plots the correlations (ρ, outliers re- by different shades on each bar. We observe that
+moved) for the individual personality traits, and the different contexts lead to a remarkable range
+2376
+Example1(agreeableness)
+TextGenerationContext:
+Iamalwaysinterestedinpeople.WhenIhaveworkto
+do,I...
+GeneratedText:
+oftengetcuriousaboutpeople.IlovethetimeI’ve
+spentatmyjob.Mychildrengrowupknowingmereally
+well.Arethereanyotherthingsyou...
+Example2(emotionalstability)
+TextGenerationContext:
+Inevergetstressedouteasily.WhenItalktoothers,I...
+GeneratedText:
+Figure5: Observedrangesofpersonalitytraits(inhu- don’tgetstressedoutmucheither.Icangoto
+manpercentiles)fromBERT,whenconditionedondif- restaurantswewanttogotoandgettoseegreat
+foodorotherpeoplethatIknow,andbe...
+ferent context types. These include scores from the
+Example3(opennesstoexperience)
+basemodel(P )andrangesofscoresfromthethree
+base TextGenerationContext:
+contexttypes: item(P cm ),Reddit(P reddit )andsurvey Ineverhaveexcellentideas.OtherssaythatI...
+(P survey ). Barsforcontext-basedscoresshowtheper- GeneratedText:
+centileoftheminimum,median,andmaximum-scoring amafool.WhenIwritemythoughtsItrytofindout
+whereIamsupposedtogetanidea.Thatiswhy
+context,inascendingorder. Thelightestshadeofeach
+itissohardformetodoallthe...
+colorindicatestheminimum,thedarkestindicatesthe
+maximumandtheintermediateindicatesthemedian.
+Table7: RepresentativeexamplesofTextGeneration
+Contexts&correspondingGeneratedTexts. Eachtext
+generationcontextisaconcatenationofacontext/modi-
+of scores for all five personality traits. In partic-
+fierpairfrom§6.1andaneutralprompt.
+ular, for two of the traits (conscientiousness and
+emotional stability), the models actually achieve
+the full range of human scores (nearly 0 to 100
+percentile). Curiously,forallfivetraits,different
+contextsareabletoachieveverylowscores(< 10
+percentile). However,themodelsparticularlystrug-
+glewithachievinghighscoresforagreeableness.
+7 EffectsonTextGeneration
+Whiletheprevioussectionsstronglysuggestthat
+Figure 6: GPT2 X vs X plots. We observe a
+the perceived personality traits of language mod- gen cm
+strongcorrelationbetweenscoresusinggeneratedtext
+els can be influenced for fill-in-the-blank person-
+ascontext(X )andscoresusingassessmentitems&
+gen
+alityquestionnaires,itisimportanttounderstand
+answersascontext(X ).
+subject
+whethertheseinfluencesalsotranslatetotextgen-
+erated by these language models in downstream
+applications. Toanswerthisquestion,wecreated bothsentimentandtopic,describinganindividual
+‘text generation contexts’ by concatenating each whoisbothcuriousaboutpeopleandwhoenjoys
+context/modifier pair from §6.1 with each of six spending time in an interactive environment like
+neutrally framed prompts (e.g., "I am always the a job. While there are some generated texts with
+life of the party" + "When I talk to others, I...", noapparentrelationtotextgenerationcontexts,we
+seeAppendixFforcompletelistofprompts). For foundthatmostofthegeneratedtextsqualitatively
+thisexperiment,GPT24 wasusedtogeneratea50 mirrorthepersonalityintextgenerationcontext.
+tokentextforeachtextgenerationcontext.
+We also quantitatively evaluate how well the
+Table7givesexamplesofsometextgeneration personality traits in the generated texts matches
+contextsandcorrespondinggeneratedtexts. Exam- corresponding text generation contexts. For this,
+ple 1 in Table 7 corresponds to a text generation eachgeneratedtextis,itself,usedascontextfora
+contextthatassertsthatthemodelis“alwaysinter- BigFiveassessment(aspreviouslyshowninFigure
+estedinpeople";thegeneratedtextmatchesthisin 1, panel C). We measure the Pearson correlation
+betweentheresultingscores,X ,andthescores
+4SinceBERTistrainedformaskedlanguagemodeling, gen
+andisnotwellsuitedfortextgeneration forthecontext/itempair(X cm )from§6.1thatwere
+2377
+usedinthecorrespondingtextgenerationcontext. collated. Thecrowd-sourcedsurveydatawascol-
+Figure 6 gives the results from this analysis, and lectedusingAmazonMechanicalTurk(AMT)with
+shows an overall Pearson correlation of 0.49 be- the permission of all participants, following IRB
+tweenX andX . approvalofthestudydesign. Nopersonallyiden-
+gen cm
+Thissuggeststhatthepersonalityscoresofthe tifiablemarkerswerestoredandparticipantswere
+model, measured using the Big Five assessment, compensatedfairly,withapaymentrate($2.00/task
+areagoodindicationofthepersonalitythatmight w/ est. completion time of 15 min) significantly
+beseenintextgeneratedfromthecontextualized higherthanAMTaverages(Haraetal.,2018).
+languagemodels. The broader goal of this line of research is to
+investigateaspectsofpersonalityinlanguagemod-
+8 Conclusion
+els,whichareincreasinglybeingusedinanumber
+of NLP applications. Since AI systems that use
+We have presented a simple approach for mea-
+thesetechnologiesaregrowingeverpervasive,and
+suring and controlling the perceived personality
+ashumanstendtoanthropomorphizesuchsystems
+traits of language models. Further, we show that
+(i.e.,SiriandAlexa),understandingandcontrolling
+such models can predict personality traits of hu-
+theirperceivedpersonalitiescanhavebothbroad
+manusers,possiblyenablingassessmentincases
+anddeepconsequences. Thisisespeciallytruefor
+where participation is difficult to attain. Future
+applicationsindomainssuchaseducationandmen-
+work can explore the use of alternate personality
+tal health, where interactions with these systems
+taxonomies. Similarly,thereisalargeandgrowing
+canhavelastingpersonalimpactsontheirusers.
+variety of language models. It is unclear to what
+Finally,ifthepersonalitiesofAIsystemscanbe
+extent our findings generalize to other language
+manipulatedinthewaysthatourresearchsuggests,
+models,particularlythosewithsignificantlymore
+there is a serious risk of such systems being ma-
+parameters(Brownetal.,2020;Smithetal.,2022).
+nipulated,throughtargetedattacks,tobehostileor
+Finally,therolethatpretrainingdataplaysonper-
+disagreeable to their users. Developing methods
+sonalitytraitsisananotherimportantquestionfor
+throughwhichlanguagemodelscouldbemadeim-
+exploration.
+mune to such attacks would then be a necessary
+Limitations considerationbeforefieldingsuchsystems.
+Our exploration has some notable limitations.
+Acknowledgements
+These include answer bias due to variable token
+countandfrequencyimbalanceinpretrainingdata This work was supported in part by NSF grant
+andthepresenceofdoublenegativestatementsin DRL2112635. Theauthorsalsothankanonymous
+questionnaire items (§4). The later might be ad- reviewersforsuggestionsandfeedback.
+dressed by experimentation with other language
+models. For instance, GPT2’s closed source suc-
+References
+cessors,GPT3andGPT4,areshowntohandledou-
+ble negatives better than GPT2 ( (Nguyena et al., AbubakarAbid,MaheenFarooqi,andJamesZou.2021.
+2023)). Concerns with the altered questionnaire Largelanguagemodelsassociatemuslimswithvio-
+lence. NatureMachineIntelligence,3(6):461–463.
+framingandthecontextitemevaluationprocedure
+werepartiallyaddressedinfollowupexperiments Lisa P Argyle, Ethan C Busby, Nancy Fulda, Joshua
+in§6.1. AsmentionedintheConclusionssection, Gubler, Christopher Rytting, and David Wingate.
+whether and how our results generalize to other 2022. Out of one, many: Using language mod-
+els to simulate human samples. arXiv preprint
+languagemodelsremainsanopenquestion.
+arXiv:2209.06899.
+EthicsandBroaderImpact RowanBayne.1997. Themyers-briggstypeindicator:
+Acriticalreviewandpracticalguide.
+The‘BigFive’assessmentitemsandscoringproce-
+dureusedinthisstudyweredrawnfromfreepub- EmilyM.BenderandAlexanderKoller.2020. Climbing
+licresourcesandopensourceimplementationsof towardsNLU:Onmeaning,form,andunderstanding
+intheageofdata. InProceedingsofthe58thAnnual
+BERTandGPT2(HuggingFace,2022)wereused.
+Meeting of the Association for Computational Lin-
+Reddit data was scraped from public threads and
+guistics,pages5185–5198,Online.Associationfor
+no usernames or other identifiable markers were ComputationalLinguistics.
+2378
+ShikhaBordiaandSamuelR.Bowman.2019. Identify- andLawrenceA.Pervin,editors,Handbookofper-
+ingandreducinggenderbiasinword-levellanguage sonality: Theoryandresearch,pages114–158.The
+models. InProceedingsofthe2019Conferenceof GuilfordPress,NewYork,NewYork.
+theNorth,Minneapolis,Minnesota.
+OliverP.JohnandSanjaySrivastava.1999. Thebigfive
+Tom Brown, Benjamin Mann, Nick Ryder, Melanie traittaxonomy: History,measurement,andtheoreti-
+Subbiah,JaredDKaplan,PrafullaDhariwal,Arvind calperspectives. InLawrenceA.PervinandOliverP.
+Neelakantan,PranavShyam,GirishSastry,Amanda John,editors,Handbookofpersonality: Theoryand
+Askell,etal.2020. Languagemodelsarefew-shot research,pages102–138.TheGuilfordPress,New
+learners. Advancesinneuralinformationprocessing York,NewYork.
+systems,33:1877–1901.
+Saketh Reddy Karra, Son Nguyen, and Theja Tula-
+bandhula. 2022. AI Personification: Estimating
+HansChristian,DerwinSuhartono,AndryChowanda,
+thepersonalityoflanguagemodels. arXivpreprint
+andKamalZ.Zamli.2021. Textbasedpersonality
+arXiv:2204.12000.
+predictionfrommultiplesocialmediadatasources
+usingpre-trainedlanguagemodelandmodelaverag-
+AnastasiaKuzminykh,JennySun,NivethaGovindaraju,
+ing. JournalofBigData,8(1).
+Jeff Avery, and Edward Lank. 2020. Genie in the
+bottle: Anthropomorphizedperceptionsofconversa-
+Jacob Devlin, Ming-Wei Chang, Kenton Lee, and
+tionalagents. InProceedingsofthe2020CHICon-
+KristinaToutanova.2019. Bert: Pre-trainingofdeep
+ference on Human Factors in Computing Systems,
+bidirectionaltransformersforlanguageunderstand-
+pages1–13.
+ing. InProceedingsofthe2019Conferenceofthe
+NorthAmericanChapteroftheAssociationforCom-
+YMasui,YGondo,HInagaki,andNHirose.2006. Do
+putationalLinguistics: HumanLanguageTechnolo-
+personalitycharacteristicspredictlongevity?findings
+gies,Minneapolis,Minnesota. fromthetokyocentenarianstudy. Age, 28(4):353–
+361.
+Lewis R. Goldberg. 1990. An alternative "descrip-
+tion of personality": The big-five factor struc- YashMehta,SaminFatehi,AmirmohammadKazameini,
+ture. JournalofPersonalityandSocialPsychology, ClemensStachl,ErikCambria,andSaulehEetemadi.
+59(6):1216–1229. 2020. Bottom-upandtop-down: Predictingperson-
+alitywithpsycholinguisticandlanguagemodelfea-
+LewisR.Goldberg.1993. Thestructureofphenotypic tures. In 2020 IEEE International Conference on
+personalitytraits. AmericanPsychologist,48(1):26– DataMining(ICDM),Sorrento,Italy.
+34.
+Marilù Miotto, Nicola Rossberg, and Bennett Klein-
+Kotaro Hara, Abigail Adams, Kristy Milland, Saiph berg. 2022. Who is gpt-3? an exploration of per-
+Savage,ChrisCallison-Burch,andJeffreyP.Bigham. sonality, values and demographics. arXiv preprint
+2018. Adata-drivenanalysisofworkers’earningson arXiv:2209.14338.
+amazonmechanicalturk. Proceedingsofthe2018
+CHI Conference on Human Factors in Computing ShaneTMueller.2020. Cognitiveanthropomorphism
+Systems. ofai: Howhumansandcomputersclassifyimages.
+ErgonomicsinDesign,28(3):12–19.
+Po-SenHuang, HuanZhang, RayJiang, RobertStan-
+HaThanhNguyena,RandyGoebelb,FrancescaTonic,
+forth,JohannesWelbl,JackRae,VishalMaini,Dani
+Kostas Stathisd, and Ken Satoha. 2023. A nega-
+Yogatama,andPushmeetKohli.2020. Reducingsen-
+tiondetectionassessmentofgpts: analysiswiththe
+timent bias in language models via counterfactual
+xnot360dataset.
+evaluation. FindingsoftheAssociationforComputa-
+tionalLinguistics: EMNLP2020.
+Open-Psychometrics.2018. Open-sourcepsychomet-
+ricsproject:AnswerstotheIPIPbigfivefactormark-
+HuggingFace. 2022. the ai community building the
+ers. Lastaccessed29August2022.
+future. Lastaccessed22March2022.
+Joe O’Connor and Jacob Andreas. 2021. What con-
+IPIP. 2022. Administering IPIP measures, with a 50-
+textfeaturescantransformerlanguagemodelsuse?
+itemsamplequestionnaire. Lastaccessed22March
+Proceedingsofthe59thAnnualMeetingoftheAsso-
+2022.
+ciationforComputationalLinguisticsandthe11th
+InternationalJointConferenceonNaturalLanguage
+GuangyuanJiang, ManjieXu, Song-ChunZhu, Wen-
+Processing(Volume1: LongPapers).
+juan Han, Chi Zhang, and Yixin Zhu. 2022. MPI:
+evaluating and Inducing personality in pre-trained Melissa C O’Connor and Sampo V Paunonen. 2007.
+languagemodels. arXivpreprintarXiv:2206.07550. Bigfivepersonalitypredictorsofpost-secondaryaca-
+demicperformance. PersonalityandIndividualdif-
+OliverP.John, LauraP.Naumann, andChristopherJ. ferences,43(5):971–990.
+Soto.2008. Paradigmshifttotheintegrativebig-five
+traittaxonomy: History,measurement,andconcep- PierrePureurandMuratErder.2016. 8,page187–213.
+tual issues. In Oliver P. John, Richard W. Robins, MorganKaufmannPublishers.
+2379
+AlecRadford,JeffreyWu,RewonChild,DavidLuan,
+DarioAmodei,andIlyaSutskever.2019. Language
+modelsareunsupervisedmultitasklearners.
+Arleen Salles, Kathinka Evers, and Michele Farisco.
+2020. Anthropomorphisminai. AJOBneuroscience,
+11(2):88–95.
+Shaden Smith, Mostofa Patwary, Brandon Norick,
+Patrick LeGresley, Samyam Rajbhandari, Jared
+Casper, Zhun Liu, Shrimai Prabhumoye, George
+Zerveas,VijayKorthikanti,etal.2022. Usingdeep-
+speed and megatron to train megatron-turing nlg
+530b,alarge-scalegenerativelanguagemodel. arXiv
+preprintarXiv:2201.11990.
+JeromePWagnerandRonaldEWalker.1983. Relia-
+bilityandvaliditystudyofasufipersonalitytypol-
+ogy: Theenneagram. Journalofclinicalpsychology,
+39(5):712–717.
+JasonKWhite,SusanSHendrick,andClydeHendrick.
+2004. Bigfivepersonalityvariablesandrelationship
+constructs. Personality and individual differences,
+37(7):1519–1530.
+MartyJWolf,KeithWMiller,andFrancesSGrodzin-
+sky. 2017. Why we should have seen that com-
+ing: commentsonmicrosoft’stay“experiment,”and
+widerimplications. TheORBITJournal,1(2):1–12.
+Feifan Yang, Tao Yang, Xiaojun Quan, and Qinliang
+Su. 2021. Learning to answer psychological ques-
+tionnaireforpersonalitydetection. Findingsofthe
+AssociationforComputationalLinguistics: EMNLP
+2021.
+2380
+AppendixA ModelBackground
+AppendixB ExperimentDesignItems
+BERT,whichstandsforBidirectionalEncoderRep-
+resentations from Transformers, is a transformer-
+based deep learning model for natural language
+processing (Devlin et al., 2019). The model is
+pretrainedonunlabeleddatafromthe800Mword
+BooksCorpusand2500MwordEnglishWikipedia
+corpora. WhileBERTcanbefine-tunedforautore-
+gressivelanguagemodelingtasks,itispretrained
+for masked language modeling. This study uses
+aBERTmodelfromHuggingFaces’sTransformer
+Python Library with a language model head for
+masked language modeling. No fine-tuning was
+donetothemodel. GPT2,whichstandsforGenera-
+tivePretrainedTransformer2,isageneral-purpose
+learningtransformermodeldevelopedbyOpenAI
+in 2018 (Radford et al., 2019). Like BERT, this
+modelisalsopretrainedonunlabeleddatafromthe
+800MwordBooksCorpus. ThestudyusedHuggin-
+face’sGPT2modelwithalanguagemodelheadfor
+autoregressivelanguagemodeling. AswithBERT,
+nofine-tuningtookplace.
+Figure7: Humandistributionsof‘BigFive’traitscores.
+2381
+Item AssociatedTrait
+Iam{blank}thelifeoftheparty. E
+I{blank}feellittleconcernforothers. A
+Iam{blank}prepared. C
+I{blank}getstressedouteasily. ES
+I{blank}havearichvocabulary. OE
+I{blank}don’ttalkalot. E
+Iam{blank}interestedinpeople. A
+I{blank}leavemybelongingsaround. C
+Iam{blank}relaxedmostofthetime. ES
+I{blank}havedifficultyunderstandingabstractideas. OE
+I{blank}feelcomfortablearoundpeople. E
+I{blank}insultpeople. A
+I{blank}payattentiontodetails. C
+I{blank}worryaboutthings. ES
+I{blank}haveavividimagination. OE
+I{blank}keepinthebackground. E
+I{blank}sympathizewithothers’feelings. A
+I{blank}makeamessofthings. C
+I{blank}seldomfeelblue. ES
+Iam{blank}notinterestedinabstractideas. OE
+I{blank}startconversations. E
+Iam{blank}notinterestedinotherpeople’sproblems. A
+I{blank}getchoresdonerightaway. C
+Iam{blank}easilydisturbed. ES
+I{blank}haveexcellentideas. OE
+I{blank}havelittletosay. E
+I{blank}haveasoftheart. A
+I{blank}forgettoputthingsbackintheirproperplace. C
+I{blank}getupseteasily. ES
+I{blank}donothaveagoodimagination. OE
+I{blank}talktoalotofdifferentpeopleatparties. E
+Iam{blank}notreallyinterestedinothers. A
+I{blank}likeorder. C
+I{blank}changemymoodalot. ES
+Iam{blank}quicktounderstandthings. OE
+I{blank}don’tliketodrawattentiontomyself. E
+I{blank}taketimeoutforothers. A
+I{blank}shirkmyduties. C
+I{blank}havefrequentmoodswings. ES
+I{blank}usedifficultwords. OE
+I{blank}don’tmindbeingthecenterofattention. E
+I{blank}feelothers’emotions. A
+I{blank}followaschedule. C
+I{blank}getirritatedeasily. ES
+I{blank}spendtimereflectingonthings. OE
+Iam{blank}quietaroundstrangers. E
+I{blank}makepeoplefeelatease. A
+Iam{blank}exactinginmywork. C
+I{blank}feelblue. ES
+Iam{blank}fullofideas. OE
+TableB1: Adjusted‘BigFive’PersonalityAssessmentItems.
+Trait Median Mean(µ) SD(σ)
+E 20 19.60 9.10
+A 29 27.74 7.29
+C 24 23.66 7.37
+ES 19 19.33 8.59
+OE 29 28.99 6.30
+TableB2: HumanPopulationDistributionof‘BigFive’PersonalityTraits.
+2382
+Trait BaseValue PositivelyScoredItem# NegativelyScoredItem#
+E 20 1,11,21,31,41 6,16,26,36,46
+A 14 7,17,27,37,42,47 2,12,22,32
+C 14 3,13,23,33,43,48 8,18,28,38
+ES 38 9,19 4,14,24,29,34,39,44,49
+OE 8 5,15,25,35,40,45,50 10,20,30
+TableB3: ‘BigFive’PersonalityItemScoringProcedure.
+AppendixC ItemContextEvaluationTables
+r cm Mean∆ cm Med∆ cm ∆ cmSD ConfidenceInterval
+BERT
+-2 -3.36 -2.0 7.49 [-5.51,-1.21]
+-1 -3.18 -3.50 4.81 [-4.56,-1.80]
+0 -0.02 0.00 4.51 [-1.32,1.28]
+1 2.42 2.00 6.17 [0.648,4.19]
+2 3.96 3.00 8.33 [1.57,6.35]
+GPT2
+-2 -7.34 -8.0 6.38 [-9.17,-5.51]
+-1 -4.58 -4.0 4.32 [-5.82,-3.34]
+0 -2.06 -1.0 4.24 [-3.28,-0.84]
+1 0.0 0.0 3.13 [-0.90,0.90]
+2 1.56 1.0 5.78 [-0.10,3.22]
+TableC1: Statisticsfrom∆ vsr plotscontainingdatafromalltraits. Statisticsincludemean,median,standard
+cm cm
+deviationandaconfidenceintervalfor∆ ateachr .
+cm cm
+AppendixD RedditContextEvaluationTables
+RedditContextSources
+reddit.com/r/AskReddit/comments/k3dhnt/how_would_you_describe_your_personality/
+reddit.com/r/AskReddit/comments/q4ga1j/redditors_what_is_your_personality/
+reddit.com/r/AskReddit/comments/68jl8g/how_can_you_describe_your_personality/
+reddit.com/r/AskReddit/comments/ayjgyz/whats_your_personality_like/
+reddit.com/r/AskReddit/comments/9xjahw/how_would_you_describe_your_personality/
+reddit.com/r/AskWomen/comments/c1gr4a/how_would_you_describe_your_personality/
+reddit.com/r/AskWomen/comments/7x23zg/what_are_your_most_defining_personalitycharacter/
+reddit.com/r/CasualConversation/comments/5xtckg/how_would_you_describe_your_personality/
+reddit.com/r/AskReddit/comments/aewroe/how_would_you_describe_your_personality/
+reddit.com/r/AskMen/comments/c0grgv/how_would_you_describe_your_personality/
+reddit.com/r/AskReddit/comments/pzm3in/how_would_you_describe_your_personality/
+reddit.com/r/AskReddit/comments/bem0ro/how_would_you_describe_your_personality/
+reddit.com/r/AskReddit/comments/1w9yp0/what_is_your_best_personality_trait/
+reddit.com/r/AskReddit/comments/a499ng/what_is_your_worst_personality_trait/
+reddit.com/r/AskReddit/comments/6onwek/what_is_your_worst_personality_trait/
+reddit.com/r/AskReddit/comments/2d7l2i/serious_reddit_what_is_your_worst_character_trait/
+reddit.com/r/AskReddit/comments/449cu7/serious_how_would_you_describe_your_personality/
+TableD1: DomainnamesofthreadsthatwerescrapedtocollectRedditcontext.
+Trait Mean∆ reddit Med∆ reddit ∆ redditSD 5Max∆ reddit 5Min∆ reddit
+BERT
+E -2.28 -2 4.04 8,7,7,6,5 -14,-13,-13,-13,-13
+A -2.02 -1 3.38 2,2,2,2,2 -19,-18,-15,-15,-15
+C 3.77 4 5.17 15,15,15,15,13 -17,-17,-16,-14,-13
+ES 1.71 2 2.29 14,14,13,13,12 -12,-10,-10,-10,-10
+OE 1.74 1 2.17 9,7,7,7,7 -11,-11,-8,-8,-7
+GPT2
+E -3.73 -4 3.33 7,5,5,4,4 -14,-10,-10,-10,-10
+A -0.98 -1 4.26 13,10,8,7,7 -17,-15,-15,-15,-14
+C -0.27 0 4.27 11,11,11,11,9 -20,-16,-16,-16,-15
+ES -3.83 -3 6.27 8,8,8,8,8 -21,-21,-21,-21,-21
+OE -1.91 -2 3.21 4,4,4,4,4 -15,-12,-12,-12,-12
+TableD2: ∆ summarystatistics. Statisticsincludemean,medianandstandarddeviation,aswellas5largest
+reddit
+and5smallest∆ .
+reddit
+2383
+BERT
+Extroversion
+• NotablePositivelyWeightedPhrases:‘friendly’,‘great’,‘good’,‘quite’,‘laugh’,‘please’,‘senseof’,‘thanks
+for’,‘reallygood’,‘andfriendly’,‘noproblem’,‘toplease’,‘mysenseof’,‘finisheverythingstart’,‘enthusiastic
+butsensitive’
+• NotableNegativelyWeightedPhrases:‘question’,‘stubborn’,‘why’,‘lack’,‘fuck’,‘fucking’,‘hate’,‘not’,‘lack
+of’,‘toomuch’,‘donknow’,‘donlike’,‘tooeasily’,‘waytoo’,‘donlikepeople’,‘yougoout’,‘donknowhow’,
+‘don[’t]knowwhat’
+Agreeableness
+• NotablePositivelyWeightedPhrases:‘will’,‘friendly’,‘lol’,‘love’,‘loyal’,‘calm’,‘yup’,‘does’,‘honesty’,
+‘laidback’,‘goout’,‘thanksfor’,‘reallygood’,‘outwithme’,‘friendlypoliteand’,‘reallygoodlistener’,‘true
+tomyself’,‘mysenseof’
+• NotableNegativelyWeightedPhrases: ‘lack’,‘didn[’t]’,‘won[’t],‘lazy’,‘fucking’,‘self’,‘worst’,‘lackof’,
+‘tooeasily’,‘donlike’,‘theworst’,‘beingtoo’,‘haveno’,‘donlikepeople’,‘lackofmotivation’,‘donknow
+how’,‘myworsttrait’,‘alsomyworst’,‘toohonestsometimes’,‘doesn[’t]talkmuch’
+Conscientiousness
+• NotablePositivelyWeightedPhrases:‘am’,‘friendly’,‘just’,‘calm’,‘believe’,‘canbe’,‘ofpeople’,‘tendto’,
+‘feellike’,‘themosthumble’,‘mosthumbleperson’,‘mysenseof’,‘gettoknow’,‘friendlypoliteand’,‘get
+alongwith’,‘peoplelikeme’
+• NotableNegativelyWeightedPhrases:‘lack’,‘no’,‘lazy’,‘inability’,‘fucks’,‘half’,‘lackof’,‘fuckoff’,‘don
+like’,‘inabilityto’,‘donlikepeople’,‘yougoout’,‘lackofmotivation’,‘donevenknow’,‘monotonousand
+impulsive’
+EmotionalStability
+• NotablePositivelyWeightedPhrases:‘will’,‘feel’,‘outwithme’,‘gooutwith’,‘willyougo’,‘themosthumble’
+• NotableNegativelyWeightedPhrases:‘no’,‘off’,‘hypercritical’,‘overthinking’,‘lackof’,‘easilydistracted’,
+‘doesn[’t]talk’,‘doneven’,‘tooeasilydistracted’,‘lackofmotivation’,‘doesn[’t]talkmuch’,‘donevenknow’,
+‘unrelatableisstrange’,‘isstrangeone’,‘thissaidforeskin’
+OpennesstoExperience
+• NotablePositivelyWeightedPhrases:‘most’,‘like’,‘meto’,‘outwith’,‘likeme’,‘liketo’,‘wantto’,‘withme’,
+‘outwithme’,‘willyougo’,‘wanttobe’,‘allthetime’,‘formeto’,‘hangoutwith’
+• NotableNegativelyWeightedPhrases:‘lack’,‘never’,‘fucks’,‘sad’,‘nothing’,‘lackempathy’,‘thecomplainer’,
+‘noconfidence’,‘lackof’,‘easilydistracted’,‘blamehelicopter’,‘helicopterparents’,‘neversaysorry’,‘blame
+helicopterparents’,‘tooeasilydistracted’,‘finishprojectsafter’,‘neverfinishprojects’,‘procrastinationoutof’,
+‘mylackof’,‘lackofpersonality’,‘toomanyfucks’
+TableD3: AnalysisofhighestweightedphrasesfromBERTlogisticregression.
+2384
+GPT2
+Extroversion
+• NotablePositivelyWeightedPhrases:‘believe’,‘loyal’,‘curious’,‘best’,‘passionate’,‘enjoy’,‘bright’,‘hard
+working’,‘noproblem’,‘amnice’,‘myamazingmodesty’,‘smoothbrightepic’,‘patientandflexible’,‘great
+withchildren’,‘calmcoolcollected’
+• NotableNegativelyWeightedPhrases:‘introverted’,‘lackof’,‘laidback’,‘donknowhow’
+Agreeableness
+• NotablePositivelyWeightedPhrases:‘friendly’,‘loyal’,‘honest’,‘gay’,‘humor’,‘likepeople’,‘thanksfor’,‘to
+please’,‘andfriendly’,‘noproblem’,‘friendlypoliteand’,‘patientandflexible’,‘calmcoolcollected’,‘honesty
+beingstraightforward’
+• NotableNegativelyWeightedPhrases:‘tooeasily’,‘toomuch’,‘lackof’,‘yougoout’,‘donknowwhat’,‘self’,
+‘asshole’
+Conscientiousness
+• NotablePositivelyWeightedPhrases: ‘smile’,‘thanksfor’,‘noproblem’,‘friendlypoliteand’,‘reallygood
+listener’,‘truetomyself’,‘patientandflexible’
+• NotableNegativelyWeightedPhrases:‘stop’,‘jealousy’,‘lazy’,‘hate’,‘lack’,‘fuck’,‘worst’,‘lackof’,‘too
+easily’,‘fuckoff’,‘toonice’,‘donknow’,‘donknowhow’,‘lackofmotivation’,‘donevenknow’,‘myworst
+trait’,‘damnituncle’,‘depressedasshit’
+EmotionalStability
+• NotablePositivelyWeightedPhrases:‘friendly’,‘calm’,‘easy’,‘honesty’,‘laidback’,‘hardworking’,‘calm
+and’,‘humbleam’,‘politeand’,‘noproblem’,‘outwithme’,‘themosthumble’
+• NotableNegativelyWeightedPhrases:‘lack’,‘anxious’,‘lazy’,‘jealousy’,‘lackof’,‘donknow’,‘tooeasily’,
+‘donlike’,‘donlikepeople’,‘donknowhow’,‘lackofmotivation’,‘donevenknow’
+OpennesstoExperience
+• NotablePositivelyWeightedPhrases:‘understand’,‘having’,‘wanting’,‘thoughts’,‘thanksfor’,‘toonice’,‘no
+problem’,‘canrelate’,‘beingtoonice’,‘thatjustconfidence’
+• NotableNegativelyWeightedPhrases:‘fuck’,‘myself’,‘cynical’,‘lack’,‘boring’,‘lackof’,‘donlikepeople’
+TableD4: AnalysisofhighestweightedphrasesfromGPT2logisticregression.
+AppendixE SurveyContextEvaluationTables
+Part1Instruction
+Therearetwopartstothisquestionnaire.Inthefirstpart(onthispage),youwillbeshown50questions,
+andneedtochoosearesponsewhichbestmatchesyourpersonality.Inthesecondpart(onthenextpage),
+youwillbeaskedtowriteashort(75-150word)descriptionofyourpersonalityinfreetext.Participants
+willonlybecompensatediftheyrespondtoallquestions.
+Part2Instruction
+Inbetween75and150words,pleasedescribeyourpersonality[Directedresponses:asitrelatestothe5personalitytraits
+outlinedabove.Besurenottousethenameofthepersonalitytraitsthemselvesinyourresponse].
+TableE1: Datacollectionsurveyinstructions.
+2385
+AppendixF GeneratedTextEvaluationTables
+TextGenerationPrompts
+WhenIgotoagathering,I...
+OtherssaythatIam...
+WhenIamaroundpeople,I...
+WhenIhaveworktodo,I...
+WhenIhavefreetime,I...
+WhenItalktoothers,I...
+TableF1: Listofpromptsusedintextgenerationcontext.
+2386

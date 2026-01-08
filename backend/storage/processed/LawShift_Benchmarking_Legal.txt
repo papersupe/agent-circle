@@ -1,0 +1,1764 @@
+LawShift: Benchmarking Legal Judgment Prediction
+Under Statute Shifts
+ZhuoHan1∗,YiYang1∗,YiFeng1†,WanhongHuang1,XuxingDing1
+ChuanyiLi1,JidongGe1,VincentNg2
+1StateKeyLaboratoryforNovelSoftwareTechnology,NanjingUniversity,China
+2HumanLanguageTechnologyResearchInstitute,UniversityofTexasatDallas,USA
+fy@nju.edu.cn
+Abstract
+LegalJudgmentPrediction(LJP)seekstopredictcaseoutcomesgivenavailable
+caseinformation,offeringpracticalvalueforbothlegalprofessionalsandlayper-
+sons. However,akeylimitationofexistingLJPmodelsistheirlimitedadaptability
+tostatutoryrevisions. CurrentSOTAmodelsareneitherdesignednorevaluated
+forstatutoryrevisions. Tobridgethisgap,weintroduceLawShift,abenchmark
+dataset for evaluating LJP under statutory revisions. Covering 31 fine-grained
+changetypes,LawShiftenablessystematicassessmentofSOTAmodels’abilityto
+handlelegalchanges. WeevaluatefiverepresentativeSOTAmodelsonLawShift,
+uncoveringsignificantlimitationsintheirresponsetolegalupdates. Ourfindings
+showthatmodelarchitectureplaysacriticalroleinadaptability,offeringactionable
+insightsandguidingfutureresearchonLJPindynamiclegalcontexts.
+1 Introduction
+LegalJudgmentPrediction(LJP)aimstopredictjudicialoutcomesbasedoncaseinformationsuch
+asfactsandclaims[1,2],andhasbeenstudiedacrossmultiplelegaljurisdictions. IntheU.S.and
+India,LJPtypicallycentersonpredictingcourtdecisions,i.e.,whetherclaimswillbeupheld,given
+thecasefactsandarguments[3,4]. Incontrast,inotherjurisdictions,LJPemphasizesaligningcase
+factswithapplicablelawarticles[5–11]. Forinstance,LJPintheEUprimarilyfocusesonpredicting
+applicablelawarticles[12–14]. Similarly,ChineseLJPtargetsthepredictionoflawarticles,aswell
+ascharges,andprisontermsbasedoncasefacts[15,1,16,17]. LJPprovidestimelyinsightsinto
+caseresults,supportinglegalprofessionalsandlaypersonsindecision-makingwhileminimizingtime
+consumptionandtheneedforlegalconsultations.
+A significant challenge in LJP is the dynamic nature of legal systems, where ongoing statutory
+revisions in both common and civil law continually reshape legal norms to align with evolving
+societaldemands[18–20]. Table1illustrateshowstatutoryrevisionscanaltercaseoutcomes. In
+the example, the defendant was acquitted under the prior statute despite discharging radioactive
+substancesintopublicwaters;aftertherevision,thesameactresultedinconviction. Thishighlights
+thesignificantimpactthatchangesinlawarticleshaveonjudicialdecisions,affectingbothindividuals
+and society. Consequently, LJP models must swiftly adapt to updated statutes, revise their legal
+reasoning,andproducejudgmentsgroundedincurrentlegalstandards.
+However,existingLJPresearchoverlooksthischallenge.First,LJPmodelsarenotexplicitlydesigned
+toaccommodatelegalupdates,leadingtopotentialjudgmenterrors. Whileoff-the-shelftechniques,
+suchasmodelfine-tuning[21]andmodelediting[22,23],canincorporateupdatedlegalknowledge,
+∗Theseauthorscontributedequallytothiswork.
+†Correspondingauthor.
+39thConferenceonNeuralInformationProcessingSystems(NeurIPS2025).
+Table1: Anexampleofdifferentjudgmentoutcomesbeforeandafterrevisions.
+FactDescription:ThedefendantstoleTritium,aradioactivesubstance,fromalocalchemistrylabanddeliberatelyintroduceditintothe
+publicdrinkingwatersupplyinhisneighborhood,resultinginsevereconsequences,including...
+OldArticle:...commitsarson,breachesdikes,causeexplosion,spreadspoisonoussubstancesshallbesentenced...
+Judgment:Non-Violation(obsolete)
+RevisedArticle:...commitsarson,breachesdikes,causeexplosion,spreadspoisonousorradioactivesubstancesshallbesentenced...
+Judgment:Violation(up-to-date)
+they do not ensure consistent adherence to the latest statutes. Second, existing LJP evaluation
+typicallyreliesonstatic,held-outdatasetsthattreatlawarticlesasunchanging,ignoringevolving
+legalnorms[16,17]. Thesedatasetsmergedifferentversionsofstatutesunderthesamelabel[15],
+despite significant variations in the underlying judgment logic across versions. This conflation
+introducesconsiderablenoisefromjudgmentlogicshiftsduringmodeltraining.
+Thispaperinvestigatestheabilityofstate-of-the-art(SOTA)LJPmodelstoadapttojudgmentlogic
+shifts caused by statutory revisions, highlighting their limitations and guiding future research in
+dynamiclegalcontexts. Torigorouslyevaluatemodelperformanceamidsuchchanges,weintroduce
+LawShift, a Chinese statutory revision-oriented LJP benchmark featuring a metamorphic testing
+framework. Notethatdiversestatutoryrevisions,suchasaddingexceptions,redefiningterms,or
+modifyingconditions,differentiallyaffectjudgmentlogic,LawShiftencompasses31fine-grained
+revisiontypestocapturethiscomplexity.
+ToevaluatewhetherLJPmodelscaptureshiftsinlegalreasoningcausedbystatutoryrevisions,we
+employametamorphictesting(MT)approach[24]. TraditionalevaluationsusingmetricslikeF1
+depend on ground-truth labels, which are often missing or ambiguous in the context of evolving
+laws—especiallywhennewlyrevisedstatuteslackcorrespondingjudgedcasesandlabels. MTsolve
+thislimitationbydefiningmetamorphicrelations,whicharelogicallygroundedexpectationsabout
+howmodelpredictionsshouldchangefollowingspecificstatuterevisions.
+WeevaluatefiveSOTALJPmodelsusingLawShiftandfindthattheyexhibitnotablevulnerabilities
+underevolvinglegalnorms. Mostmodelsstruggletoaligntheirreasoningwithupdatedstatutes,
+defaulting to outdated legal logic learned during training. Models equipped with explicit legal
+knowledgeencodingmechanismsorfine-grainedattentiontostatutesemanticsshowslightlyimproved
+adaptability,whilethoseprimarilyrelyingonstatisticalcorrelationsbetweenfactsandlabelsperform
+significantlyworse. Inanutshell,ourcontributionsarethree-fold.
+First,weconductthefirstevaluationofLJPmodelsunderstatutoryshiftsbyintroducingacompre-
+hensivedatasettailoredtotestmodeladaptabilitytostatutoryrevisions. Covering31revisiontypes,
+our dataset serves as a foundational resource for advancing LJP and legal reasoning in language
+models.
+Second,weadoptametamorphictestingstrategytoassesswhethermodelpredictionsalignwith
+revisedlegalreasoning,withoutrelyingonextensivemanualannotations. Thisapproachisbroadly
+applicabletootherlegaltaskswhereground-truthlabelsareunavailableorambigious[25–27].
+Third, we conduct an in-depth evaluation of SOTA LJP models on our dataset, uncovering key
+strengths and limitations under statutory revisions. Our analysis of model mechanisms offers
+actionableinsightsforimprovinglegalreasoningindynamiclegalcontexts.
+2 RelatedWorks
+CurrentSOTAmethodsprimarilyfocusonimprovingperformanceonexistingbenchmarks(suchas
+ECtHRandCAIL-2018)[12,15]withstaticlawlabels,employingdeeplearningmodelstoaddress
+LJPsubtasks. Someapproachesproposeneuralnetwork-basedmethodsthatcapturetheinherent
+dependencies among LJP subtasks, thereby enhancing model performance [1, 28]. Others make
+predictionsbyreasoningoverlegalknowledgeexpressedthroughthesemanticsofsubtasklabels
+[28,16]. WiththeadvancementofPretrainedLanguageModels(PLMs),researchershavedeveloped
+PLMsspecificallypretrainedonextensivelegaltexts[29,30]. Thesetailoredmodelsaredesigned
+tobetterhandlethenuancesoflegallanguageandcanbefine-tunedforspecificLJPsubtasks. The
+riseofpowerfulLargeLanguageModels(LLMs)hasledtotheirrapidadoptioninLJP,withseveral
+LLM-basedapproachesachievingnotablesuccess[31,32].
+2
+Tothebestofourknowledge,nopriorworkhasexploredLJPunderstatutoryrevisions,acrucialyet
+overlookedaspectforreal-worldapplicability. Existingdatasetsconflatedifferentversionsoflaw
+articlesunderstaticlabels,introducinglegalreasoningnoiseduringtraining.Moreover,currentSOTA
+modelslackspecificallydesignedmechanismstoaccommodateevolvingstatutes. Whilestrategies
+likemodelfine-tuningandeditingcaninjectupdatedlegalknowledge,theydonotensureLJPmodels
+consistentlyalignwithrevisedstatutes,resultinginpredictionerrors[33,34]. Arelatedworkby
+Wangetal.[35]benchmarksLLMs’abilitytohandleeditedlegalknowledge,focusingprimarily
+on evluating updating mechanisms. They apply various updating mechanisms (e.g., RAG [36],
+ROME[33],LoRA[37])tomultipleLLMsandevaluatetheirperformance. Incontrast,ourwork
+focusesonevaluatingLJPmodels’abilitytoadapttoshiftsinunderlyingjudgmentlogicinducedby
+statutoryrevisions. Ourdatasetencompasses31distincttypesofstatutorychanges,farexceedingthe
+threecoveredbypriorwork. Additionally,theirdataset’sfactdescriptionsarehighlycondensedand
+simplified,lackingthecomplexityofauthenticcasenarratives. Thisoversimplificationrisksbiasing
+evaluationsandunderminingobjectivity,asLJPcriticallydependsonnuancedfactualdetailstoalign
+withstatutoryelements. Ourdatasetpreservestherichnessandstructuralcomplexityofreal-world
+cases, enabling a more realistic and robust assessment of models’ true capability in statute shift
+scenarios. Anotherrelatedstudy[25]examinesLJPmodels’capacitytoextractkeyelementsand
+ensurefairnessacrosssensitiveattributeslikerace. Bycontrast,ourworkprobesmodels’sensitivity
+and adaptability to judgment logic shifts induced by statutory revisions, further analyzing how
+architecturaldifferencesaffecttheirlegalreasoningadaptability.
+3 LawShift
+ThisstudytargetstheChineseCriminalCode3. WedetailtheannotationprocessofLawShift.
+3.1 IdentifyingStatutoryRevisionTypes
+Alawarticleconsistsoftwocorecomponents: theconstitutiveelement,whichspecifiesthefactual
+conditions required for the law to apply, and the legal consequence, which defines the resulting
+outcomesorpenaltieswhenthoseconditionsaremet. Inpractice,statutoryrevisionsmodifythese
+componentsthroughdiversechanges. Notethatreal-worldrevisionsareoftencoarse-grained,with
+multiplecomponentchangesoccurringsimultaneously. However,ouraimistoevaluateLJPmodels
+onasfine-grainedrevisiontypesaspossible.
+Tosystematicallyidentifyfine-grainedstatutoryrevisions,wefirstintroduceaLawArticleTem-
+plateoutliningkeylegalarticlecomponentsmaychange. Next,wedefineacomprehensivesetof
+Amendment Dimensions that capture all possible ways these components can be changed (i.e.,
+how components change). We analyze all 12 historical editions of the Chinese Criminal Code
+Amendmentstoderiveempiricallygroundedrevisiontypes,whichdefinethefinalstatutoryrevision
+taxonomyofLawShift.
+evitutitsnoc
+wal
+lagel
+tnemele
+elcitra
+ecneuqesnoc
+explicitextension
+subject expansion
+implicit expansion For the purpose of profit, if a subject
+implicit expansion construction contractor engages
+action reallocation implicit reduction in arson, breaches dikes, or action
+object scope reduction e im xp pl l i i c c i i t t r r e e d m uc o ti v o a n l d fo is re c s h t a e r d ges lan p d rod o u r cti w o a n te w r as s t o e ur i c n e to s object
+objective condition addition without approval from the local
+condition condition Modification condition removal production safety authority, they objCon
+s c u o b n j d e i c t t i i o v n e num sh e if r t ical s s h h i i f f t t u d p own s im ha p l r l is b o e nm se e n n t t en o c f ed le t s o s f th ix a e n d- t t h e r r e m e sbCon
+term sentence extremity extremity introduction years. term
+sentence extremity elimination
+Figure1: Lawarticletemplate(left)andamend- Figure2: Afictionallawarticlecraftedtoinclud
+mentdimensions(right). allcomponentswithinasingleexample.
+3WeemphasizethatwhileourdatasetisconstructedfromcasesandlawsinChina, themethodologyis
+applicableacrossotherlegaljurisdictions.FurtherdiscussionsofgeneralizationcanbefoundinAppendixB
+3
+Table2: Detailsofthethreescopechanges. S andS′denotethescopesbeforeandafterrevision
+TYPE DEFINITION DESCRIPTION EXAMPLE
+expansion S⊊S′ thescopeofacomponentisbroadened adults→anyoneabove16
+reallocation S∩S′ ̸= ∅and thenewscopeaddedandremovedcertainen- state-ownedenterpriseemployees→
+S△S′̸=∅ titiesoractionspreviouslycovered executivesofanycorporation
+reduction S′⊊S thescopeofacomponentisnarrowed consumeandtrafficdrugs→consumedrugs
+Lawarticletemplate Underguidancefromlegalexperts,wedecomposelawarticlesintomultiple
+sub-components,asillustratedinFigure1,withtheconstitutiveelementsfurtherdividedintofive
+sub-components: (1)subject,whichdefinesthescopeoftheindividualsorgroupsresponsibleforthe
+crime;(2)action,whichspecifiesthescopeofthecriminalactionsbythesubject;(3)object,which
+identifiesthescopeofentitiesinvolvedinoraffectedbytheaction;(4)objectivecondition,which
+outlinessituationalconstraintsunderwhichtheactionbecomescriminal;(5)subjectcondition,which
+capturestherequiredintentormentalstateofthesubject. Thelegalconsequencesisrepresentedbya
+singlesub-component: thetermsentence4. Figure2presentsanexampleoflawarticles.
+Amendment dimensions We identify possible changes and organize them into a hierarchical
+structure,asillustratedinFigure1.
+There are three primary revision types: changes in scope definitions, conditions, and sentences.
+Thescopedefinitionchangesinvolvecomponentsthatspecifythedefinedboundariesofentitiesor
+actionssubjecttoregulationunderthecorrespondingarticles. Thistypeofchangeinvolvesfoursub-
+components,i.e.,subject,actions,object,andobjectivecondition.RecalltheexampleinTable1,after
+thescopeoftheobjectchangsfrompoisonoussubstancestopoisonousorradioactivesubstances,
+thecase’soutcomeshiftedfromNon-ViolationtoViolation. Thescopecanbefurtherclassifiedinto
+threetypes: expansion,reduction,andreallocation,asshowninTable2. Wecanfurthercategorize
+expansion,reallocationandreductionchangesintotwosubtypes,i.e. explicitextension/removaland
+implicitrephrasing. Explicitscopechangesoccurthroughenumerativeorparallelmodifications,
+whereasimplicitrephrasedscopechangesinvolveasemanticshiftmarkedbyacompleterewording
+ofthecomponent’sdefinition,asillustratedinTable3.
+Similarly,theconditionchangesinvolvesubjectiveconditionandobjectivecondition. Theserevisions
+typicallymanifesteitherthroughtheadditionofaconditionortheremovalofanexistingone. The
+additionofaconditionmayintroducenewcriteriaorprerequisitesthatmustbemetforthelawto
+apply,potentiallymakingthelegalrequirementsmorestrict.
+Thesentencechangeinvolvesthetermsentencecomponentinanarticle’slegalconsequences. This
+type of change can be further divided into two categories, namely numerical shift and extremity.
+Numerical shift refers to adjustments in penalty ranges, specifically shift up and shift down. Ex-
+tremityrepresentsnon-numericalmodifications,includingtheintroductionoreliminationofdiscrete
+sentencingterms,suchaslifeimprisonmentorthedeathpenalty.
+Table3: Examplesofexplicitandim- Table4: ExamplesofmetamorphictestinginLawShift.
+plicitscopechanges
+TYPE LAWRVSN. FACTALT. EXPT
+TYPE EXAMPLE T1.1 Article271:...personnelof ... the defendant while V
+explicit exten- poisonoussubstances→poi- state-ownedcompanies,... servingaspersonincharge
+sion sonous or radioactive sub- →...personnelofprivate ofcompanyA,whichisa
+stances enterprises, state-owned state-ownedcompany, ...
+companies,... →... thedefendantwhile
+implicit expan- adults→anyoneabove16 serving...aprivateenter-
+sion priseB...
+explicitremoval consumeandtrafficdrugs→ T6.1 Article232:...thesentence N/A T↑
+consumedrugs shallbe3to10yearsim-
+prisonment.→...thesen-
+implicit reduc- corporation employees → tenceshallbemorethan10
+tion corporationexecutives yearsimprisonment.
+4Otherpenalties,suchasfines,areinconsistentlyspecifiedacrossstatutesandoftenignoredbyexistingLJP
+models,thusexcludedfromourstudy.
+4
+Table5:Revisiontypes,correspondingtestingmethods,andthenumberoftestinstancesinLawShift.
+TYPE BRIEFDESCRIPTION TASK EXPT. #
+T1.1:subject-exp-ee identifysubjectintheexplicitlyextendedscope Article V 261
+T1.2:subject-exp-ie identifysubjectsintheimplicitlyexpandedscope Article V 261
+T1.3:subject-rel-ie identifysubjectsintheexpandedscopeofthereallocation Article V 261
+T1.4:subject-rel-ir identifysubjectsinthereducedscopeofthereallocation Article NV 261
+T1.5:subject-red-er identifysubjectsintheexplicitlyremovedscope Article NV 261
+T1.6:subject-red-ir identifysubjectsintheimplicitlyreducedscope Article NV 261
+T2.1:action-exp-ee identifyactionsfallsintheexplicitlyextendedscope Article V 102
+T2.2:action-exp-ie identifyactionsfallsintheimplicitlyexpandedscope Article V 102
+T2.3:action-rel-ie identifyactionsfallsintheexpandedscopeofthereallocation Article V 102
+T2.4:action-rel-ir identifyactionsfallsinthereducedscopeofthereallocation Article NV 102
+T2.5:action-red-er identifyactionsfallsintheexplicitlyremovedscope Article NV 102
+T2.6:action-red-ir identifyactionsfallsintheimplicitlyreducedscope Article NV 102
+T3.1:object-exp-ee identifyobjectsintheexplicitlyextendedscope Article V 459
+T3.2:object-exp-ie identifyobjectsintheimplicitlyexpandedscope Article V 459
+T3.3:object-rel-ie identifyobjectsintheexpandedscopeofthereallocation Article V 459
+T3.4:object-rel-ir identifyobjectsinthereducedscopeofthereallocation Article NV 459
+T3.5:object-red-er identifyobjectsintheexplicitlyremovedscope Article NV 459
+T3.6:object-red-ir identifyobjectsintheimplicitlyreducedscope Article NV 459
+T4.1:objCon-exp-ee identifyentitiesintheexplicitlyextendedscopeanddeterminenon-compliance Article NV 150
+T4.2:objCon-exp-ie identifyentitiesintheimplicitlyexpandedscopeanddeterminenon-compliance Article NV 150
+T4.3:objCon-rel-ie identifyentitiesintheexpandedscopeofthereallocationanddeterminenon- Article NV 150
+compliance
+T4.4:objCon-rel-ir identifyentitiesinthereducedscopeofthereallocationanddeterminecompliance Article V 150
+T4.5:objCon-red-ir identifyentitiesintheimplicitlyreducedscopeanddeterminecompliance Article V 150
+T4.6:objCon-mod-add determinenon-compliancewiththeaddedobjectivecondition Article NV 409
+T4.7:objCon-mod-re determinecompliancewiththeremovedobjectivecondition Article V 149
+T5.1:sbCon-mod-add determinenon-compliancewiththeaddedsubjectivecondition Article NV 470
+T5.2:sbCon-mod-re determinecompliancewiththeremovedsubjectivecondition Article V 115
+T6.1:term-num-up sentencelongerterms Term T↑ 215
+T6.2:term-num-dn sentenceshorterterms Term T↓ 215
+T6.3:term-x-in sentenceextremeterms Term XT 215
+T6.4:term-x-el nolongersentenceextremeterms Term NX 99
+Determining the final revision types Following these steps, we define all potential statutory
+revisiontypesascomponent-amendmentpairs(Figure1). However,notalltheoreticallypossible
+types occur in practice. After reviewing all 12 historical editions of the Chinese Criminal Code
+Amendments,LawShiftincorporatesonlythoserevisiontypesempiricallyobservedinreal-world.
+ThefinalizedtypesandtheirdetaileddescriptionsareprovidedinTable5.
+3.2 TestingMethodology
+In LJP, ground-truth labels are often unavailable or ambiguous under evolving statutes as newly
+revisedstatutesmaylackcorrespondingreal-worldcasesandnogoldenlabelexist. Whileexpert
+annotationisanoption,theselabelsareannotator-generatedratherthancourt-issued,raisingconcerns
+aboutjudicialauthenticityandunderminingtheobjectivityandfairnessofevaluation.Thus,traditional
+evaluationmethods(e.g.,computingtheF1scoreforlawarticlepredictiontask)arenotsuitablefor
+statutoryrevisions,astheyrelyonground-truthlabelsthatmaybemissingundershiftingstatutes.
+Metamorphictestingallowsforthetestingofsituationswhereitmaynotbefeasibletodefineground-
+truthlabels[24]. Specifically,metamorphictestingassesseswhetherLJPmodelsproduceexpected
+outputsconsistentwiththejudgmentlogicintroducedbystatutoryrevisions. Weemploytwokinds
+ofmetamorphictesting. OneiscomparingtheoutcomesofLJPmodelsbeforeandafterrevisions
+(T6.1-T6.4). As shown in Table 4, for revision type T6.1 (i.e., changes to statutory sentencing
+ranges),weevaluatewhetherLJPmodelsadjustsentencingpredictionsinlinewithupdatedjudgment
+logic. Forinstance,ifArticle232’srangeshiftsfrom"3–10years"to"morethan10years",amodel
+passess the test if cases previously predicted within 3–10 years now yield predictions exceeding
+10years. Here,ground-truthlabelsareunnecessary—weonlyassesswhetherthemodeloutputsa
+valueexceeding10years. Theotherkindofmetamorphictestingconstructsminimaltestinstances
+targetingasinglecapability,e.g.,recognizingalegalconditionchange(T1.1-T5.2). Forexample,in
+Article271inTable4,originallyappliedonlytostate-ownedenterprisepersonnelbutwasextended
+toincludeprivateenterpriseindividuals. Wecreateaminimaltestbymodifyingrealcasesjudged
+underthepre-revisionstatute,i.e.,replacing"state-ownedenterprise"with"privateenterprise"while
+5
+keepingotherfactsunchanged. IfIftheLJPmodelpredictsaviolation,itrevealsthatthemodel
+internalizeslogicchanges(e.g.,statutoryrevisions). Thisstrategyavoidscraftingentirelynewcases
+andreliesontargetedtexteditstoreflectstatutorychanges5.
+3.3 GeneratingTestInstances
+Next,wedetailhowwegeneratetestinstances.
+Collectingoriginalcases WeconstructLawShifttestinstancesbasedonreal-worldjudicialdocu-
+mentsfromChinaJudgmentsOnline(CJO)6.Specifically,weselectcasesissuedbetween2017/11/4
+and 2021/2/28 as these cases share the same version of laws and judged by the same judgment
+logic. Bycontrollingthetimespan,weensurethattheoriginaljudgmentsareconsistentwiththe
+legal framework in effect at the time, allowing us to attribute changes in model behavior solely
+totheintroducedstatutoryrevisionsandavoidinterferencefromotherlegalcontextsortemporal
+discrepancies[38]7.
+WethenconstructLawShiftusingtheoriginallegalcasescollectedabove. Eachtestinstanceconsists
+ofthreeelements: apairoflawarticles(beforeandaftertherevision),acorrespondingpairoffact
+descriptions(fromtheoriginalcaseanditseditedversion),andanexpectedoutcomealignedwiththe
+revisedlawarticle. Duringtheannotationprocess,weengagedoneseniorannotator(alawschool
+professor)andtwoannotators(lawschoolPhDcandidates)toensurethelegalexpertiseofLawShift.
+Revisinglawarticles Next,weintroducerevisonstolawarticles. ForeachrevisiontypeinTable5,
+annotatorscollaborativelyidentifysuitablelawarticlesandmanuallyconstructcorrespondingrevised
+versionsthatreflecttheintendedchanges.Forinstance,forrevisiontypeT4.7(removalofanobjective
+condition), onlylawarticlescontainingthiscomponentareeligibleforrevision. Inpractice, one
+annotatorindependentlydraftseachrevisedlawarticlebasedonthetargetrevisiontype,whichisthen
+reviewedbyasecondannotatorforlegalvalidity,coherence,andalignment. Conflictsareresolved
+throughdiscussionsledbyaseniorannotator,whoiterativelyrefinesthedraftstoensureconsensus.8
+ToensurefaircomparisonofLJPmodelperformanceacrossdifferentrevisiontypesaffectingthe
+samecomponent,somerevisiontypesshareidenticalselectedlawarticlesandoriginalcases. For
+example,T6.1andT6.2,whichinvolverevisionstosentencingterms,sharethesamesetofselected
+lawarticles. Thisdesignensuresthat,foreachcomponent,theimpactofitsdifferentrevisontypes
+canbecomparedfairlywithoutbeingaffectedbydoctrinalvariations,ordatadistributiondifferences.
+Editingfacts Foreachrevisiontype,weretrieveoriginalcasescitingthecorrespondinglawarticle
+fromthepreviouslyselectedset. Wethenedittheretrievedcasefacts,whennecessary,toalignwith
+thecorrespondingrevisedlawarticle. Forinstance,facteditingisrequiredwhentestingrevision
+typesinvolvingconstitutiveelements,asweadoptaminimalteststrategy(Section3.2). Forexample,
+ifastatute’ssubjectexpandsfrom"poisonoussubstances"to"poisonousorradioactivesubstances",
+weedittheoriginalcasefactstoreplacethepoisonoussubstancewitharadioactiveone. Thisminimal
+changeisolatestheeffectoftherevision,enablingustoassesswhetherthemodelcorrectlyrecognizes
+theinclusionofradioactivesubstancesundertherevisedstatute.AsforT6.1-T6.4,weusetheoriginal
+factsasweadoptthecomparisonstrategy(Section3.2).
+Thereare threeapproacheswe’veusedto revise thecasefacts: (1)perturbing existingcases, (2)
+employingLLMstosynthesizenewfacts,and(3)usingrealcasefacts.
+For revisions targeting subject, object, objective condition, and subjective condition ( T1.1–1.6,
+T3.1–3.6, T4.1–4.7, T5.1–5.2), weapplytheperturbationstrategy. Thisinvolves(1)identifying
+relevantfactspansusingregularexpressions,and(2)insertingorreplacingthemwithphrasesfrom
+predefinedsetscuratedbyourthreeexpertannotatorsduringthelawrevisionprocess. Forinstance,
+wheneditingfactsforT5.1,wherethesubjectiveconditionmayberevisedto"outofrevengeorto
+ventfrustration", webuildaphraselistdescribingalternativemotivesunrelatedtothiscondition
+to prompt non-violation predictions. Using regular expressions, we locate the defendant span in
+5SeeTable13(AppendixH)fordetailsofrevisiontypeswiththeirtestingmethods,examples.
+6http://wenshu.court.gov.cn/
+7SeeAppendixCforpre-processingdetails.
+8Theannotatorswerepaidanhourlywageof200RMB.
+6
+the case facts and prepend a randomly selected phrase from the list. This perturbation approach
+ensuresminimal,targetededitsspecifictotherevisiontype,whilepreservingtheoverallcoherence
+andintegrityofthecasefacts.
+LLMsareemployedtoeditcasefactsforrevisiontypesT2.1–T2.6,whichinvolvechangestoaction
+scopes. Unlikeentities—typicallyisolatednounphrases—actionsareembeddedwithincomplex
+narrativestructures,andrevisionstotheirscopeoftenalterthesemanticsoftheentirecase. Such
+complexity makes simple perturbation insufficient. To address this, we leverage GPT-4o [39] to
+generatecoherent,legallysoundcasefactsthatreflecttherevisedstatutorydefinitions. GPT-4ois
+guidedviaone-shotprompting,usingexemplarpairscraftedbyannotatorstoensurealignmentwith
+therevisionintentandjudicialstyle. Specifically,twoannotatorsindependentlydraftoneexemplar
+for the revised law articles of each revision type. Each exemplar consists of a pair of case facts
+(before-and-after revision) aligned with the corresponding revised law article. Subsequently, the
+seniorannotatorreviewsandrefinestheseexemplarswhennecessary9.
+RevisiontypesT6.1–T6.4,whichinvolvechangestolegalconsequences,donotrequiremodification
+ofcasefacts. AsillustratedinTable4, theserevisionscanbeevaluatedbycomparingamodel’s
+sentencingpredictionsonunchangedfactsundertheoriginalandrevisedstatutes. Thus,theoriginal
+casefactsaredirectlyreusedastheeditedones10.
+ExpectedOutput AnLJPmodelisconsideredtopassatestinstanceinLawShiftifitgeneratesthe
+expectedoutputgiventheeditedfact. ExpectedoutputsforeachrevisiontypearedefinedinTable5.
+Forexample,inT1.1(subjectextension),ifamodelcorrectlyidentifiesasubjectwithinthenewly
+extendedscopeandpredictsViolation(V),itpasses. OtherexpectedoutputsincludeNon-Violation
+(NV),IncreasedTerm(T↑),DecreasedTerm(T↓),ExtremeTerm(XT),andNon-ExtremeTerm
+(NX). DifferentLJPtasksareuseddependingonthenatureofeachrevisiontype.
+LawShiftstatistics LawShiftencompassesatotalof7,569testinstances11. Thestatisticsoftest
+instancesforeachrevisiontypeisshowninTable5.
+4 Experiments
+4.1 EvaluationSetup
+Basedataset BeforeevaluatingLJPmodelsonLawShift,weconstructabasedatasetformodel
+training. Thisdataset,likeLawShift,issourcedfromChinaJudgmentOnlineandprocessedusing
+thesamepipeline(seeAppendixC).Toensureconsistentjudgmentlogic,weselectcasesfromthe
+sametimespanasLawShift. Thefinaldatasetincludes253,936trainingand63,484validationcases.
+Baselinesandmetrics WeevaluatenineSOTA(TopJudge[1],D-LADAN[16],NeurJudge[40],
+Lawformer [30], Qwen2.5-7B, Llama3-Instruct-8B, ChatGLM3-6B, Llama3-8B-Law, and Law-
+model-7B)onLawShiftandreportthePassRateforeachrevisiontype—whereacaseisconsidered
+apassifthemodelgeneratestheexpectedoutcomegiventheeditedfact. Eachbaselinerepresentsa
+distinctfamilyofLJPmodelingapproaches,someofwhichareinherentlycapableofadaptingto
+statutoryrevisions. Forexample,NeurJudgeandLawformerincludemechanismsformatchingwith
+lawarticletexts;duringevaluation,weprovidethemwiththerevisedstatutesasinput. Similarly,
+LLM-basedmodelsareevaluatedusingpromptsthatincludetherevisedlawtexttoassesstheirability
+toadapttochangesinjudgmentlogic. Weconducttwoevaluations(beforeandafterrevision)per
+revisiontypeonLawShift:(1)assessingmodelperformanceonoriginaljudgmentsusingoriginalfacts,
+and(2)assessingperformanceonexpectedoutcomesusingtheeditedfacts. Thiscanhelpusfairly
+compareLJPmodels’performanceacrossdifferentcomponents.Specifically,wecomputenormalized
+relativepassrateshiftR (ofcomponentc),computedasR =
+(cid:80)nc
+2∗(r −r /(r +r )
+c c i=1 fi orii) fi orii
+wherer denotesthepassrateunderrevisionandr representsthepassratebeforerevisionforthe
+fi orii
+i-threvisiontypeofcomponentc. n isthenumberofdifferentrevisiontypesofcomponentc. Data
+c
+9SeeAppendixH.2forpromptandexemplardetails.
+10ExamplesofhowwereviselawarticlesandcorrespondingfactscanbefoundinAppendixH.
+11Our dataset and code are available on https://huggingface.co/datasets/triangularPeach/
+LawShift/tree/mainandhttps://github.com/triangularPeach/LawShift.
+7
+distributionsvaryacrosscomponents,e.g.,theoriginalcasesforT1.1andT2.1differ. R mitigates
+c
+these distributional differences, enabling fair comparisons between components (e.g., subject vs.
+action). Tocomparemodelsacrossdifferentrevisiontypesofthesamecomponent,weanalyzer ,
+fi
+sincetheserevisiontypessharethesameselectedlawarticlesandoriginalcases(asmentionedin
+Section3.3). Detailsonbaselines,metrics,andexperimentalsettingsareprovidedinAppendixD.
+Pass Rate Across Revision Types
+4.2 PerformanceAnalysis T1.2 T1.1 T6.4
+T1.3 T6.3
+T2.1 T6.2
+WereportexperimentalresultsinFigure3(SeeTable T2.2 T6.1
+11inAppendixfordetailedvalues).
+T2.3 T5.1
+T3.1 T4.6
+Overallresults InFigure3,therevisiontypesin-
+dicated by the gray background (e.g., T1.2, T4.5) T3.2 T4.3
+representtypeswherepredictionsareexpectedtore-
+T3.3 T4.2
+main consistent, whereas those highlighted with a
+beigebackground(e.g.,T1.4andT5.1)correspond T4.4 T4.1
+to revisions expected to lead to changes in predic-
+T4.5 T3.6
+tions. Wecanfindthat,mostneural-basedLJPmod-
+T4.7 T3.5
+elsperformreliablywhenpredictionsareexpectedto
+remainconsistentbutstruggletoadjustwhenlegalre- T5.2 T3.4
+T1.4 T2.6
+visionsrequiredifferentoutcomes,highlightingtheir T1.5 T2.5
+T1.6 T2.4
+limitedadaptabilitytostatutorychanges,whileLLM Top Neur Qwen GLM LawM
+solutionsofLJPexhibithigherlevelofperformance LADAN Law Llama LlmLw
+onlegalrevisionsrequirealteredsentence. Figure3: Passrateacrossrevisiontypes.
+Notably,T2.2andT2.3areoftenmisclassifiedunder
+anunrelatedlawarticle,specifically,drugpossession,whichisapatternnotseenbeforerevision.
+Thismaybeduetorevisedcasesincludingphraseslikeharboringindividualsfordrugtransactions,
+whichsemanticallyoverlapwithpossessionoffenses. ThepatternsuggestsLawformerreliesmoreon
+surface-levelkeywordsthanonaccuratelegalinterpretationincontext.
+Revision types related to prison terms are highlighted with a pink background. We observe that
+modelsachieveshigherpassratesonrevisionsthatreducesentenceseverity. Specifically,models
+performbetteronT6.2thanT6.1andonT6.4thanT6.3. Thistrendindicatesabiastowardlighter
+penalties,possiblyduetothetrainingdata’sskewtowardlenientoutcomes.
+NormalizedRelativePassRateShift Wefurtherexaminemodelsensitivitytochangestodifferent
+componentsusingthemetricR . InFigure4,allneural-basedmodelsdemonstratesimilarlevelof
+c
+performanceonsubjectandobjectrevisions,suggestingthesecomponentsrequiresimilarreasoning
+process. Incontrast,neural-basedmodelsperformrelativelyworseonobjectiveconditionrevisions,
+whichdemandadditionalreasoningoverscopeandconditionallogic,whileperformingbetteron
+subjectiveconditionrevisionsthatmainlyinvolveaddingorremovingsingleconditions.
+GeneralpurposeLLMsshowclearvariationintheirsensitivityacrossreasoningcomponents. As
+shown in Figure 4, LLMs exhibit larger shifts on object and subjective condition components,
+indicatingthatrevisionsinvolvingsemanticrolechangesortheadditionandremovalofqualifying
+conditionsarethemostlikelytoaffecttheirpredictions. Thesetwocomponentsrequirethemodelto
+reinterpretlocalcontextualdependencieswhilepreservingglobalconsistency,whichincreasesthe
+reasoningcomplexitycomparedwithstaticentitiesorstructuralterms. Incontrast,smallershiftsare
+observedforsubjectandobjectiveconditioncomponents,suggestingthatidentifyingcoreentitiesor
+scopeboundariesislesschallengingformodelstrainedonbroadtextcorpora.
+Acrossallmodels,termrevisionsandactionrevisionsremainthemostchallenging,withtraditional
+baselinesshowingthelowestnormalizedpassrateandonlymarginalimprovementfromlargemodels.
+Fortermrevisions,theresultsimplythatsentence-termreasoningstillposesapersistentlimitation
+evenforarchitectureswithlarge-scalepretraining,asitrequiresquantitativealignmentbetweencase
+outcomesandstatutoryboundariesratherthanpurelylinguisticunderstanding. Actionrevisionsalso
+poseagreatestchallengeformodels,likelybecauseunderstandingrevisionstocases’actionsrequires
+deepercontextualcomprehension12.
+12SeeAppendixFfordetailsonactionrevisionerroranalysis.
+8
+1.0
+0.5
+0.0
+0.5
+1.0
+1.5
+subject action object objCon sbCon term
+Components
+)demrofsnart-rewop(
+SRP-RN
+Top Ladan Neur Law Qwen Llama GLM LlmLw LawM 1.0
+Models' NR-PRS Shifts Across Components
+0.8
+0.6
+0.4
+0.2
+0.0
+ee/ie er/ir
+Figure4: Relativepassrateshiftsacrosscompo-
+nents.
+etaR
+ssaP
+subject action
+0 00
+ee/ie er/ir
+1.0
+0.8
+0.6
+0.4
+0.2
+0.0
+ee/ie er/ir
+etaR
+ssaP
+Comparison of Model Performance on Paired Revision Types
+object objCon
+ee/ie
+Top Neur Qwen GLM LawM
+LADAN Law Llama LlmLw
+Figure5: Passratedifferencesbetweenexplicit
+andimplicitchanges. Lightershadesrepresent
+implicitchanges(ie/ir).
+PassRatesbetweenFormulations AsdescribedinSection3.1,wedefinetwoformulationtypes
+forscoperevisions: explicitextension/removalandimplicitrephrasing. Figure5presentsmodelpass
+ratesonrevisiontypesinvolvingsuchdistinctions,specificallyT1.1-1.2;1.5-1.6,T2.1-2.2;2.5-2.6,
+T3.1-3.2;3.5-3.6,andT4.1-4.2. Itisevidentthatallmodelsperformbetteronexplicitchangesthan
+ontheirimplicitcounterparts. Thissupportsourhypothesisthatimplicitrephrasingposesgreater
+challenges,likelyduetoitshigherdemandforsemanticunderstandingoflegallanguage.
+4.3 Discussions
+Amongtheninemodels,TopJudgeperformsworstduetoitslackoflawarticleawareness,under-
+scoringthatincorporatinglegaltextboostsadaptability. ModelslikeD-LADANandNeurJudge,
+whichexplicitlyreferencelawarticlesforlegaldifferentiationorkeyfactextraction,showbetter
+robustnessbutstillstrugglewithrevisionsrequiringdeepersemanticsunderstanding,suchasimplicit
+rephrasingoractionrevisions. Meanwhile,thegeneral-domainLLMsadaptflexiblyviain-context
+learning,buttheiroutputsaregenerallyinconsistentduetopromptsensitivityandpretrainingbias.
+ForgeneralpurposeLLMs,theirpretrainingenablesstrongergeneralizationtocontext-dependent
+changes, particularlywhenmodificationsinvolvenominalorsemanticroleadjustments, butalso
+makesthemmoresensitivetosurface-levelvariationsinconditionalstructures. Amongthem,Chat-
+GLM maintains relatively stable shifts across all components, indicating balanced sensitivity to
+bothentityandlogicalchanges,whereasLlamashowsmorefluctuationbetweenobjectandterm
+components,implyingpartialover-relianceonlexicalco-occurrencelearnedfromopen-domaintext.
+Ontheotherhand,law-orientedmodelsdemonstrateadistinctbiastowardscondition-levelreasoning.
+They perform consistently on subject and object components but show higher positive shifts on
+objectiveandsubjectiveconditioncomponents, suggestinganincreasedcapacitytoencodelegal
+relationaldependenciesoncepretrainingincludesdomainstatutesorfine-tuningonlegalcorpora.
+ToimproveLJPmodelsunderstatuteshifts,futureresearchshouldfocusonseveraldirections. First,
+betterutilizationoflawcontentisneeded.Modelsshouldmovebeyondkeywordmatchingandlearn
+context-awarerepresentationsthatcapturelegalhierarchiesandfact-lawmatching. Second,handling
+implicitrephrasingsandactionchangesremainsakeychallenges. Currentmodelsstrugglewith
+semanticabstraction,callingforcontrastivelearningandevent-levelrepresentationstailoredtolegal
+textbeyondsurface-levelunderstanding. Third,balancingstabilityandadaptabilityisdifficult.
+LLMslikeQwenadaptwellincontextbutlackconsistency. HybridmethodssuchasadaptiveRAG
+mayhelpbygroundingpredictionsindynamiclegalcontextwhilemaintainingstructuredreasoning.
+Finally,temporallegallearningisessential. Modelsshouldsupporttimestamp-awarepretraining
+andcontinuallearningtotracklegalamendmentswithoutfullretraining. Moreover,consideringthat
+inreal-worldsettings,post-amendmentdataisscarce,makingfullretrainingimpractical. Thiscalls
+fortrainingframeworksthattreattimeaspartofsupervision,guidingmodelstoalignpredictions
+withthevalidlawattherelevanttime,evenunderlow-resourceconditions.
+9
+L12 0.991
+L11 0.010 match net 0.0000
+L10 0.011
+L9 0.010
+L8 0.010
+L L 6 7 0.011 0.018 law encoder 0.8915
+L5 0.025
+L4 0.030
+L3 0.071
+L2 0.243 fact encoder 0.0000
+L1 mean=0.142 0.279
+102 101 100 0.0 0.2 0.4 0.6 0.8 1.0
+k k
+100
+80
+60
+40
+20
+0
+T1.1 T1.2 T1.3 T1.4 T1.5 T1.6 T2.1 T2.2 T2.3 T2.4 T2.5 T2.6 T3.1 T3.2 T3.3 T3.4 T3.5 T3.6 T4.1 T4.2 T4.3 T4.4 T4.5 T4.6 T4.7 T5.1 T5.2 T6.1 T6.2 T6.3 T6.4
+Type
+erocS
+Lawformer vs NeurJudge (before vs after) by Type
+Lawformer(before)
+Lawformer(after)
+NeurJudge(before)
+NeurJudge(after)
+Figure 6: (top) Layer-wise and module-wise hidden-state shifts (∆k) with updated statutes of
+LawformerandNeurJudge,respectively. (bottom)Post-editingperformanceacrossrevisiontypes
+afterapplyinglocalizedmodelweightupdates.
+4.4 BroaderEvaluation: KnowledgeTracingandEditing
+To further explore how model responds to statutory revisions and whether post-hoc updates can
+effectively adapt models, we conduct broader evaluation experiments using knowledge tracing
+[41,42]andmodelediting[33]onLawformerandNeurJudge.
+KnowledgeTracing Wetracehiddenrepresentationsofbothmodelsbeforeandafterstatutory
+revisionstorevealhowinternallayersencodelegalchanges. Figure6(top-left)showsthatLawformer
+exhibitsthelargestchangeatitsfinalencoderlayer(Layer12),indicatingthatstatuterevisionsmainly
+influencehigh-levelsemanticrepresentations. Incontrast,NeurJudgedisplaysconcentratedvariation
+initslaw-encodercomponent,whileitsfactencoderandmatchingmoduleremainnearlystable,as
+illustratedinFigure6(top-right). Thesefindingsidentifythemostrevision-sensitivelayers,providing
+concreteanchorpointsforsubsequentlightweightediting13.
+KnowledgeEditing Buildingonthetracinganalysis,wetookinspirationsfromthemodelediting
+method ROME [33] and applied localized rank-one updates to the most sensitive position in the
+respective models. As illustrated in Figure 6 (bottom), both backbones benefit from editing, as
+both models show improvements across most revision types. However, the gains are still rather
+small, andtheresultssuggestthatlocalizedparameterupdatescanalleviatecertainsurface-level
+mismatchesbutfallshortofcapturingdeeperjudgmentlogicshifts. Moreprincipledapproaches,
+suchasstructure-awarecontinuallearningorrepresentation-leveladaptation,arestillrequiredto
+achieverobustresponsivenessunderstatutoryrevisions.
+5 Conclusion
+WeproposeLawShift,abenchmarkforevaluatingLJPmodelsunderstatutoryrevisions,covering31
+revisiontypesacross6categories,eachalignedwithspecificexpectedmodelbehaviors. Weassess
+fiverepresentativeSOTALJPmodels,revealingtheirstrengths,limitations,anddesignimplications
+forimprovingadaptabilitytolegalchanges.
+Limitations DespiteLawShift’sjurisdictionalandlinguisticconstraints,itscoretestingmethod-
+ology(decomposinglegalrevisions,aligningthemwithmodelbehavior,andevaluatingreasoning
+consistency)isbroadlygeneralizableacrosslanguagesandlegalsystems. Weevaluatebaselineswith
+limitedrevision-handlingcapabilities,e.g.,law-awareattentionorpromptinjection. Nonetheless,our
+focusisidentifyinghowmodelsfailunderstatuteshifts,ratherthansolvingtheupdateprocess.
+13DetailsoftheseexperimentsareshowninAppendixG.1.
+10
+Acknowledgments
+Wethankthereviewersfortheirvaluablecommentsonanearlierdraftofthispaper. Thisworkwas
+supportedbyNationalNaturalScienceFoundationofChina(No.62406139),StateKeyLaboratoryfor
+NovelSoftwareTechnologyatNanjingUniversity(KFKT2025A15,ZZKT2025B14,KFKT2024A07,
+ZZKT2024B02).
+References
+[1] HaoxiZhong,ZhipengGuo,CunchaoTu,ChaojunXiao,ZhiyuanLiu,andMaosongSun. Legal
+judgmentpredictionviatopologicallearning. InEllenRiloff,DavidChiang,JuliaHockenmaier,
+and Jun’ichi Tsujii, editors, Proceedings of the 2018 Conference on Empirical Methods in
+Natural Language Processing, Brussels, Belgium, October 31 - November 4, 2018, pages
+3540–3549.AssociationforComputationalLinguistics,2018. doi: 10.18653/V1/D18-1390.
+URLhttps://doi.org/10.18653/v1/d18-1390.
+[2] JeffreyASegal. Predictingsupremecourtcasesprobabilistically: Thesearchandseizurecases,
+1962-1981. AmericanPoliticalScienceReview,78(4):891–900,1984.
+[3] VijitMalik,RishabhSanjay,ShubhamKumarNigam,KripabandhuGhosh,ShouvikKumar
+Guha, Arnab Bhattacharya, and Ashutosh Modi. ILDC for CJPE: indian legal documents
+corpusforcourtjudgmentpredictionandexplanation. InChengqingZong,FeiXia,WenjieLi,
+andRobertoNavigli,editors,Proceedingsofthe59thAnnualMeetingoftheAssociationfor
+ComputationalLinguisticsandthe11thInternationalJointConferenceonNaturalLanguage
+Processing, ACL/IJCNLP2021, (Volume1: LongPapers), VirtualEvent, August1-6, 2021,
+pages4046–4062.AssociationforComputationalLinguistics,2021. doi: 10.18653/V1/2021.
+ACL-LONG.313. URLhttps://doi.org/10.18653/v1/2021.acl-long.313.
+[4] GilSemo,DorBernsohn,BenHagag,GilaHayat,andJoelNiklaus. Classactionprediction:
+A challenging benchmark for legal judgment prediction of class action cases in the US. In
+NikolaosAletras,IliasChalkidis,LeslieBarrett,CatalinaGoanta,andDanielPreotiuc-Pietro,
+editors,ProceedingsoftheNaturalLegalLanguageProcessingWorkshop,NLLP@EMNLP
+2022,AbuDhabi,UnitedArabEmirates(Hybrid),December8,2022,pages31–46.Association
+forComputationalLinguistics,2022. doi: 10.18653/V1/2022.NLLP-1.3. URLhttps://doi.
+org/10.18653/v1/2022.nllp-1.3.
+[5] Kankawin Kowsrihawat, Peerapon Vateekul, and Prachya Boonkwan. Predicting judicial
+decisions of criminal cases from thai supreme court using bi-directional gru with attention
+mechanism. In20185thAsianConferenceonDefenseTechnology(ACDT),pages50–55.IEEE,
+2018.
+[6] LangCao,ZifengWang,CaoXiao,andJimengSun. PILOT:legalcaseoutcomeprediction
+withcaselaw. InKevinDuh,HelenaGómez-Adorno,andStevenBethard,editors,Proceedings
+ofthe2024ConferenceoftheNorthAmericanChapteroftheAssociationforComputational
+Linguistics: HumanLanguageTechnologies(Volume1: LongPapers),NAACL2024,Mexico
+City,Mexico,June16-21,2024,pages609–621.AssociationforComputationalLinguistics,
+2024. doi: 10.18653/V1/2024.NAACL-LONG.34. URLhttps://doi.org/10.18653/v1/
+2024.naacl-long.34.
+[7] BenjaminStricksonandBeatrizdelaIglesia. LegaljudgementpredictionforUKcourts. In
+ICISS2020: The3rdInternationalConferenceonInformationScienceandSystem,Cambridge,
+UK,March19-22,2020,pages204–209.ACM,2020. doi: 10.1145/3388176.3388183. URL
+https://doi.org/10.1145/3388176.3388183.
+[8] Octavia-MariaSulea,MarcosZampieri,MihaelaVela,andJosefvanGenabith. Predictingthe
+lawareaanddecisionsoffrenchsupremecourtcases. InRuslanMitkovandGaliaAngelova,
+editors,ProceedingsoftheInternationalConferenceRecentAdvancesinNaturalLanguage
+Processing,RANLP2017,Varna,Bulgaria,September2-8,2017,pages716–722.INCOMA
+Ltd.,2017. doi: 10.26615/978-954-452-049-6\_092. URLhttps://doi.org/10.26615/
+978-954-452-049-6_092.
+11
+[9] EliasJacobdeMenezes-NetoandMarcoBrunoMirandaClementino. Usingdeeplearningto
+predictoutcomesoflegalappealsbetterthanhumanexperts: Astudywithdatafrombrazilian
+federalcourts. PloSone,17(7):e0272287,2022.
+[10] Alice Saebom Kwak, Cheonkam Jeong, Ji Weon Lim, and Byeongcheol Min. A korean
+legaljudgmentpredictiondatasetforinsurancedisputes. CoRR,abs/2401.14654,2024. doi:
+10.48550/ARXIV.2401.14654. URLhttps://doi.org/10.48550/arXiv.2401.14654.
+[11] HiroakiYamada,TakenobuTokunaga,RyutaroOhara,AkiraTokutsu,KeisukeTakeshita,and
+MihokoSumida. Japanesetort-casedatasetforrationale-supportedlegaljudgmentprediction.
+CoRR,abs/2312.00480,2023. doi: 10.48550/ARXIV.2312.00480. URLhttps://doi.org/
+10.48550/arXiv.2312.00480.
+[12] IliasChalkidis,IonAndroutsopoulos,andNikolaosAletras. Neurallegaljudgmentprediction
+inenglish. InAnnaKorhonen,DavidR.Traum,andLluísMàrquez,editors,Proceedingsof
+the57thConferenceoftheAssociationforComputationalLinguistics,ACL2019,Florence,
+Italy, July 28- August 2, 2019, Volume 1: Long Papers, pages 4317–4323. Association for
+ComputationalLinguistics,2019. doi: 10.18653/V1/P19-1424. URLhttps://doi.org/10.
+18653/v1/p19-1424.
+[13] IliasChalkidis,NicolasGarneau,CatalinaGoanta,DanielMartinKatz,andAndersSøgaard.
+Lexfilesandlegallama: Facilitatingenglishmultinationallegallanguagemodeldevelopment.
+InAnnaRogers,JordanL.Boyd-Graber,andNaoakiOkazaki,editors,Proceedingsofthe61st
+AnnualMeetingoftheAssociationforComputationalLinguistics(Volume1:LongPapers),ACL
+2023,Toronto,Canada,July9-14,2023,pages15513–15535.AssociationforComputational
+Linguistics, 2023. doi: 10.18653/V1/2023.ACL-LONG.865. URLhttps://doi.org/10.
+18653/v1/2023.acl-long.865.
+[14] JoelNiklaus,VetonMatoshi,PoojaRani,AndreaGalassi,MatthiasStürmer,andIliasChalkidis.
+LEXTREME: A multi-lingual and multi-task benchmark for the legal domain. In Houda
+Bouamor,JuanPino,andKalikaBali,editors,FindingsoftheAssociationforComputational
+Linguistics: EMNLP2023,Singapore,December6-10,2023,pages3016–3054.Association
+forComputationalLinguistics,2023. doi: 10.18653/V1/2023.FINDINGS-EMNLP.200. URL
+https://doi.org/10.18653/v1/2023.findings-emnlp.200.
+[15] ChaojunXiao,HaoxiZhong,ZhipengGuo,CunchaoTu,ZhiyuanLiu,MaosongSun,Yansong
+Feng,XianpeiHan,ZhenHu,HengWang,andJianfengXu. CAIL2018: Alarge-scalelegal
+datasetforjudgmentprediction. CoRR,abs/1807.02478,2018. URLhttp://arxiv.org/
+abs/1807.02478.
+[16] NuoXu,PinghuiWang,JunzhouZhao,FeiyangSun,LinLan,JingTao,LiPan,andXiaohong
+Guan. Distinguishconfusioninlegaljudgmentpredictionviarevisedrelationknowledge. ACM
+Trans.Inf.Syst.,43(1):6:1–6:32,2025. doi: 10.1145/3689628. URLhttps://doi.org/10.
+1145/3689628.
+[17] YiFeng,ChuanyiLi,andVincentNg. Legaljudgmentpredictionviaeventextractionwith
+constraints. InSmarandaMuresan,PreslavNakov,andAlineVillavicencio,editors,Proceed-
+ings of the 60th Annual Meeting of the Association for Computational Linguistics (Volume
+1: Long Papers), ACL 2022, Dublin, Ireland, May 22-27, 2022, pages 648–664. Associa-
+tion for Computational Linguistics, 2022. doi: 10.18653/V1/2022.ACL-LONG.48. URL
+https://doi.org/10.18653/v1/2022.acl-long.48.
+[18] OonaAHathaway. Pathdependenceinthelaw: Thecourseandpatternoflegalchangeina
+commonlawsystem. IowaL.Rev.,86:601,2000.
+[19] AnitaSKrishnakumar. Thecommonlawasstatutorybackdrop. Harv.L.Rev.,136:608,2022.
+[20] IainStewart. Morscodicis: Endoftheageofcodification. Tul.Eur.&Civ.LF,27:17,2012.
+[21] JeremyHowardandSebastianRuder. Universallanguagemodelfine-tuningfortextclassifica-
+tion. arXivpreprintarXiv:1801.06146,2018.
+12
+[22] EricMitchell,CharlesLin,AntoineBosselut,ChelseaFinn,andChristopherDManning. Fast
+modeleditingatscale. arXivpreprintarXiv:2110.11309,2021.
+[23] KevinMeng,ArnabSenSharma,AlexAndonian,YonatanBelinkov,andDavidBau. Mass-
+editingmemoryinatransformer. arXivpreprintarXiv:2210.07229,2022.
+[24] TsongYChen,ShingCCheung,andShiuMingYiu. Metamorphictesting: anewapproachfor
+generatingnexttestcases. arXivpreprintarXiv:2002.12543,2020.
+[25] Yuan Zhang, Wanhong Huang, Yi Feng, Chuanyi Li, Zhiwei Fei, Jidong Ge, Bin Luo, and
+VincentNg. LJPCheck: Functionaltestsforlegaljudgmentprediction. InLun-WeiKu,Andre
+Martins,andVivekSrikumar,editors,FindingsoftheAssociationforComputationalLinguistics:
+ACL2024,pages5878–5894,Bangkok,Thailand,August2024.AssociationforComputational
+Linguistics. doi: 10.18653/v1/2024.findings-acl.350. URLhttps://aclanthology.org/
+2024.findings-acl.350.
+[26] MarcoTúlioRibeiro,TongshuangWu,CarlosGuestrin,andSameerSingh. Beyondaccuracy:
+BehavioraltestingofNLPmodelswithchecklist. InDanJurafsky,JoyceChai,NatalieSchluter,
+andJoelR.Tetreault,editors,Proceedingsofthe58thAnnualMeetingoftheAssociationfor
+ComputationalLinguistics,ACL2020,Online,July5-10,2020,pages4902–4912.Association
+forComputationalLinguistics,2020. doi: 10.18653/V1/2020.ACL-MAIN.442. URLhttps:
+//doi.org/10.18653/v1/2020.acl-main.442.
+[27] PaulRöttger,BertieVidgen,DongNguyen,ZeerakWaseem,HelenZ.Margetts,andJanetB.
+Pierrehumbert. Hatecheck: Functionaltestsforhatespeechdetectionmodels. InChengqing
+Zong,FeiXia,WenjieLi,andRobertoNavigli,editors,Proceedingsofthe59thAnnualMeeting
+oftheAssociationforComputationalLinguisticsandthe11thInternationalJointConference
+onNaturalLanguageProcessing,ACL/IJCNLP2021,(Volume1: LongPapers),VirtualEvent,
+August1-6,2021,pages41–58.AssociationforComputationalLinguistics,2021.doi:10.18653/
+V1/2021.ACL-LONG.4. URLhttps://doi.org/10.18653/v1/2021.acl-long.4.
+[28] Linan Yue, Qi Liu, Binbin Jin, Han Wu, and Yanqing An. A circumstance-aware neural
+frameworkforexplainablelegaljudgmentprediction. IEEETrans.Knowl.DataEng.,36(11):
+5453–5467,2024. doi: 10.1109/TKDE.2024.3387580. URLhttps://doi.org/10.1109/
+TKDE.2024.3387580.
+[29] IliasChalkidis,ManosFergadiotis,ProdromosMalakasiotis,NikolaosAletras,andIonAndrout-
+sopoulos. LEGAL-BERT:"preparingthemuppetsforcourt’". InTrevorCohn,YulanHe,and
+YangLiu,editors,FindingsoftheAssociationforComputationalLinguistics:EMNLP2020,On-
+lineEvent,16-20November2020,volumeEMNLP2020ofFindingsofACL,pages2898–2904.
+AssociationforComputationalLinguistics,2020. doi: 10.18653/V1/2020.FINDINGS-EMNLP.
+261. URLhttps://doi.org/10.18653/v1/2020.findings-emnlp.261.
+[30] Chaojun Xiao, Xueyu Hu, Zhiyuan Liu, Cunchao Tu, and Maosong Sun. Lawformer: A
+pre-trainedlanguagemodelforchineselegallongdocuments. AIOpen,2:79–84,2021. doi:
+10.1016/J.AIOPEN.2021.06.003. URL https://doi.org/10.1016/j.aiopen.2021.06.
+003.
+[31] ZhiweiFei,XiaoyuShen,DaweiZhu,FengzheZhou,ZhuoHan,AlanHuang,SongyangZhang,
+KaiChen,ZhixinYin,ZongwenShen,JidongGe,andVincentNg. Lawbench: Benchmarking
+legal knowledge of large language models. In Yaser Al-Onaizan, Mohit Bansal, and Yun-
+NungChen, editors, Proceedingsofthe2024ConferenceonEmpiricalMethodsinNatural
+LanguageProcessing,EMNLP2024,Miami,FL,USA,November12-16,2024,pages7933–
+7962.AssociationforComputationalLinguistics,2024. URLhttps://aclanthology.org/
+2024.emnlp-main.452.
+[32] XuranWang,XinguangZhang,VanessaHoo,ZhouhangShao,andXuguangZhang. Legalrea-
+soner: Amulti-stageframeworkforlegaljudgmentpredictionvialargelanguagemodelsand
+knowledgeintegration. IEEEAccess,12:166843–166854,2024. doi: 10.1109/ACCESS.2024.
+3496666. URLhttps://doi.org/10.1109/ACCESS.2024.3496666.
+13
+[33] KevinMeng,DavidBau,AlexAndonian,andYonatanBelinkov. Locatingandeditingfactual
+associationsinGPT. InSanmiKoyejo,S.Mohamed,A.Agarwal,DanielleBelgrave,K.Cho,
+andA.Oh,editors,AdvancesinNeuralInformationProcessingSystems35: AnnualConference
+onNeuralInformationProcessingSystems2022,NeurIPS2022,NewOrleans,LA,USA,Novem-
+ber28-December9,2022,2022. URLhttp://papers.nips.cc/paper_files/paper/
+2022/hash/6f1d43d5a82a37e89b0665b33bf3a182-Abstract-Conference.html.
+[34] ZexuanZhong,ZhengxuanWu,ChristopherD.Manning,ChristopherPotts,andDanqiChen.
+Mquake: Assessingknowledgeeditinginlanguagemodelsviamulti-hopquestions. InHouda
+Bouamor,JuanPino,andKalikaBali,editors,Proceedingsofthe2023ConferenceonEmpirical
+MethodsinNaturalLanguageProcessing,EMNLP2023,Singapore,December6-10,2023,
+pages15686–15702.AssociationforComputationalLinguistics,2023. doi: 10.18653/V1/2023.
+EMNLP-MAIN.971. URLhttps://doi.org/10.18653/v1/2023.emnlp-main.971.
+[35] Changyue Wang, Weihang Su, Yiran Hu, Qingyao Ai, Yueyue Wu, Cheng Luo, Yiqun Liu,
+MinZhang,andShaopingMa. Lekube: Aknowledgeupdatebenchmarkforlegaldomain. In
+TetsuyaSakai,EmiIshita,HiroakiOhshima,FaeghehHasibi,JiaxinMao,andJoemonM.Jose,
+editors,Proceedingsofthe2024AnnualInternationalACMSIGIRConferenceonResearch
+andDevelopmentinInformationRetrievalintheAsiaPacificRegion,SIGIR-AP2024,Tokyo,
+Japan,December9-12,2024,pages175–185.ACM,2024. doi: 10.1145/3673791.3698407.
+URLhttps://doi.org/10.1145/3673791.3698407.
+[36] PatrickLewis,EthanPerez,AleksandraPiktus,FabioPetroni,VladimirKarpukhin,Naman
+Goyal,HeinrichKüttler,MikeLewis,Wen-tauYih,TimRocktäschel,etal.Retrieval-augmented
+generation for knowledge-intensive nlp tasks. Advances in neural information processing
+systems,33:9459–9474,2020.
+[37] Edward J Hu, Yelong Shen, Phillip Wallis, Zeyuan Allen-Zhu, Yuanzhi Li, Shean Wang,
+LuWang,WeizhuChen,etal. Lora: Low-rankadaptationoflargelanguagemodels. ICLR,1
+(2):3,2022.
+[38] T. Y. S. S. Santosh, Tuan-Quang Vuong, and Matthias Grabmair. Chronoslex: Time-aware
+incrementaltrainingfortemporalgeneralizationoflegalclassificationtasks. InLun-WeiKu,
+AndreMartins,andVivekSrikumar,editors,Proceedingsofthe62ndAnnualMeetingofthe
+Association for Computational Linguistics (Volume 1: Long Papers), ACL 2024, Bangkok,
+Thailand,August11-16,2024,pages3022–3039.AssociationforComputationalLinguistics,
+2024. doi: 10.18653/V1/2024.ACL-LONG.166. URL https://doi.org/10.18653/v1/
+2024.acl-long.166.
+[39] OpenAI. Gpt-4osystemcard,2024. URLhttps://arxiv.org/abs/2410.21276.
+[40] LinanYue,QiLiu,BinbinJin,HanWu,KaiZhang,YanqingAn,MingyueCheng,BiaoYin,
+and Dayong Wu. Neurjudge: A circumstance-aware neural framework for legal judgment
+prediction. In Fernando Diaz, Chirag Shah, Torsten Suel, Pablo Castells, Rosie Jones, and
+TetsuyaSakai,editors,SIGIR’21: The44thInternationalACMSIGIRConferenceonResearch
+andDevelopmentinInformationRetrieval,VirtualEvent,Canada,July11-15,2021,pages
+973–982.ACM,2021. doi: 10.1145/3404835.3462826. URLhttps://doi.org/10.1145/
+3404835.3462826.
+[41] RiccardoGuidotti,AnnaMonreale,SalvatoreRuggieri,FrancoTurini,FoscaGiannotti,and
+DinoPedreschi. Asurveyofmethodsforexplainingblackboxmodels. ACMComput.Surv.,51
+(5):93:1–93:42,2019. doi: 10.1145/3236009. URLhttps://doi.org/10.1145/3236009.
+[42] YuZhang,PeterTiño,AlesLeonardis,andKeTang. Asurveyonneuralnetworkinterpretability.
+IEEE Trans. Emerg. Top. Comput. Intell., 5(5):726–742, 2021. doi: 10.1109/TETCI.2021.
+3100641. URLhttps://doi.org/10.1109/TETCI.2021.3100641.
+[43] Dobbsv.JacksonWomen’sHealthOrganization,2022. URLhttps://www.supremecourt.
+gov/opinions/21pdf/19-1392_6j37.pdf. Opinion,U.S.SupremeCourt.
+[44] Roev.Wade. 410u.s.113. U.S.SupremeCourt,1973. U.S.SupremeCourt,1973.
+14
+[45] JinzeBai,ShuaiBai,YunfeiChu,ZeyuCui,KaiDang,XiaodongDeng,YangFan,Wenbin
+Ge,YuHan,FeiHuang,BinyuanHui,LuoJi,MeiLi,JunyangLin,RunjiLin,DayihengLiu,
+GaoLiu,ChengqiangLu,KemingLu,JianxinMa,RuiMen,XingzhangRen,XuanchengRen,
+ChuanqiTan,SinanTan,JianhongTu,PengWang,ShijieWang,WeiWang,ShengguangWu,
+BenfengXu,JinXu,AnYang,HaoYang,JianYang,ShushengYang,YangYao,BowenYu,
+HongyiYuan,ZhengYuan,JianweiZhang,XingxuanZhang,YichangZhang,ZhenruZhang,
+ChangZhou,JingrenZhou,XiaohuanZhou,andTianhangZhu. Qwentechnicalreport. arXiv
+preprintarXiv:2309.16609,2023.
+[46] ZenoVendler. Linguisticsinphilosophy. CornellUniversityPress,2019.
+[47] JamesPustejovsky. Thegenerativelexicon. MITpress,1998.
+15
+NeurIPSPaperChecklist
+1. Claims
+Question: Dothemainclaimsmadeintheabstractandintroductionaccuratelyreflectthe
+paper’scontributionsandscope?
+Answer: [Yes]
+Justification: TheabstractandintroductionclearlystatethegoalofevaluatingLJPmodels
+understatutoryrevisionsandoutlinetheLawShiftbenchmarkastheproposedsolution. This
+alignswiththedetailedmethodologyandexperimentsinSections3and4.
+Guidelines:
+• The answer NA means that the abstract and introduction do not include the claims
+madeinthepaper.
+• Theabstractand/orintroductionshouldclearlystatetheclaimsmade,includingthe
+contributionsmadeinthepaperandimportantassumptionsandlimitations. ANoor
+NAanswertothisquestionwillnotbeperceivedwellbythereviewers.
+• Theclaimsmadeshouldmatchtheoreticalandexperimentalresults,andreflecthow
+muchtheresultscanbeexpectedtogeneralizetoothersettings.
+• Itisfinetoincludeaspirationalgoalsasmotivationaslongasitisclearthatthesegoals
+arenotattainedbythepaper.
+2. Limitations
+Question: Doesthepaperdiscussthelimitationsoftheworkperformedbytheauthors?
+Answer: [Yes]
+Justification: InSection5,wherewenotethatLawShiftisChinese-onlyandprobesjust
+twosimpleupdatestrategies;whilethislimitscoverage,theevaluationprotocolisbroadly
+transferable,andouraimistorevealcurrentmodels’weaknessesunderstatuteshiftsrather
+thantosolveknowledgeupdatingitself.
+Guidelines:
+• TheanswerNAmeansthatthepaperhasnolimitationwhiletheanswerNomeansthat
+thepaperhaslimitations,butthosearenotdiscussedinthepaper.
+• Theauthorsareencouragedtocreateaseparate"Limitations"sectionintheirpaper.
+• Thepapershouldpointoutanystrongassumptionsandhowrobusttheresultsareto
+violationsoftheseassumptions(e.g.,independenceassumptions,noiselesssettings,
+modelwell-specification,asymptoticapproximationsonlyholdinglocally).Theauthors
+shouldreflectonhowtheseassumptionsmightbeviolatedinpracticeandwhatthe
+implicationswouldbe.
+• Theauthorsshouldreflectonthescopeoftheclaimsmade,e.g.,iftheapproachwas
+onlytestedonafewdatasetsorwithafewruns. Ingeneral,empiricalresultsoften
+dependonimplicitassumptions,whichshouldbearticulated.
+• Theauthorsshouldreflectonthefactorsthatinfluencetheperformanceoftheapproach.
+Forexample,afacialrecognitionalgorithmmayperformpoorlywhenimageresolution
+isloworimagesaretakeninlowlighting. Oraspeech-to-textsystemmightnotbe
+usedreliablytoprovideclosedcaptionsforonlinelecturesbecauseitfailstohandle
+technicaljargon.
+• Theauthorsshoulddiscussthecomputationalefficiencyoftheproposedalgorithms
+andhowtheyscalewithdatasetsize.
+• If applicable, the authors should discuss possible limitations of their approach to
+addressproblemsofprivacyandfairness.
+• Whiletheauthorsmightfearthatcompletehonestyaboutlimitationsmightbeusedby
+reviewersasgroundsforrejection,aworseoutcomemightbethatreviewersdiscover
+limitationsthataren’tacknowledgedinthepaper. Theauthorsshouldusetheirbest
+judgmentandrecognizethatindividualactionsinfavoroftransparencyplayanimpor-
+tantroleindevelopingnormsthatpreservetheintegrityofthecommunity. Reviewers
+willbespecificallyinstructedtonotpenalizehonestyconcerninglimitations.
+3. Theoryassumptionsandproofs
+16
+Question: Foreachtheoreticalresult,doesthepaperprovidethefullsetofassumptionsand
+acomplete(andcorrect)proof?
+Answer: [NA]
+Justification: Thispaperdoesnotinvolvetheoreticalresults.
+Guidelines:
+• TheanswerNAmeansthatthepaperdoesnotincludetheoreticalresults.
+• Allthetheorems, formulas, andproofsinthepapershouldbenumberedandcross-
+referenced.
+• Allassumptionsshouldbeclearlystatedorreferencedinthestatementofanytheorems.
+• Theproofscaneitherappearinthemainpaperorthesupplementalmaterial, butif
+theyappearinthesupplementalmaterial,theauthorsareencouragedtoprovideashort
+proofsketchtoprovideintuition.
+• Inversely,anyinformalproofprovidedinthecoreofthepapershouldbecomplemented
+byformalproofsprovidedinappendixorsupplementalmaterial.
+• TheoremsandLemmasthattheproofreliesuponshouldbeproperlyreferenced.
+4. Experimentalresultreproducibility
+Question: Doesthepaperfullydisclosealltheinformationneededtoreproducethemainex-
+perimentalresultsofthepapertotheextentthatitaffectsthemainclaimsand/orconclusions
+ofthepaper(regardlessofwhetherthecodeanddataareprovidedornot)?
+Answer: [Yes]
+Justification: AlldetailsofdataprocessingandexperimentalsetuparedescribedinSections
+3,4,andAppendixC.
+Guidelines:
+• TheanswerNAmeansthatthepaperdoesnotincludeexperiments.
+• Ifthepaperincludesexperiments,aNoanswertothisquestionwillnotbeperceived
+well by the reviewers: Making the paper reproducible is important, regardless of
+whetherthecodeanddataareprovidedornot.
+• Ifthecontributionisadatasetand/ormodel,theauthorsshoulddescribethestepstaken
+tomaketheirresultsreproducibleorverifiable.
+• Dependingonthecontribution,reproducibilitycanbeaccomplishedinvariousways.
+Forexample,ifthecontributionisanovelarchitecture,describingthearchitecturefully
+mightsuffice,orifthecontributionisaspecificmodelandempiricalevaluation,itmay
+benecessarytoeithermakeitpossibleforotherstoreplicatethemodelwiththesame
+dataset,orprovideaccesstothemodel. Ingeneral. releasingcodeanddataisoften
+onegoodwaytoaccomplishthis,butreproducibilitycanalsobeprovidedviadetailed
+instructionsforhowtoreplicatetheresults,accesstoahostedmodel(e.g.,inthecase
+ofalargelanguagemodel),releasingofamodelcheckpoint,orothermeansthatare
+appropriatetotheresearchperformed.
+• WhileNeurIPSdoesnotrequirereleasingcode,theconferencedoesrequireallsubmis-
+sionstoprovidesomereasonableavenueforreproducibility,whichmaydependonthe
+natureofthecontribution. Forexample
+(a) Ifthecontributionisprimarilyanewalgorithm,thepapershouldmakeitclearhow
+toreproducethatalgorithm.
+(b) Ifthecontributionisprimarilyanewmodelarchitecture,thepapershoulddescribe
+thearchitectureclearlyandfully.
+(c) Ifthecontributionisanewmodel(e.g.,alargelanguagemodel),thenthereshould
+eitherbeawaytoaccessthismodelforreproducingtheresultsorawaytoreproduce
+themodel(e.g.,withanopen-sourcedatasetorinstructionsforhowtoconstruct
+thedataset).
+(d) We recognize that reproducibility may be tricky in some cases, in which case
+authorsarewelcometodescribetheparticularwaytheyprovideforreproducibility.
+Inthecaseofclosed-sourcemodels,itmaybethataccesstothemodelislimitedin
+someway(e.g.,toregisteredusers),butitshouldbepossibleforotherresearchers
+tohavesomepathtoreproducingorverifyingtheresults.
+17
+5. Openaccesstodataandcode
+Question: Doesthepaperprovideopenaccesstothedataandcode,withsufficientinstruc-
+tionstofaithfullyreproducethemainexperimentalresults,asdescribedinsupplemental
+material?
+Answer: [Yes]
+Justification: Code and data are made public accessible (HF: https:
+//huggingface.co/datasets/triangularPeach/LawShift; GitHub: https:
+//github.com/triangularPeach/LawShift),asmentionedinSection3.
+Guidelines:
+• TheanswerNAmeansthatpaperdoesnotincludeexperimentsrequiringcode.
+• Please see the NeurIPS code and data submission guidelines (https://nips.cc/
+public/guides/CodeSubmissionPolicy)formoredetails.
+• Whileweencouragethereleaseofcodeanddata,weunderstandthatthismightnotbe
+possible,so“No”isanacceptableanswer. Paperscannotberejectedsimplyfornot
+includingcode,unlessthisiscentraltothecontribution(e.g.,foranewopen-source
+benchmark).
+• Theinstructionsshouldcontaintheexactcommandandenvironmentneededtorunto
+reproducetheresults. SeetheNeurIPScodeanddatasubmissionguidelines(https:
+//nips.cc/public/guides/CodeSubmissionPolicy)formoredetails.
+• Theauthorsshouldprovideinstructionsondataaccessandpreparation,includinghow
+toaccesstherawdata,preprocesseddata,intermediatedata,andgenerateddata,etc.
+• Theauthorsshouldprovidescriptstoreproduceallexperimentalresultsforthenew
+proposedmethodandbaselines. Ifonlyasubsetofexperimentsarereproducible,they
+shouldstatewhichonesareomittedfromthescriptandwhy.
+• Atsubmissiontime, topreserveanonymity, theauthorsshouldreleaseanonymized
+versions(ifapplicable).
+• Providingasmuchinformationaspossibleinsupplementalmaterial(appendedtothe
+paper)isrecommended,butincludingURLstodataandcodeispermitted.
+6. Experimentalsetting/details
+Question: Doesthepaperspecifyallthetrainingandtestdetails(e.g.,datasplits,hyper-
+parameters, how they were chosen, type of optimizer, etc.) necessary to understand the
+results?
+Answer: [Yes]
+Justification: ThetrainingandtestingdetailsaredescribedinSection4andAppendicesC
+andD.
+Guidelines:
+• TheanswerNAmeansthatthepaperdoesnotincludeexperiments.
+• Theexperimentalsettingshouldbepresentedinthecoreofthepapertoalevelofdetail
+thatisnecessarytoappreciatetheresultsandmakesenseofthem.
+• Thefulldetailscanbeprovidedeitherwiththecode,inappendix,orassupplemental
+material.
+7. Experimentstatisticalsignificance
+Question:Doesthepaperreporterrorbarssuitablyandcorrectlydefinedorotherappropriate
+informationaboutthestatisticalsignificanceoftheexperiments?
+Answer: [Yes]
+Justification: This paper report average results of three runs of experiments to ensure
+robustness. DetailsareaddressedinAppendixD.
+Guidelines:
+• TheanswerNAmeansthatthepaperdoesnotincludeexperiments.
+• Theauthorsshouldanswer"Yes"iftheresultsareaccompaniedbyerrorbars,confi-
+denceintervals,orstatisticalsignificancetests,atleastfortheexperimentsthatsupport
+themainclaimsofthepaper.
+18
+• Thefactorsofvariabilitythattheerrorbarsarecapturingshouldbeclearlystated(for
+example,train/testsplit,initialization,randomdrawingofsomeparameter,oroverall
+runwithgivenexperimentalconditions).
+• Themethodforcalculatingtheerrorbarsshouldbeexplained(closedformformula,
+calltoalibraryfunction,bootstrap,etc.)
+• Theassumptionsmadeshouldbegiven(e.g.,Normallydistributederrors).
+• Itshouldbeclearwhethertheerrorbaristhestandarddeviationorthestandarderror
+ofthemean.
+• It is OK to report 1-sigma error bars, but one should state it. The authors should
+preferablyreporta2-sigmaerrorbarthanstatethattheyhavea96%CI,ifthehypothesis
+ofNormalityoferrorsisnotverified.
+• Forasymmetricdistributions,theauthorsshouldbecarefulnottoshowintablesor
+figuressymmetricerrorbarsthatwouldyieldresultsthatareoutofrange(e.g. negative
+errorrates).
+• Iferrorbarsarereportedintablesorplots,Theauthorsshouldexplaininthetexthow
+theywerecalculatedandreferencethecorrespondingfiguresortablesinthetext.
+8. Experimentscomputeresources
+Question: Foreachexperiment,doesthepaperprovidesufficientinformationonthecom-
+puterresources(typeofcomputeworkers,memory,timeofexecution)neededtoreproduce
+theexperiments?
+Answer: [Yes]
+Justification: ThecomputerresourcesusedaredescribedinAppendixD.
+Guidelines:
+• TheanswerNAmeansthatthepaperdoesnotincludeexperiments.
+• ThepapershouldindicatethetypeofcomputeworkersCPUorGPU,internalcluster,
+orcloudprovider,includingrelevantmemoryandstorage.
+• Thepapershouldprovidetheamountofcomputerequiredforeachoftheindividual
+experimentalrunsaswellasestimatethetotalcompute.
+• Thepapershoulddisclosewhetherthefullresearchprojectrequiredmorecompute
+thantheexperimentsreportedinthepaper(e.g.,preliminaryorfailedexperimentsthat
+didn’tmakeitintothepaper).
+9. Codeofethics
+Question: Doestheresearchconductedinthepaperconform, ineveryrespect, withthe
+NeurIPSCodeofEthicshttps://neurips.cc/public/EthicsGuidelines?
+Answer: [Yes]
+Justification: All experiments comply with the NeurIPS ethical guidelines. Personally
+identifiableinformationhasbeenanonymized;seeAppendixAfordetails.
+Guidelines:
+• TheanswerNAmeansthattheauthorshavenotreviewedtheNeurIPSCodeofEthics.
+• IftheauthorsanswerNo,theyshouldexplainthespecialcircumstancesthatrequirea
+deviationfromtheCodeofEthics.
+• Theauthorsshouldmakesuretopreserveanonymity(e.g.,ifthereisaspecialconsid-
+erationduetolawsorregulationsintheirjurisdiction).
+10. Broaderimpacts
+Question: Does the paper discuss both potential positive societal impacts and negative
+societalimpactsoftheworkperformed?
+Answer: [Yes]
+Justification: ThispaperaddressesitssocietalimpactindetailinSections1.
+Guidelines:
+• TheanswerNAmeansthatthereisnosocietalimpactoftheworkperformed.
+19
+• IftheauthorsanswerNAorNo,theyshouldexplainwhytheirworkhasnosocietal
+impactorwhythepaperdoesnotaddresssocietalimpact.
+• Examplesofnegativesocietalimpactsincludepotentialmaliciousorunintendeduses
+(e.g.,disinformation,generatingfakeprofiles,surveillance),fairnessconsiderations
+(e.g.,deploymentoftechnologiesthatcouldmakedecisionsthatunfairlyimpactspecific
+groups),privacyconsiderations,andsecurityconsiderations.
+• Theconferenceexpectsthatmanypaperswillbefoundationalresearchandnottied
+toparticularapplications,letalonedeployments. However,ifthereisadirectpathto
+anynegativeapplications,theauthorsshouldpointitout. Forexample,itislegitimate
+topointoutthatanimprovementinthequalityofgenerativemodelscouldbeusedto
+generatedeepfakesfordisinformation. Ontheotherhand,itisnotneededtopointout
+thatagenericalgorithmforoptimizingneuralnetworkscouldenablepeopletotrain
+modelsthatgenerateDeepfakesfaster.
+• Theauthorsshouldconsiderpossibleharmsthatcouldarisewhenthetechnologyis
+being used as intended and functioning correctly, harms that could arise when the
+technologyisbeingusedasintendedbutgivesincorrectresults,andharmsfollowing
+from(intentionalorunintentional)misuseofthetechnology.
+• Iftherearenegativesocietalimpacts,theauthorscouldalsodiscusspossiblemitigation
+strategies (e.g., gated release of models, providing defenses in addition to attacks,
+mechanismsformonitoringmisuse,mechanismstomonitorhowasystemlearnsfrom
+feedbackovertime,improvingtheefficiencyandaccessibilityofML).
+11. Safeguards
+Question: Doesthepaperdescribesafeguardsthathavebeenputinplaceforresponsible
+releaseofdataormodelsthathaveahighriskformisuse(e.g.,pretrainedlanguagemodels,
+imagegenerators,orscrapeddatasets)?
+Answer: [NA]
+Justification: LawShiftconsistsofanonymizedpubliclegalcasesandsynthetictexts;itdoes
+notconstituteahigh-riskmodelordatasetandrequiresnoadditionalreleaserestrictions.
+Guidelines:
+• TheanswerNAmeansthatthepaperposesnosuchrisks.
+• Releasedmodelsthathaveahighriskformisuseordual-useshouldbereleasedwith
+necessarysafeguardstoallowforcontrolleduseofthemodel,forexamplebyrequiring
+thatusersadheretousageguidelinesorrestrictionstoaccessthemodelorimplementing
+safetyfilters.
+• DatasetsthathavebeenscrapedfromtheInternetcouldposesafetyrisks. Theauthors
+shoulddescribehowtheyavoidedreleasingunsafeimages.
+• Werecognizethatprovidingeffectivesafeguardsischallenging,andmanypapersdo
+notrequirethis,butweencourageauthorstotakethisintoaccountandmakeabest
+faitheffort.
+12. Licensesforexistingassets
+Question: Arethecreatorsororiginalownersofassets(e.g.,code,data,models),usedin
+thepaper,properlycreditedandarethelicenseandtermsofuseexplicitlymentionedand
+properlyrespected?
+Answer: [Yes]
+Justification: Thepretrainedmodelsusedforreproduction(seeAppendixD)arecitedwith
+theiroriginalpapersandappropriatelyattributedundertheirrespectiveApache-2.0orMIT
+licenses; theCJOjudicialdocumentsarepublicdomainresources,andtheirsourcesare
+clearlyindicateduponcitation(referenceofCJOseeSection3).
+Guidelines:
+• TheanswerNAmeansthatthepaperdoesnotuseexistingassets.
+• Theauthorsshouldcitetheoriginalpaperthatproducedthecodepackageordataset.
+• Theauthorsshouldstatewhichversionoftheassetisusedand,ifpossible,includea
+URL.
+20
+• Thenameofthelicense(e.g.,CC-BY4.0)shouldbeincludedforeachasset.
+• Forscrapeddatafromaparticularsource(e.g.,website),thecopyrightandtermsof
+serviceofthatsourceshouldbeprovided.
+• If assets are released, the license, copyright information, and terms of use in the
+packageshouldbeprovided. Forpopulardatasets,paperswithcode.com/datasets
+hascuratedlicensesforsomedatasets. Theirlicensingguidecanhelpdeterminethe
+licenseofadataset.
+• Forexistingdatasetsthatarere-packaged,boththeoriginallicenseandthelicenseof
+thederivedasset(ifithaschanged)shouldbeprovided.
+• Ifthisinformationisnotavailableonline,theauthorsareencouragedtoreachoutto
+theasset’screators.
+13. Newassets
+Question:Arenewassetsintroducedinthepaperwelldocumentedandisthedocumentation
+providedalongsidetheassets?
+Answer: [Yes]
+Justification: LawShiftisreleasedundertheCC-BY-4.0license,accompaniedbyCroissant
+metadataandusageinstructionsintherepository(seeSection3).
+Guidelines:
+• TheanswerNAmeansthatthepaperdoesnotreleasenewassets.
+• Researchersshouldcommunicatethedetailsofthedataset/code/modelaspartoftheir
+submissions via structured templates. This includes details about training, license,
+limitations,etc.
+• Thepapershoulddiscusswhetherandhowconsentwasobtainedfrompeoplewhose
+assetisused.
+• Atsubmissiontime,remembertoanonymizeyourassets(ifapplicable). Youcaneither
+createananonymizedURLorincludeananonymizedzipfile.
+14. Crowdsourcingandresearchwithhumansubjects
+Question: Forcrowdsourcingexperimentsandresearchwithhumansubjects,doesthepaper
+includethefulltextofinstructionsgiventoparticipantsandscreenshots,ifapplicable,as
+wellasdetailsaboutcompensation(ifany)?
+Answer: [Yes]
+Justification: As described in Section 3, our annotators were paid 200 RMB per hour,
+approximately.
+Guidelines:
+• TheanswerNAmeansthatthepaperdoesnotinvolvecrowdsourcingnorresearchwith
+humansubjects.
+• Includingthisinformationinthesupplementalmaterialisfine,butifthemaincontribu-
+tionofthepaperinvolveshumansubjects,thenasmuchdetailaspossibleshouldbe
+includedinthemainpaper.
+• AccordingtotheNeurIPSCodeofEthics,workersinvolvedindatacollection,curation,
+orotherlaborshouldbepaidatleasttheminimumwageinthecountryofthedata
+collector.
+15. Institutional review board (IRB) approvals or equivalent for research with human
+subjects
+Question: Doesthepaperdescribepotentialrisksincurredbystudyparticipants,whether
+suchrisksweredisclosedtothesubjects,andwhetherInstitutionalReviewBoard(IRB)
+approvals(oranequivalentapproval/reviewbasedontherequirementsofyourcountryor
+institution)wereobtained?
+Answer: [Yes]
+Justification: SectionAaddressthisissue.
+Guidelines:
+21
+• TheanswerNAmeansthatthepaperdoesnotinvolvecrowdsourcingnorresearchwith
+humansubjects.
+• Dependingonthecountryinwhichresearchisconducted,IRBapproval(orequivalent)
+mayberequiredforanyhumansubjectsresearch. IfyouobtainedIRBapproval,you
+shouldclearlystatethisinthepaper.
+• Werecognizethattheproceduresforthismayvarysignificantlybetweeninstitutions
+andlocations,andweexpectauthorstoadheretotheNeurIPSCodeofEthicsandthe
+guidelinesfortheirinstitution.
+• Forinitialsubmissions,donotincludeanyinformationthatwouldbreakanonymity(if
+applicable),suchastheinstitutionconductingthereview.
+16. DeclarationofLLMusage
+Question: Does the paper describe the usage of LLMs if it is an important, original, or
+non-standardcomponentofthecoremethodsinthisresearch? NotethatiftheLLMisused
+onlyforwriting,editing,orformattingpurposesanddoesnotimpactthecoremethodology,
+scientificrigorousness,ororiginalityoftheresearch,declarationisnotrequired.
+Answer: [Yes]
+Justification: InSection3andAppendixH.2describedtheprocessofLLMsbeingusedto
+constructdatasets,usedasbaselinemodles,aswellastheusedpromptingexamples.
+Guidelines:
+• The answer NA means that the core method development in this research does not
+involveLLMsasanyimportant,original,ornon-standardcomponents.
+• PleaserefertoourLLMpolicy(https://neurips.cc/Conferences/2025/LLM)
+forwhatshouldorshouldnotbedescribed.
+22
+A EthicalConsiderations
+TheoriginalcasedatausedduringLawShiftconstructionareallfrompubliclyavailableresources.
+When using non-locally deployed large language models, all case data inputs were properly
+anonymized (e.g. defendant names, location, etc.) to mitigate the risk of privacy leaks. Our
+motivationistoevaluatetheperformanceofLJPmodelsunderstatutoryrevisions,withtheaimof
+helpingresearchersindevelopingmorerobustLJPsystems. WedonotintendtoassertthatLJP
+modelsarecapableofadaptingtolegalchangestotheextentthattheycanbedeployedindependently
+withouthumanverification.
+B GeneralizationandScalabilityofLawShift
+B.1 Generalization
+ForthedesignandconstructionofLawShift,themethodofstatutedecompositionandrevisiontype
+definitioniswidelygeneralizable. Regardlessoflegalsystem,codifiedrulescanberepresentedas
+propositionalstatementsorstructuredclauses,whichourdecompositionstrategyisbuilttohandle.
+Forexample,theUK’sSentencingCouncilspecifieskeyelementsandpenaltiesforAttemptedMurder
+14,noting"... theoffenderhadanintentiontokill;accordinglyandoffenderconvictedofthisoffence
+willhavedemonstratedahighlevelofculpability..."with"maximum: lifeimprisonment;offence
+range: 3-40years’custody."Usingourapproach(seeFigure1),thisstatutecanbedecomposedinto
+corecomponent:subject(offender),action(kill),subjectcondition(intention),andlegalconsequences
+(sentence range: 3-40 years). Although our revision taxonomy was developed from the Chinese
+CriminalCode,manytypeslikeT6.1(term-num-up,referringtoTable5)andT2.1(action-exp-ee)
+applydirectlytosuchUKstatutes.
+Second, our metamorphic testing approach for assessing model adaptability to legal revisions is
+broadlyapplicable. Forinstance,intheUS,complexitiesarisewhenbothstatutesandprecedents
+change. The2022SupremeCourtdecisioninDobbsv. JacksonWomen’sHealthOrganization[43]
+overturnedthe1973Roev. Wade[44]precedentthatrecognizedabortionasaconstitutionalright,
+shifting regulatory authority back to the states. While Roe invalidated state-level abortion bans,
+Dobbsallowsstatestocriminalizeabortion. Thus,aTexasdoctorperformingabortionsin2021acted
+lawfully,butidenticalconductin2023mayleadtoprosecution,reflectingthe2022statelegislation
+banningabortion.
+Wecandesignmetamorphictestcasesthatcapturetheinterplayofstatutoryandprecedentchanges
+(asshowninTable6). Bypresentingidenticalfactswithvariationsintime,region,orprecedent,we
+Table6: Judgmentshiftexamplesafterstatute/precedentchangeintheUS.
+TESTID YEAR REGION FACT APPLICABLE EXPECTEDPREDICTION REASONINGCHANGEPOINT
+STATUTE/PRECEDENT
+1 2021 Texas Abortion Roev.Wade NotaCrime BasedonRoe,thefederalconsti-
+tutionalrighttoprivacyprotects
+awoman’sdecisiontohavean
+abortion;statescannotimposea
+criminalprohibition.
+2 2023 Texas Abortion Statelaw+Dobbs Crime After Dobbs overturned Roe,
+abortionregulationauthorityre-
+turned to the states. Texas
+enactedlawsbanningabortion,
+nowenforceablewithoutRoe’s
+limits.
+3 2021 California Abortion Statelaw+Roe NotaCrime WhileRoeestablishedafederal
+protectionbaseline,California
+alsohadexplicitstatelawsaf-
+firmingabortionrights,reinforc-
+ingthenon-criminalstatus.
+evaluatewhethermodelsadjusttheirjudgmentsaccordingly,reflectingadaptivelegalreasoning. For
+example,inthefirsttwoabortioncaseswithidenticalfactsbutdifferingintimeandprecedent,the
+modelshouldclassifythelatercaseasacrimeandtheearlieroneasnotacrime.
+14https://sentencingcouncil.org.uk/guidelines/attempted-murder/
+23
+B.2 Scalability
+TheprocessoftheconstructionoftheLawShiftdatasetisscalableandsustainable. Wecanleverage
+regexorLLMstoenablesemi-/fully-automaticdataannotation. Forinstance,whenthestatutory
+subjectexpandsfrom“poisonoussubstances”to“poisonousorradioactivesubstances,”anLLMcan
+detecttheoriginalspanandreplaceitwithasampledentity(e.g.,“radium”)fromapredefinedlist.
+Thissupportsfactualdiversitybutmayintroducespan-matchingerrors. Toimprovereliabilitywhile
+limitingmanualeffort,wecanadopthumanverificationorensembleLLMvotingformorerobust
+spandetection.
+AsdescribedinSection3.3, werelyonlegalexpertstoensurethatrevisiontypeannotationsare
+legallyplausible,e.g.,avoidingunrealisticeditssuchasrevisingatheftchargeintoacapitaloffense.
+However,toscaletheannotationofrevisiontypes,wemayalsoadoptsemi-automaticorautomatic
+methods. Wecanfirstusetoolstolocatetherevisionspan(e.g.,thepenaltyclause),andthenreplace
+orinsertcontentfromacuratedsetofcandidates(e.g.,alternativepenaltiesfortheft). Subsequently,
+expert review or voting-based aggregation can be used to reduce technical errors. Note human
+verification is applied at critical points to ensure legal fidelity, balancing cost and quality. Thus,
+whilelegalexpertiseisnecessary,ourworkflowcanbedesignedforlong-termextensibilitywith
+manageableoverhead.
+C DataPre-Processing
+Inthissectionwedescribeindetailthedatapre-processingprocedureusedtoconstructthetraining
+andvalidationdatasets,aswellastheoriginalcasepoolofLawShift.
+Chineselawstipulatesthatjudicialcasesmustbejudgedaccordingtotheversionoflawineffectat
+thetimethecriminalbehavioroccurred. Incasesinvolvingmultiplecriminalacts,theapplicablelaw
+istheoneinforceatthetimeofthelastcriminalbehavior. Toensureconsistencyinlegalstandards
+acrossthedataset,weannotateeachcasewithitscorrespondinglawversionandconstructthetraining
+and validation datasets as well as the original case pool using only cases judged under the same
+versionoftheCriminalCode.
+Specifically,thisannotationprocessisperformedviaone-shotpromptingofageneraldomainLLM,
+Qwen1.5-14B-Chat[45]. AnexampleofpromptingQwentoextractthedateofthefinalcriminal
+act(translatedintoEnglish)isshowninTable7. Then, wedivideallcasesintogroupsbasedon
+Table7: AnEnglish-translatedexampleofpromptingQwentoobtainacase’sfinalcrimedate.
+INSTRUCTION
+YouareanexpertofChineseCriminalLaw. Belowisafactdescriptionofacriminalcase. Please
+identifythecriminaleventsinvolvedandextractthedateofthelastcriminalactivity. Ifthereare
+multiplecriminalacts,extractonlythedateofthemostrecentone. Theoutputformatmustbe:
+<time>yyyy-MM-dd<eoa>. Forexample: <time>2001-01-09<eoa>. Pleaseonlyoutputthisdata
+withnoexplanationsoradditionalinformation.
+Example:
+Fact:ThedefendantZhangstoleawhiteiPhonefromthevictimWangatthelocalmallonJanuary
+1st,2018,... onJanuary16th,ZhangbrokeintoLi’shouseandstole3,100yuanincash,...,Zhang
+onceagainstolethevictimLiu’swalletatthelocalmallonJanuary20th,2018beforearrestedby
+thepolice...
+Output: <time>2018-01-20<eoa>.
+Nowpleaseprocessthefollowingcasefactandextractitsfinalcrimedate:
+Fact: OnFebruary2,2020,ataround1:00am,thedefendantWu,togetherwithandharboring
+Jiang, Zhang, and Yang, used the method of "blowing the bottle" to inhale the drug metham-
+phetamine... OnFebruary17,2020,ataround11:00pm,thedefendantWu,togetherwithand
+harboringZhang,usedthemethodof"blowingthebottle"toinhalemethamphetamine...
+Output:
+QWEN
+<time>2020-02-17<eoa>
+thelawversionthatwasineffectatthetimeofthefinalcriminalactineachcase. Thenumberof
+24
+casescorrespondingtoeachlawversionislistedinTable8. Thetimeperiodsshowninthetable
+arederivedfromthetheofficialscriptsofCriminalCodeAmendments. Weselectthelawversion
+associatedwiththehighestnumberofcasestocontinuetoconstructthesubsequentdatasets,i.e. the
+versionineffectfromNovember4,2017toFebruary28,2021.
+Nextweannotaterelevantgroundtruthlabelsforcharge,lawarticle,andpenaltytermtasksbased
+on the fact descriptions of selected cases. Judicial documents follow a fixed structure, typically
+dividedintofourparts: factdescription,courtview,relevantlawsandjudgments. Thisannotation
+processiscarriedoutusingpreciselycraftedregularexpressions. Throughthis,weextractthefact
+descriptionforeachcase,filteringoutthosethattooshort(specifically,thosewithfewerthan100
+characters). Lawarticlelabelsareextractedfromtherelevantlawssection. Sincelawarticlesinthese
+documentsareciteddowntothespecificparagraph,weassignparagraph-levellawarticlelabelsfor
+eachcase. Meanwhile,chargelabelsandpenaltytermannotationsarederivedfromthejudgments
+section. Thepenaltytermsarefirstextractedandthenconvertedintothenumberofmonths. Labels
+forlifeimprisonmentandthedeathpenaltyarealsoretained. Anexampleofapre-processedcaseis
+showninTable10. Finally,wedivideallcasesbytheratioof16:4:5,andobtainthetrainingand
+validationdatasets,aswellastheoriginalcasepoolset,fromwhichtestinstancesareselected. The
+statisticsareshowninTable9.
+Table8: Numberofcasesofeachlawversion. Table9: Statisticsofuseddatasets.
+TimePeriod #Cases Dataset/Label #
+-99.12.24 1,063 trainingdataset 253,936
+99.12.25–01.08.30 1,307
+01.08.31–01.12.28 328 validationdataset 63,484
+01.12.29–02.12.27 1,010
+02.12.28–05.02.27 3,298 casepool 79,356
+05.02.28–06.06.28 3,062 charge 56
+06.06.29–09.02.27 12,121
+lawarticle 58
+09.02.28–11.04.30 23,199
+11.05.01–15.10.31 926,094 penaltyterm 12
+15.11.01–17.11.03 696,878
+17.11.04–21.02.28 1,187,620
+21.03.01– 11,231
+Table10: Anexampleofpre-processedcase.
+FactDescription: ThepublicprosecutionallegesthatonOctober12,2020,thedefendantQian
+stoleanelectricbicycleparkedbythevictimXunearSheshanPrimarySchool. Thebikewas
+valuedat721RMB.Qianwasapprehendedthenextdayandvoluntarilyconfessedtothecrime.
+Charge: Theft
+LawArticle: Article264,Paragraph1
+PenaltyTerm: 8months
+D EvaluationSetup
+WetestnineSOTAmodelswithLawShift. Theyare:
+1. TopJudge[1]: anLJPmodelthatutilizesadirectedacyclicgraphtocaptureinterdependen-
+ciesamongsubtasks. LawArticlecontenstarenotconsideredduringprediction. TopJudge
+representsthefamilyofLJPmodelsthatdonottakelawarticlecontentsintoconsideration.
+2. D-LADAN[16]: anLJPmodelthatnotonlyemployslawarticlecontentsduringprediction
+butlearnsthesubtledifferencesbetweensimilararticlesinordertodiscriminalizeconfusing
+labelsemantics. D-LADANrepresentsthefamilyofLJPmodelsthatutilizegraphneural
+networktolearningconfusinglawarticles.
+3. NeurJudge[28]: anLJPmodelthatemployslawarticlecontentsandusethemtoextract
+keycircumstancesincasefactsduringprediction. NeurJudgerepresentsthefamilyofLJP
+modelsthatintegratelawcontenttoguidefactunderstandingandlegalreasoning.
+4. Lawformer[30]: aPLMpretrainedonlegaldomaintextsthatcanhandlelonglegalcases.
+When adapted for LJP, the model was exposed with law article contents. Lawformer
+representsadaptedPLM-basedsolutions.
+25
+5. Qwen2.5-7B [45]: a general domain LLM which we obtain the LJP results by directly
+prompting. Lawarticlecontentsareprovidedduringinference. QwenrepresentsLLMsin
+ourexperiments.
+6. Llama3-Chinese-8B-Instruct: aninstruction-tunedgeneral-purposeLLMcapableofmul-
+tilingual reasoning, used zero-shot on LJP tasks. This model represents the family of
+open-sourceinstruction-tunedbackboneswithoutadditionallegaladaptation.
+7. ChatGLM3-6B:abilingual(Chinese–English)conversationalLLMoptimizedforreasoning
+andfactualquestionanswering. Inourexperiments,itservesasastronggeneralistbaseline
+fordirectcase-lawpromptingwithoutdomainfine-tuning.
+8. Llama3-8B-Chinese-LoRA-Law:adomain-adaptedversionofLlama3-8Bfurtherfine-tuned
+viaLoRAonChineselegalcorpora. Thismodelreflectsparameter-efficientadaptationof
+generalLLMstothelegaldomain.
+9. Law-model-7B:aChineselegal-specializedLLMpretrainedonlarge-scalejudicialdocu-
+mentsandstatutorytexts. Itrepresentstheclassoffoundationmodelsexplicitlyaligned
+withlegalterminologyandreasoningpatterns.
+Theninebaselinesweselectedrepresentstate-of-the-artandwidelyrecognizedapproachesinlegal
+judgmentprediction(LJP),spanningtraditionalneuralmodels,pre-trainedlegal-specificmodels,and
+LLM-basedmethods,threekeyparadigmsinLJP.Notably,threeofthese(D-LADAN,NeurJudge,
+Qwen2.5,ChatGLM3,Llama3/Llama3Law)arerecentmodels(2024–2025),ensuringourevaluation
+reflectsbothfoundationalandcutting-edgework.TheLLM-basedapproachesselectionwasaccording
+to the performance report on legal benchmarks such as LawBench. This inclusion ensures our
+evaluation captures not only traditional and PLM-based methods but also the latest advances in
+LLM-basedlegalreasoning.
+Weconducttwoevaluations(beforeandafterrevision)perrevisiontypeonLawShift: (1)assessing
+modelperformanceonoriginaljudgmentsusingoriginalfacts,and(2)assessingperformanceon
+expectedoutcomesusingtheeditedfacts.
+Foreachtypeofrevisiontested,werecordthePassRateforthecorrespondingtestset. Acaseis
+deemedapassifthemodelproducestheexpectedresultgiventheeditedfact. Theexpectedoutcomes
+for each type are detailed in Table 13. All experiments are run on 4×NVIDIA RTX 3090 GPUs
+(24GBeach). Thehyper-parametersandtrainingsettingfolloweachmodel’soriginalpaper.
+ForeachLJPmodel,weconductedthreeindependentrunsandreportedtheaverageresultstoensure
+thestatisticalsignificanceoftheexperiments.
+E DetailedResults
+TheoveralltestresultsofallrevisiontypesacrossallmodelsarelistedinTable11. Rowsdenoted
+withOrirepresenttheresultsonunaltered(original)cases. ThesubsequentrowsstartingwithT(e.g.,
+T4.1,T4.2,...) correspondtodifferentmetamorphicvariantsderivedfromthesamesetoforiginal
+cases(untilthenextOrirow). Therefore,theirresultsaredirectlycomparabletotheprecedingOri
+row.
+F DetailedAnalysesforPerformanceonActionComponents
+Actions are typically expressed through complex event descriptions, often involving multi-step
+process, causative verbs, and temporal or conditional modifiers. Such event-centered constructs
+requireunderstanding causality, temporalsequence, identifying cross-sentencecomposition, and
+implicitconditions,whichismoredemandingthanrecognizingtherelativelystaticandwell-defined
+nominalstructuresofsubjectsorobjects. Fromalinguisticsperspective,priorstudies[46,47]have
+shownthatverbsandeventstructuresaresemanticallyricherandsyntacticallymorevariablethan
+nouns,oftenrequiringcompositionalinterpretationacrossclauses. Vendler[46]arguesverbsencode
+temporalboundariesandeventdynamics,whichinherentlyincreasestheirinterpretivecomplexity.
+Pustejovsky[47]furtherarguesthatverbsrequireamulti-layeredsemanticrepresentation(e.g.,event
+structure,argumentstructure,etc.),makingtheunderstandingofactionsdependentonbothcontext
+andsub-eventreasoningratherthanonisolatedlexicalcues. (i.e.,whatwemeanbyrequiringdeeper
+26
+Table 11: Pass rates of all models on all revision types. The results labeled as Ori represent the
+originaloutcomesundertheunrevisedlawsforthecorrespondingrevisiontype.
+TYPE TOP D-LADAN NEUR LAW QWEN LLAMA GLM LLMLW LAWM
+Ori.1 90.80 91.57 91.95 92.34 59.00 65.90 47.13 74.71 19.92
+T1.1 79.69 93.87 88.51 89.27 78.54 72.41 32.95 84.29 20.69
+T1.2 74.71 93.87 86.21 88.51 74.71 72.03 32.95 84.29 19.92
+T1.3 87.36 92.34 87.74 89.66 56.70 74.71 32.57 82.38 21.07
+T1.4 13.03 13.41 12.64 12.64 29.12 31.03 64.37 19.54 78.16
+T1.5 13.03 14.18 12.64 12.26 41.38 25.67 68.20 16.86 80.08
+T1.6 9.20 11.11 8.05 7.66 27.97 21.46 67.82 14.18 78.93
+Ori.2 100.0 100.0 100.0 100.0 97.06 80.39 31.37 91.18 75.49
+T2.1 100.0 93.14 99.02 99.02 100.0 33.33 45.10 77.45 57.84
+T2.2 63.73 53.92 69.61 0.00 93.14 30.39 20.59 67.65 49.02
+T2.3 77.45 76.47 78.43 7.84 81.37 30.39 36.28 72.55 62.75
+T2.4 18.63 56.86 18.63 97.06 8.82 43.14 81.37 5.88 41.18
+T2.5 4.90 14.71 16.67 6.86 0.00 24.51 74.51 5.88 53.92
+T2.6 2.94 1.96 9.80 4.90 0.00 4.90 82.35 1.96 43.14
+Ori.3 98.47 97.82 96.51 98.69 10.24 37.69 14.81 88.02 59.26
+T3.1 98.26 96.73 96.30 97.60 11.11 33.55 11.33 91.94 53.59
+T3.2 91.72 94.34 85.84 94.77 11.76 32.68 8.28 90.41 52.51
+T3.3 91.72 94.34 87.36 94.77 11.11 32.90 11.33 90.41 52.51
+T3.4 1.74 14.81 13.72 9.37 88.89 63.18 88.02 8.06 47.06
+T3.5 1.74 14.16 13.29 10.02 88.45 68.19 89.32 6.97 47.06
+T3.6 1.53 13.07 9.80 9.37 88.89 62.09 88.02 8.93 41.18
+Ori.4 94.67 94.67 98.00 92.67 23.33 40.67 24.00 40.00 50.67
+T4.1 5.33 3.33 3.33 4.67 76.67 58.00 78.00 42.67 49.33
+T4.2 4.67 2.67 2.00 4.67 76.00 58.00 78.00 43.33 48.67
+T4.3 4.67 4.00 2.00 4.67 76.67 56.67 80.00 42.00 46.67
+T4.4 93.33 95.33 98.00 93.33 21.33 46.67 18.00 58.67 53.33
+T4.5 93.33 96.00 98.67 92.67 22.67 46.00 18.67 57.33 51.33
+Ori.4.6 97.80 98.04 96.09 97.07 1.96 87.04 18.58 79.22 24.35
+T4.6 2.69 2.69 6.11 3.18 97.78 12.47 81.91 17.36 25.22
+Ori.4.7 95.63 94.63 97.99 92.62 23.49 40.94 24.16 40.27 75.79
+T4.7 89.93 94.63 97.99 91.95 24.16 44.97 16.78 53.69 26.16
+Ori.5.1 81.28 88.30 88.72 85.74 15.32 36.81 17.45 36.38 37.02
+T5.1 16.38 14.89 12.34 13.19 82.55 65.11 88.09 57.45 64.04
+Ori.5.2 86.96 93.91 81.74 81.74 0.00 55.65 4.35 9.57 24.35
+T5.2 88.70 93.91 80.00 81.74 0.00 53.91 5.22 26.96 25.21
+Ori.6 12.09 37.67 24.65 39.53 29.30 0.93 7.91 20.47 3.72
+T6.1 0.00 9.30 0.00 9.77 13.02 0.00 3.26 1.40 3.72
+T6.2 49.30 35.35 69.77 42.79 53.95 100.0 93.49 97.67 94.88
+T6.3 6.05 17.67 4.65 7.91 13.02 0.00 2.33 0.00 0.47
+Ori.6.4 77.78 92.93 90.91 91.92 53.54 0.00 10.10 1.01 2.02
+T6.4 0.00 2.02 0.00 7.07 47.47 100.0 96.97 98.99 97.98
+27
+contextualunderstanding). Inourexperiments,modelsbasedonword2vec+deeplearningbaselines
+failbecausetheirembeddingrepresentationslackthecapacitytoencodecomplexeventsemantics
+andprimarilyrelyonco-occurrencepatterns. ThepretrainedLawformermodel,whileleveraging
+transformer-basedcontextualembeddings,isstilllimitedbytoken-levelattentionwithoutexplicit
+eventdecomposition,bringingchallengeswhentheactionsemanticsareparaphrasedorrestructured.
+G DetailsforBroaderModelEvaluation
+G.1 KnowledgeTracing
+Weperformedbasicknowledgetracing[41,42]experimentsonLawformer(Transformer-based)and
+NeurJudge(neural-based)andevaluatedthemwiththeactioncomponent’srevisiontypes. Ourgoal
+istoanalyzehowtheinternalrepresentationsofLJPmodelsevolvewhenencounteringstatutory
+revisions, andtoidentifywhichlayersormodulesaremostresponsibleforfailures. Weconduct
+layer-wiseandmodule-leveltracingonLawformerandNeurJudge.ForLawformer,weextracthidden
+statesfromalltransformerlayers(L1-L12)forbothoriginalandrevisedclauses. ForNeurJudge,
+asitdoesn’thavetransformerblocks,wetraceandrecordthreevectors: (1)thefinalhiddenstate
+of the fact encoder, (2) the final hidden state of the law encoder, and (3) the pre-softmax output
+oftheMatchNet. EverylayerofLawformeroreverymajorsub-moduleofNeurJudgeencodesa
+compressedsummaryofthestatuteithasread. Byextractingthesevectorsbeforeandafterweswap
+intheamendedclause,weobtaintwosnapshotsofthemodels’internalpictureofthelaw. Thenwe
+runthemodeltwice. Oncewiththeoriginalclauses,oncewiththerevisedclause. Forthetworunsof
+experiments,wetraceandcompute∆k =||vk −vk || wherekindexeslayersforLawformerand
+orig rev 2
+thethreevectorsforNeurJudge. Largegapmeansthesemanticsstoredinlayerkchangesalotwhen
+theclausechanges. Thatlayeristhereforesensitivetotheamendment. Asmallgapshowsthatthe
+layerislargelyoblivioustoclausechanges. Byscanningthroughallk,welearnwhereinthenetwork
+thenewlegalknowledgeis(orisnot)understood. TheresultsareshowninFigure6(top).
+ForLawformer,thestrongestperturbationoccursinencoderblock12. Inthevariance-normalized
+comparison of average hidden-state distances across all transformer blocks, block 12 shows the
+largestmeanchange,indicatingthatthisblockisthepointmostsensitivetoaction-clauserevisions.
+ForNeurJudge,thelargestshiftappearsinthelawencoderfinalstate,thustheGRUlawembeddings
+isthebottleneckthroughwhichactionrevisionsmustbeabsorbed. Thesetracingresultsprovide
+a concrete roadmap for our future work on how to adapting to revisions. For Lawformer, the
+pronouncedsensitivityofencoderblock12suggeststhatsubsequentresearchshouldtargetthisblock
+withinterventionsthatspecialiseitsfeed-forwardspaceforrevisedactionclauses. ForNeurJudge,the
+saliencypeakinthelaw-encoderstateindicatesthatupcomingeffortsshouldexplorerepresentation-
+levelpatchesorlightweightgatingmechanismsthatoperatedirectlyonthatvector. Byfocusingon
+theseempiricallylocatedmemoryslots,futureediting/updatingstrategiescanaddressstatutoryaction
+revisionswithmaximalimpactandminimalcollateraldrift.
+G.2 ModelEditing
+BuildingontheknowledgetracingresultsinSectionG.1,wedesignatargetedupdatemechanismto
+injectstatutorychangesintotrainedmodelswithoutre-trainingfromscratch. Specifically,weapply
+localizedparameterupdatestothemostclause-sensitivecomponents:encoderblock12inLawformer,
+and the law encoder’s final state projection in NeurJudge. Let ϕ(x) denote the model’s internal
+representationofanamendedclausex, andlety∗ denotethedesiredupdatedrepresentationthat
+alignswiththerevisedlegalsemantics. Ourgoalistoperformaminimalupdatetomodelparameters
+θsuchthatϕ(x;θ+∆θ)≈y∗,whileleavingunrelatedbehaviorsintact.
+Toachievethis,weadoptalightweightlow-rankupdatestrategyinspiredbyROME[33]. Foralinear
+projectionlayerinthetargetmodule(e.g.,thefeed-forwardblockinlayer12ofLawformer),we
+modifyitsweightmatrixW viaarank-oneupdate: W ←W +∆W, ∆W =uv⊤whereuandv
+arelearneddirections. Thesedirectionsareoptimizedtominimizethedeviationbetweentheedited
+model’soutputandtheintendedrevisedrepresentationmin ∥ϕ(x;θ+∆W)−y∗∥2.
+u,v 2
+Practically,wefreezeallmodelparametersexcepttheselectedsubmodule,andsolvefor(u,v)using
+aleast-squaresobjectiveoverasmallsetofclause-revisionpairs. ForLawformer,editingisrestricted
+tothefinalfeed-forwardlayerofencoderblock12. ForNeurJudge,thelawencoder’sfinallinear
+28
+layerprojectingtothematchspaceistheonlyeditablecomponent. Thisensuresthatthestructural
+impact of the update is concentrated at the identified bottlenecks and does not affect unrelated
+knowledge. ThetestresultsusingLawShiftontheupdatedmodelisshowninFigure6(bottom).
+Despiteimprovements,LawShiftremainschallenging.Revisionsrelyingonimplicitrephrasing(T1.6,
+T2.6,T3.6)remainaroundorbelow20%. Complexmulti-stepeventreallocationsarechallenging
+forNeurJudge,andsentencingchangesinvolvingscaleinversionorextremepenaltiesstillhavelow
+successrates. Thesepersistenterrorshighlighttwokeyobstacles: manyamendmentsshiftsemantics
+(reasoning)withoutexplicitlexicalcues,limitingtoken-leveledits;andseveralrevisiontypesrequire
+richer event-centric abstraction, aligning dispersed factual mentions with revised statutes. Thus,
+LawShiftexposessubtlesemanticshiftsdemandingdeepstructurallegalunderstanding,andwhile
+lightweighteditshelp,theyonlypartiallyaddressthiscomplexity.
+H DetailsoftheRevisionTypes
+H.1 MetamorphicTesting
+MetamorphicTesting[24]isatestingmethodthatenablessystematicassessmentbyestablishing
+metamorphicrelations,whichdefinehowtheoutputshouldchangeinresponsetospecificchangesof
+theinput. Table4illustratesMTwithexamplesfromT1.1andT6.1.
+H.2 FactGenerationthroughLLMs
+Fortheconstructionofrevisiondatasetscorrespondingtotheactioncomponent,weuseone-shot
+promptingofGPT-4otogeneratecasefactsarecontextuallyaccurate,legallyconsistent,andaligned
+withthestylisticstandardsofjudicialfactdescriptions. Table12isanexampleofpromptingGPT-4o
+toobtaincasefactforT2.1.
+H.3 RevisionDatasetInformation
+Thedetailedinformationofeachrevisiontype’sdatasetarepresentedinTable13,includingtheex-
+amplerelevantlawarticlesbeforeandafterrevision,examplecasefactsbeforeandafterperturbation,
+aswellasthecriteriaforwhatconstitutesapass.
+29
+Table12: AnexampleofpromptingGPT-4otoobtaincasefactforT2.1
+INSTRUCTION
+Background: Youarenowrequiredtomodifyasuspect’scasenarrativetoreflectanincidentof
+“harboringotherstotradedrugs.”
+Requirements: Youmustgenerateamodifiedversionofthe<input>basedonthetransformation
+styleshowninthe<reference_example>,andencloseitusingthe<output>tag. Donotinclude
+anyproceduralorcaseprogresslanguage,suchas“underfurtherinvestigation”or“subjecttolegal
+sanctions.”Focusstrictlyondescribingthecriminalactivity. Avoidanyjudgmentalorconclusion-
+oriented legal language such as: “The above facts are clear and the evidence is sufficient” or
+“AccordingtoArticle354oftheCriminalLawofthePeople’sRepublicofChina,thedefendant
+should be held criminally responsible”. Do not invent additional characters. The individuals
+involved in the narrative must only engage in the specified criminal activity. The tone of the
+generatednarrativeshouldmatchthestyleandtoneoftheexampleinthe<reference_example>.
+<reference_example>
+<before_modification>... ontheafternoonofOctober31,2020,thedefendantTonginstructed
+Zhutopurchasemethamphetamine. Around2p.m. thatsameday... heharboredZhuforone
+instance of drug use. After Zhu left, Tong harbored Jin at his home for another instance of
+druguse. Around7p.m. thatevening,ZhureturnedtoTong’shome,whereZhuandJinused
+methamphetaminetogether. Aftertheincident,thedefendantwasarrestedandassistedthepolice
+incapturingdrugdealerXu...
+</before_modification>
+<after_modification>
+... on the afternoon of October 31, 2020, the defendant Tong instructed Zhu to engage in a
+methamphetaminetransaction. Around2p.m. thatsameday... heharboredZhuforoneinstance
+ofdrugtrading. AfterZhuleft,TongharboredJinathishomeforanotherinstanceofdrugtrading.
+Aftertheincident,thedefendantwasarrestedandassistedthepoliceincapturingdrugdealerXu
+...
+</after_modification>
+</reference_example>
+<input>
+Thedefendant,Huang,onthreeseparateoccasions—ontheeveningofSeptember12,2019,at
+noononSeptember21,2019,andintheafternoonofSeptember24,2019—harboreddrugusers
+WuandTanatthesecondfloorofhisresidence, wheretheyusedthedrugmethamphetamine.
+OnthemorningofSeptember25,2019,policeofficersarrestedHuang,Wu,andTanatHuang’s
+residenceandseizedahomemadedrug-usingdevicemadefromaplasticwaterbottle,astraw,
+tin foil, and other items. Urine tests conducted on all three individuals by the public security
+authoritiesreturnedpositiveresultsformethamphetamine. Forensictestingofthehomemade
+devicerevealedresiduecontainingmethamphetamine.
+</input>
+GPT-4O
+<output>
+OntheeveningofSeptember12,2019,atnoononSeptember21,2019,andintheafternoonof
+September24,2019,thedefendantHuang,onthreeseparateoccasions,harboredWuandTan
+onthesecondfloorofhisresidencetoconductdrugtransactions. OnthemorningofSeptember
+25, 2019, police officers arrested Huang, Wu, and Tan at Huang’s residence and seized tools
+related to drug transactions, including a plastic water bottle, a straw, tin foil, and other items.
+Investigationconfirmedthatthetoolshadbeenusedindrugtransactions,andforensicanalysis
+detectedmethamphetamineresidueonthem.
+</output>
+30
+TYPE ORGNL. LAW EXAM- RVSD.LAWEXAMPLE ORGNL. FACTEXAM- RVSD.FACTEXAMPLE DESCRIPTION
+PLE PLE
+T1.1 Article271,Paragraph2: Personnelofprivateenter- ... thedefendant,Chen, ... thedefendant,Chen, Themodelpassesifitpre-
+Personnelofstate-owned prises,state-ownedcom- while serving as person whileservingasapublic dicts Article 271, Para-
+companies,enterprises,or panies, enterprises, or inchargeofcompanyA, dutypersonnelinapri- graph2astherelevantar-
+otherstate-ownedentities otherstate-ownedentities which is a state-owned vateenterpriseB,tookad- ticleundertherevisedlaw.
+engagedinpublicduties, engagedinpublicduties, company,tookadvantage vantageofhispositionto
+who commit acts speci- who commit acts speci- of his position to ille- illegallyappropriateclient
+fiedintheprecedingpara- fiedintheprecedingpara- gally appropriate client payments of a total of
+graph,shallbesentenced graph,shallbesentenced payments of a total of RMB1.3million...
+... ... RMB1.3million...
+T1.2 Article271,Paragraph2 Personnel of any enter- ... thedefendantLiwas ... thedefendantLiwas Themodelpassesifitpre-
+prise engaged in public employed by the state- employedbyaprivateex- dicts Article 271, Para-
+duties, whocommitthe ownedcompanyA,asa terpriseB,asaproperty graph2astherelevantar-
+actsspecifiedinthepre- propertyassistant... Li assistant... Liexploited ticleundertherevisedlaw.
+cedingparagraph,shallbe exploitedherpositionand herpositionandillegally
+sentenced... illegally embezzle park- embezzleparkingfeesto-
+ing fees totaling RMB talingRMB114,016...
+114,016...
+T1.3 Article271,Paragraph2 Personnel in charge of ... thedefendantWang ... thedefendantWang Themodelpassesifitpre-
+any company or enter- tookadvantageofhispo- tookadvantageofhispo- dicts Article 271, Para-
+prise engaged in public sitionasasalesrepresen- sitionassalesmanager graph2astherelevantar-
+duties, whocommitthe tativeatstate-ownedcom- atprivateenterpriseBto ticleundertherevisedlaw.
+actsspecifiedinthepre- panyAtoillegallyapply illegallyapplyforvouch-
+cedingparagraph,shallbe forvouchersthroughthe ersthroughthecompany’s
+sentenced... company’ssystemandpri- systemandprivatelysell
+vatelysellthem... them...
+T1.4 Article271,Paragraph2 Personnel in charge of ... thedefendantWang ... thedefendantWang The model passes if it
+any company or enter- tookadvantageofhispo- tookadvantageofhispo- doesnotpredictArticle
+prise engaged in public sitionaspropertyrights sitionaspropertyrights 271,Paragraph2asthe
+duties, whocommitthe processingclerkatstate- processing clerk at pri- relevantarticleunderthe
+actsspecifiedinthepre- ownedcompanyAtore- vate enterprise B to re- revisedlaw.
+cedingparagraph,shallbe peatedly misappropriate peatedly misappropriate
+sentenced... fundsfromclients,total- fundsfromclients,total-
+ingRMB646,990. ingRMB646,990.
+T1.5 Article271,Paragraph2 Personnelofstate-owned ...thedefendantBaitook ...thedefendantBaitook The model passes if it
+companies engaged in advantageofhisposition advantageofhisposition doesnotpredictArticle
+publicduties,whocommit asheadofsupplystation asheadofsupplystation 271,Paragraph2asthe
+theactsspecifiedinthe at state-owned company atstate-ownedenterprise relevantarticleunderthe
+precedingparagraph,shall AtomisappropriateRMB BtomisappropriateRMB revisedlaw.
+besentenced... 908,869... 908,869...
+T1.6 Article271,Paragraph2 Personnel in charge of ... thedefendantZhang, ... thedefendantZhang, The model passes if it
+state-owned companies whileservingasasalesad- whileservingasabook doesnotpredictArticle
+engagedinpublicduties, ministratoratstate-owned salesclerkatstate-owned 271,Paragraph2asthe
+who commit the acts company A took advan- companytookadvantage relevantarticleunderthe
+specifiedinthepreceding tage of his position to of his position to mis- revisedlaw.
+paragraph, shall be sen- misappropriateoverRMB appropriate over RMB
+tenced... 200,000... 200,000...
+T2.1 Article354,Paragraph1: Thosewhoharborsothers ... the defendant Yu ... ... the defendant Yu Themodelpassesifitpre-
+Thosewhoharborsothers toinhale,injectortrade togetherwithZhangand ... drove Zhang and dicts Article 354, Para-
+toinhaleorinjectdrugs drugsshallbesentenced Chendrovebacktothe ChenbacktotheLinLi graph1astherelevantar-
+shallbesentenced... ... LinLibarownedbyYu bar,whichisYu’sprop- ticleundertherevisedlaw.
+and consumed metham- erty,andtradedmetham-
+phetaminetogether... phetaminetogether...
+T2.2 Article354,Paragraph1 Thosewhoharborsothers ...thedefendantAntonio ...thedefendantAntonio Themodelpassesifitpre-
+to commit drug related providedavenueforthe providedavenueforthe dicts Article 354, Para-
+crimesshallbesentenced jointconsumptionofco- transactions of cocaine graph1astherelevantar-
+... caineonfouroccasions onfouroccasionsathis ticleundertherevisedlaw.
+athisresidencetoAbhi- residencetoAbhimanyu
+manyu... ...
+T2.3 Article354,Paragraph1 Thosewhoharborsoth- ... thedefendantHuang ... thedefendantHuang Themodelpassesifitpre-
+erstocommitdrugcrimes harbored Wu and Tan harbored Wu and Tan dicts Article 354, Para-
+otherthaninjectingshall onthreeoccasionsathis onthreeoccasionsathis graph1astherelevantar-
+besentenced... residence, providing a residence, providing a ticleundertherevisedlaw.
+venueforthemtoconsume venue for them to pro-
+methamphetamine... duce methamphetamine
+...
+T2.4 Article354,Paragraph1 Thosewhoharborsoth- ...thedefendantXiaore- ...thedefendantXiaore- The model passes if it
+erstocommitdrugcrimes peatedlyharboredhisrela- peatedlyharboredhisrela- doesnotpredictArticle
+otherthaninjectingshall tivesWang,LinandWang tivesWang,LinandWang 354,Paragraph1asthe
+besentenced... athisresidence,facilitat- athisresidence,facilitat- relevantarticleunderthe
+ingtheirdrugtrafficking ingtheirconsumptionof revisedlaw.
+activities... herointhroughinjection
+...
+T2.5 Article354,Paragraph1 Thosewhoharborsothers ... thedefendantWu... ... the defendant Wu The model passes if it
+toinhaledrugsshallbe providedavenueforhis ... providedavenuefor doesnotpredictArticle
+sentenced... coworkersTianandYang his coworkers Tian and 354,Paragraph1asthe
+wheretheysmokedmar- Yangwheretheyinjected relevantarticleunderthe
+ijuanaonmultipleocca- heroinonmultipleocca- revisedlaw.
+sions... sions...
+Continuetothenextpage
+31
+TYPE ORGNL. LAW EXAM- RVSD.LAWEXAMPLE ORGNL. FACTEXAM- RVSD.FACTEXAMPLE DESCRIPTION
+PLE PLE
+T2.6 Article354,Paragraph1 Thosewhodetainsothers ... thedefendantWang ... thedefendantWang The model passes if it
+toinhaleandinjectdrugs consumed metham- voluntarily provided a doesnotpredictArticle
+shallbesentenced... phetaminetogetherwith venue for Wang, with 354,Paragraph1asthe
+LiatWang’sapartment... whom they consumed relevantarticleunderthe
+methamphetamine in revisedlaw.
+Wang’sapartment...
+T3.1 Article 348, Paragraph Thosewhoillegallypos- ...thedefendantRenwas ...thedefendantRenwas Themodelpassesifitpre-
+1: Those who illegally sessmorethanonekiloof foundinpossessionofa foundinpossessionofa dicts Article 348, Para-
+possess more than one opiumorlaundrypowder, largequantityofdrugs... largequantityoflaundry graph1astherelevantar-
+kiloofopium,morethan morethan50gofheroin duringthearrest, abag powder... duringthear- ticleundertherevisedlaw.
+50gofheroinormetham- ormethamphetamine,or of heroin was found ... rest,abagoflaundrypow-
+phetamine, or a large alargequantityofother andwasdeterminedtobe derwasfound...andwas
+quantity of other drugs drugsshallbesentenced 145.3g... determinedtobe2kilos...
+shallbesentenced... ...
+T3.2 Article348,Paragraph1 Thosewhoillegallypos- ... thedefendantHuwas ... thedefendantHuwas Themodelpassesifitpre-
+sessalargeamountofad- foundinpossessionof2.3 foundinpossessionof2.3 dicts Article 348, Para-
+dictivesubstancesshallbe kilosofopiumathishouse kilos of alcohol at his graph1astherelevantar-
+sentenced... arrest... housearrest... ticleundertherevisedlaw.
+T3.3 Article348,Paragraph1 Thosewhoillegallypos- ... thedefendantWei... ... thedefendantWei... Themodelpassesifitpre-
+sess a large amount of wasarrested... uponar- wasarrested... uponar- dicts Article 348, Para-
+poppy-basedproductsor rest, hewasfoundwith rest, hewasfoundwith graph1astherelevantar-
+injectabledrugsshallbe possessionof2kilosof possessionof2kilosof ticleundertherevisedlaw.
+sentenced... opium... poppyseedoil...
+T3.4 Article348,Paragraph1 Thosewhoillegallypos- ...thedefendantLiuwas ...thedefendantLiuwas The model passes if it
+sess a large amount of foundwithatotalof1.7 foundwithatotalof1.7 doesnotpredictArticle
+poppy-basedproductsor kilosofopium... kilosofmarijuana... 348,Paragraph1asthe
+injectabledrugsshallbe relevantarticleunderthe
+sentenced... revisedlaw.
+T3.5 Article348,Paragraph1 Thosewhoillegallypos- ...thedefendantChenwas ...thedefendantChenwas The model passes if it
+sess more than 50g of foundinpossessionof60g foundinpossessionof60g doesnotpredictArticle
+methamphetamine shall methamphetamineathis heroinathishousearrest 348,Paragraph1asthe
+besentenced... housearrest... ... relevantarticleunderthe
+revisedlaw.
+T3.6 Article348,Paragraph1 Thosewhoillegallypos- ... thedefendantLiang ... thedefendantLiang The model passes if it
+sessmorethanonekilo was driving with 255 wasdrivingwith2kilosof doesnotpredictArticle
+ofopium,morethan50g methamphetaminetablets marijuanawhenhewas 348,Paragraph1asthe
+of heroin or metham- whenhewasintercepted intercepted by police at relevantarticleunderthe
+phetamine, or a large bypoliceatthecheckpoint thecheckpoint... revisedlaw.
+quantityofothersynthetic ...
+drugsshallbesentenced
+...
+T4.1 Article213,Paragraph1: Those who use a trade- ... thedefendantWang, ... thedefendantWang, The model passes if it
+Those who use a trade- mark identical to a reg- incollaborationwithChen incollaborationwithChen doesnotpredictArticle
+mark identical to a reg- isteredtrademarkonthe rentedafactorytoproduce rentedafactorytoproduce 213,Paragraph1asthe
+isteredtrademarkonthe same goods or services bulklaundrydetergentun- bulklaundrydetergentun- relevantarticleunderthe
+same goods or services without the permission der the registered trade- der the registered trade- revisedlaw.
+withoutthepermissionof ofthetrademarkowner marksAandBwithoutthe marksAandBwiththe
+the trademark owner ... ortheowner’sparents... owner’spermission... owner’smother’spermis-
+shallbesentenced... shallbesentenced... sion...
+T4.2 Article213,Paragraph1 Those who use a trade- ... thedefendantWang, ... thedefendantWang, The model passes if it
+mark identical to a reg- incollaborationwithChen incollaborationwithChen doesnotpredictArticle
+isteredtrademarkonthe rentedafactorytoproduce rentedafactorytoproduce 213,Paragraph1asthe
+same goods or services bulklaundrydetergentun- bulklaundrydetergentun- relevantarticleunderthe
+without the permission der the registered trade- der the registered trade- revisedlaw.
+ofmembersofthetrade- marksAandBwithoutthe marksAandBwiththe
+markowner’sfamilyof owner’spermission... owner’smother’spermis-
+origin ... shall be sen- sion...
+tenced...
+T4.3 Article213,Paragraph1 Those who use a trade- ... thedefendantWang, ... thedefendantWang, The model passes if it
+mark identical to a reg- incollaborationwithChen incollaborationwithChen doesnotpredictArticle
+isteredtrademarkonthe rentedafactorytoproduce rented a factory to pro- 213,Paragraph1asthe
+same goods or services bulklaundrydetergentun- ducebulklaundrydeter- relevantarticleunderthe
+withoutthepermissionof der the registered trade- gentundertheregistered revisedlaw.
+theregisteredtrademark marksAandBwithoutthe trademarksAandBwith
+owner’s direct relatives owner’spermission... theowner’saunt’spermis-
+withinthreegenerations sion...
+...shallbesentenced...
+T4.4 Article213,Paragraph1 Those who use a trade- ... thedefendantWang, ... thedefendantWang, Themodelpassesifitpre-
+mark identical to a reg- incollaborationwithChen incollaborationwithChen dicts Article 213, Para-
+isteredtrademarkonthe rentedafactorytoproduce rentedafactorytoproduce graph1astherelevantar-
+same goods or services bulklaundrydetergentun- bulklaundrydetergentun- ticleundertherevisedlaw.
+withoutthepermissionof der the registered trade- der the registered trade-
+theregisteredtrademark marksAandBwithoutthe marksAandBwiththe
+owner’s direct relatives owner’spermission... owner’spermission...
+withinthreegenerations
+...shallbesentenced...
+Continuetothenextpage
+32
+TYPE ORGNL. LAW EXAM- RVSD.LAWEXAMPLE ORGNL. FACTEXAM- RVSD.FACTEXAMPLE DESCRIPTION
+PLE PLE
+T4.5 Article213,Paragraph1 Those who use a trade- ... thedefendantWang, ... thedefendantWang, Themodelpassesifitpre-
+mark identical to a reg- incollaborationwithChen incollaborationwithChen dicts Article 213, Para-
+isteredtrademarkonthe rentedafactorytoproduce rentedafactorytoproduce graph1astherelevantar-
+same goods or services bulklaundrydetergentun- bulklaundrydetergentun- ticleundertherevisedlaw.
+withoutthewrittenper- der the registered trade- der the registered trade-
+missionoftheregistered marksAandBwithoutthe marksAandBwiththe
+trademarkowner...shall owner’spermission... owner’soralpermission
+besentenced... ...
+T4.6 Article303,Paragraph2: Thosewhoopensacasino ... thedefendantopensa ... thedefendantopensa The model passes if it
+Thosewhoopensacasino without the approval casino... casinowiththeapproval doesnotpredictArticle
+shallbesentenced... from People’s Bank of from People’s bank of 213,Paragraph1asthe
+Chinashallbesentenced China... relevantarticleunderthe
+... revisedlaw.
+T4.7 Article213,Paragraph1 Those who use a trade- ... thedefendantWang, ... thedefendantWang, Themodelpassesifitpre-
+mark identical to a reg- incollaborationwithChen incollaborationwithChen dicts Article 213, Para-
+isteredtrademarkonthe rentedafactorytoproduce rentedafactorytoproduce graph1astherelevantar-
+samegoodsorservices... bulklaundrydetergentun- bulklaundrydetergentun- ticleundertherevisedlaw.
+shallbesentenced... der the registered trade- der the registered trade-
+marksAandBwithoutthe marksAandBwiththe
+owner’spermission... owner’spermission...
+T5.1 Article274,Paragraph1: Thosewhoextortpublic ... the victim Li built ... thevictimLibuilta The model passes if it
+Thosewhoextortpublicor or private property for a house, contracted to house,contractedtoXia, doesnotpredictArticle
+privateproperty... shall thepurposeofrevenge... Xia, and was forced to and was forced to pay 274,Paragraph1asthe
+besentenced... shallbesentenced.... paythedefendnatZhang Zhang 9,000 yuan after relevantarticleunderthe
+9,000yuanafterZhangob- Zhangobstructedthecon- revisedlaw.
+structedtheconstruction structionforthepurpose
+... ofcausingchaos...
+T5.2 Article224,Paragraph1: Whoever, defrauds the ...thedefendantQi,with ... the defendant Qi, Themodelpassesifitpre-
+Whoever,withtheintent other party of property theintentofillegalposses- withtheintentofrevenge, dicts Article 274, Para-
+ofillegalpossession,de- duringthesigningorper- sion,engagedinafraud- engaged in a fraudulent graph1astherelevantar-
+fraudstheotherpartyof formance of a contract ulentscheme... through scheme... throughthis ticleundertherevisedlaw.
+propertyduringthesign- underanyofthefollow- this method, he fraudu- method, he fraudulently
+ingorperformanceofa ing circumstances, shall lentlyobtainedsteelworth obtainedsteelworthRMB
+contractunderanyofthe besentenced... RMB721,375.41... 721,375.41...
+following circumstances,
+shallbesentenced...
+T6.1 Article 232, Paragraph Whoever intentionally - - If,afterthelawrevision,
+1:Whoeverintentionally commits homicide shall themodelpredictsatleast
+commits homicide shall besentencedtodeath,life 10yearsofimprisonment
+besentencedtodeath,life imprisonment,oratleast for cases originally sen-
+imprisonment,oratleast 10 years’ imprisonment. tencedto3–10years,itis
+10 years’ imprisonment. For relatively minor consideredapass.
+Forrelativelyminorcases, cases,thesentenceshall
+thesentenceshallbe3to bemorethan10years’
+10years’imprisonment. imprisonment.
+T6.2 Article232,Paragraph1 Whoever intentionally - - If,afterthelawrevision,
+commits homicide shall the model predicts no
+besentencedtodeath,life morethan3yearsofim-
+imprisonment,oratleast prisonmentforcasesorig-
+10 years’ imprisonment. inallysentencedto3–10
+For relatively minor years,itisconsidereda
+cases,thesentenceshall pass.
+be less than 3 years’
+imprisonment.
+T6.3 Article232,Paragraph1 Whoever intentionally - - If,afterthelawrevision,
+commits homicide shall themodelpredictsdeath
+be sentenced to death, orlifeimprisonmentfor
+lifeimprisonment, orat casesoriginallysentenced
+least 10 years’ impris- to3–10years,itisconsid-
+onment. For relatively eredapass.
+minorcases,thesentence
+shall be death or life
+imprisonment.
+T6.4 Article232,Paragraph1 Whoever intentionally - - If,afterthelawrevision,
+commits homicide shall themodelpredictsmore
+besentencedtoatleast10 than10yearsofimprison-
+years’imprisonment.For mentforcasesoriginally
+relativelyminorcases,the sentencedtodeathorlife
+sentenceshallbe3to10 imprisonment,itisconsid-
+years’imprisonment. eredapass.
+Table13: Detailedexamplesanddescriptionsofeveryrevisiontype.
+33

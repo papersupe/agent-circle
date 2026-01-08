@@ -1,0 +1,1278 @@
+Preprint. Underreview.
+Semantic Probabilistic Control of Language Models
+KareemAhmed*,CatarinaG.Belem*,PadhraicSmyth&SameerSingh
+DepartmentofComputerScience
+UniversityofCalifornia,Irvine
+ahmedky, cbelem, smyth, sameer @uci.edu
+{ }
+Abstract
+SemanticcontrolentailssteeringLMgenerationstowardssatisfyingsubtle
+non-lexicalconstraints—e.g.,toxicity,sentiment,orpoliteness—attributes
+thatcanbecapturedbyasequence-levelverifier. Itcanthusbeviewedas
+samplingfromtheLMdistributionconditionedonthetargetattribute,a
+computationallyintractableproblemduetothenon-decomposablenature
+of the verifier. Existing approaches to LM control either only deal with
+syntacticconstraintswhichcannotcapturetheaforementionedattributes,
+or rely on sampling to explore the conditional LM distribution, an inef-
+fectiveestimatorforlow-probabilityevents. Inthiswork,weleveragea
+verifier’sgradientinformationtoefficientlyreasonoverallgenerationsthat
+satisfythetargetattribute,enablingprecisesteeringofLMgenerationsby
+reweighingthenext-tokendistribution. Startingfromaninitialsample,we
+createalocalLMdistributionfavoringsemanticallysimilarsentences. This
+approximation enables the tractable computation of an expected sentence
+embedding. We use this expected embedding, informed by the verifier’s
+evaluationattheinitialsample,toestimatetheprobabilityofsatisfyingthe
+constraint,whichdirectlyinformstheupdatetothenext-tokendistribution.
+Weevaluatedtheeffectivenessofourapproachincontrollingthetoxicity,
+sentiment,andtopic-adherenceofLMsyieldinggenerationssatisfyingthe
+constraintwithhighprobability(>95%)withoutdegradingtheirquality.
+1 Introduction
+Despitetheunprecedentedcapabilitiesoflanguagemodels(LMs),steeringtheirgenerations
+towards specific syntactic or semantic constraints remains an unsolved challenge (Sun
+etal.,2023;Liuetal.,2024). Syntactic(orlexical)constraintsdefineateachpositioninthe
+sequencethesetofadmissibletokensthat,takentogether,constituteavalidstringunder
+the constraint. A common use case for such constraints is to generate output in some
+formal language, for example, structured data, API calls, or code snippets (Geng et al.,
+2025). Syntacticconstraintsareeasytodealwithinaveryprecisesense: throughknowledge
+compilation(Darwiche&Marquis,2002),wecanefficientlycapturethecomputationgraph
+ofgenerationssatisfyingtheconstraint,whichwecanthenproceedtoprobabilisticallyreason
+about,exactlywhenpossible(Ahmedetal.,2022),andotherwiseapproximately(Willard&
+Louf,2023;Zhangetal.,2024a;Kooetal.,2024;Lundbergetal.,2024;Ahmedetal.,2025).
+Semantic (or non-lexical) constraints, on the other hand, are often defined in terms of
+sequence-level,non-decomposableclassifiers,orverifiers,oftencomplexneuralnetworks,
+thatassignnon-negativescorestosequencesoftokens.Inthatsense,semanticconstraintsare
+doublyhard: wehavetocontendwithnotonlythehardnessofprobabilisticreasoningbut
+alsothelackofatractablerepresentationoftheconstraintoverwhichtoreason. Semantic
+constraintsencompassusecasesinwhichwemightwishtocontrolsequence-levelproperties
+ofgenerationsthatarehardtocaptureinformallanguage,e.g.,controllingtoxicity,sentiment,
+ortopicincreativewriting;targetingoutputsdeemedfavorablebyaverifierinreasoning
+tasks,orgeneratingcorrectcodethatexhibitsstylisticrequirements(Gengetal.,2025).
+*Co-firstauthors.
+1
+5202
+yaM
+4
+]GL.sc[
+1v45910.5052:viXra
+Preprint. Underreview.
+p( [he’s, full])=
+·|
+shit shit
+of of of
+crazy crazy
+on on on
+time time staff time staff
+(a) (b) (c)
+shit
+×
+ϕa(pre
+◦
+shit)
+of of p( pre of)= of
+× A| ◦ ↑↑
+crazy
+on × ϕa(pre ◦ crazy) on × p( A| pre ◦ on)= ↑ on
+time staff time × p( A| pre ◦ time)= ↓↓ time
+×
+ϕa(pre
+◦
+staff)
+(d) (e) (f)
+Figure1: Anillustrationofourproposedapproach. (a)Givenaprefix, theLMdefines
+a distribution over possible next-tokens. (b) For each possible next-token, we efficiently
+simulatefuturegeneration. (c)AnLMsampleinducesanapproximateLMdistribution
+assigninghighprobabilitytosimilarsamplesandlowprobabilitytodissimilarsamples. (d)
+Evaluatingaverifieronasinglesimulatedgeneration,wecanusethefirst-orderinformation
+tolocallyapproximatetheverifieronallpossiblegenerations,factoringintheprobability
+of each generations w.r.t. the LM. (e) This yields a probability of the constraint, , the
+A
+setofallgenerationssatisfyingatargetattributed abeingsatisfied,usedtoreweighthe
+next-token distribution. (f) This results in a new distribution that discounts fluent but
+constraintviolatinggenerationsinfavoroflesslikelybutconstraintsatisfyinggenerations.
+Existing approaches to semantic control of LMs therefore generally fall into one of two
+classes: sample-reweigh and sequential Monte Carlo (SMC) approaches, each of which
+suffersfrommajordrawbacks. Sample-reweigh,prominentlyknownasbest-of-n(Stiennon
+etal.,2020a),generatescompletesequencesthatarereweighedbythepotentialfunction,re-
+turningtheonlyhighestscoringsequence. Sample-reweighdoesnotfactorintheconstraint
+duringgenerationandthereforethenumberofsamplesneededtosatisfytheconstraint
+cangrowexponentially,especiallyforverylowprobabilityconstraints. SMC,ontheother
+hand,maintainsasetofsamplesthatevolvethroughtime,factoringinthelikelihoodof
+thenewsampleunderthemodelaswellasinformationabouttheconstraintateverystep
+ofgeneration,eitherthroughlearningtwistfunctions(Zhaoetal.,2024)orevaluatingthe
+potentialfunctiononpartialsequences(Loulaetal.,2025). SMC,however,isnotwithout
+itsowndrawbacks: itrequiresalargenumberofsamples,whichcangrowexponentially
+withthedimensionalityofthespace;itsuffersfromsampleimpoverishment,whereafter
+afewiterationsonlyafewsamplescarryalmostalltheweight, withresampling, while
+addressingdegeneracy,leadingtoalossofsamplediversity;andcrucially,itrequiresthe
+carefuldesignofaproposaldistribution,whichgreatlyaffectstheperformanceofSMC.
+Inthiswork,inadeparturefromtheaforementionedapproaches,weproposeperforming
+exact inference in an approximate model (Koller & Friedman, 2009). We propose Semantic
+Control Estimator, or SConE, which leverages the gradient information of a verifier to
+tractablyperformexactinferenceoverallgenerationssatisfyingtheconstraint,allowing
+precisesteeringofLMgenerationsbyreweighingeachprobablenexttokenaccordingto
+itsprobabilityofsatisfyingtheconstraint. Moreprecisely,startingfromalookaheadsample,
+we construct a local, contextualized LM distribution that assigns a higher probability to
+semanticallysimilarsentencesandalowerprobabilitytosemanticallydissimilarones. We
+will show that we can tractably and efficiently compute the expected embedding of all
+sentences w.r.t. this approximate LM distribution. Computing the expected embedding
+allowsustoestimatetheexpectedprobabilityoftheconstraintusingasingleLMsampleanda
+2
+Preprint. Underreview.
+singleevaluationoftheverifierbydistributingfirst-orderinformationregardingtheverifier
+overtheexpectedembedding. Thenext-tokendistributionisthenreweighedbyexpected
+probabilityoftheconstraintandrenormalizedtoobtainthe(approximately)correctconstrained
+next-tokendistribution. Computationally, theexpectedembeddingcanbecomputedin
+O(1)vectorizedtime,whereasthelookaheadsamplecanbedrawnefficientlybyutilizing
+anauxiliarymodel1tounmaskfuturetokenspairedwithHogWild! (asynchronous)Gibbs
+sampling (Niu et al., 2011; Smola & Narayanamurthy, 2010), with the synchronization
+frequencytradingoffaccuracyforefficiency. AnoverviewofourapproachisinFigure1.
+Weevaluatedourproposedapproachonthetasksofcontrollingthetoxicityandsentiment
+ofLMgenerations,aswellasoncontrollingthetopicofgenerations. Weobservedthatour
+approachwasfarmorelikelytosatisfytheconstraintcomparedtopreviousapproaches,
+withoutcompromisingthequalityoftheLMgenerations,asmeasuredbyperplexity. Our
+proposedmethodisaninference-timeapproach,requiringnodataandnofine-tuning,and
+canbeeasilyintegratedwithmanypreviousapproachesthatenforcesyntacticconstraints.2
+Contributions Insummary,weintroduceSConE,anapproachthatleveragesexactproba-
+bilisticinferenceinanapproximatemodeltoexertsemanticcontroloverLMgenerations.
+UsingasingleLMsamplecoupledwithasingleverifierevaluation,usedtoobtainfirst-order
+informationabouttheverifier,weareabletocomputeanestimateoftheprobabilityofthe
+constraintw.r.t.allsentencesintheneighborhoodoftheLMsample. SConEcantherefore
+beseenasaseamlessmarriagebetweensamplingandexactinference. Ourexperiments
+showthatSConEgreatlyamplifiesanLM’sabilitytoconformtosemanticconstraintsdefined
+usingpotentialfunctionswhileretainingtheLM’slanguagemodelingcapabilities.
+2 LevelsofControl: FromSyntactictoSemanticConstraints
+We denote an LM generation of arbitrary length T as y := [y y ...y ], where y is the
+1:T 1 2 T i
+instantiationofrandomvariableY andtakesvaluesfromafixedvocabularyV= 1,...,V .
+i
+{ }
+AnLMgenerationcanbesubjecttooneoftwotypesofconstraints: syntacticandsemantic.
+Syntactic (or lexical) constraints comprise sets of rules, typically expressed using logical
+connectivesorinsomeformallanguage,thatrestrictthesetofpermissiblevaluesassumed
+byarandomvariableY
+i
+suchthatthereexistssomecompletiony>i ofthesentencethat
+satisfiesthesyntacticconstraintβ,giventhecurrentprefixy ,ortostateitmoreformally
+1:i
+∃
+y>i β
+| y1:i
+(1)
+An example of such constraint could be a simple logical sentence that disallows an ex-
+pression deemed inappropriate to appear as part of an LM’s generation, e.g., (y =
+i
+¬
+“full” y = “of” y = “sh!t”) (Ahmed et al., 2023). Syntactic constraints offer
+i+1 i+2
+∧ ∧
+anattractiveopportunityforparallelization: weareabletocompilesyntacticconstraintsinto
+computationalgraphsthatreusesolutionstosubproblemstoefficientlycapturethespace
+ofallsatisfyingassignments. Traversingthesecomputationgraphsamountstoefficient
+parallelevaluationacrossanexponentialnumberofpossiblecontinuations(Choietal.,2020;
+Vergarietal.,2021),enablingustotractablycomputethequantityofinterestinEquation(1).
+Semantic(ornon-lexical)constraints,ontheotherhand,presupposethatLMgenerations
+satisfycertainattributes(e.g.,toxicity,politeness,orpositivesentiment). Suchattributesare
+oftenhardtoascertainlexically,orintermsofsurface-levelfeaturesthatcanbecaptured
+usingaformallanguage,e.g.,“he’sgotsomeattitude!” invokesasnarkytonethatishard
+toattributetoanyparticulartokeninthegeneration. Rather,givenatargetattributea,we
+supposeaccesstoasequence-levelverifierfora,whichwedenotebyϕ ,thatgivenasequence
+a
+y assignsabinaryvalue,either0or1,tothesequencey ,i.e.,ϕ (y )) 0,1 . Wecan
+1:T 1:T a 1:T
+∈ { }
+thendefine asthesetofallsequencesy thatsatisfytheattribute a,i.e., := y
+1:T 1:T
+A A { |
+ϕ (y ) = 1 . Unlikesyntacticconstraints, semanticconstraints, oftenimplementedas
+a 1:T
+}
+complexneuralnetworks,arenotamenabletotheformofcompilationthatenablesusto
+efficiently capture the set of all satisfying assignments. In fact, compiling even a single
+1WemadeuseofModernBERT(Warneretal.,2024)inourexperiments
+2OurcodeandscriptstoreproduceallnumbersarepubliclyavailableinourGitHubrepository.
+3
+Preprint. Underreview.
+neuron is known to be NP-hard (Shi et al., 2020). Computing Equation (1) would thus
+requirethatweenumerateeverypossiblecontinuation,scoreitusingtheverifier,discard
+continuationsforwhichtheattributedoesnotholdandrenormalize,whichisintractable.
+Prologue. Inwhatfollowswewillrelaxtheverifierϕ foranattributeatobeprobabilistic.
+a
+Wewillthenframetheproblemofsemanticcontrolasaprobabilisticinferenceproblem
+whereweareinterestedintheposteriorLMdistributionsubjecttoasemanticconstraint.
+Wewillshowthattheproblemcanbereducedtothatofcomputingexpectations,whichwe
+thenshowhowtoestimatebyperformingexactandefficientprobabilisticinferenceinan
+approximateLMinducedbyasingularmodelsampleandasingleevaluationoftheverifier.
+3 GreatExpectations
+WestartbyassumingaccesstotheLMdistribution,denotedby p,asequence-levelverifier
+ϕ forattributea,andaprefixy whereeachtokeny assumesvaluesinvocabularyV.Our
+a 1:i j
+goalisthentosamplefromtheLMdistributionpagenerationy subjecttotheconstraint
+i+1:T
+thattheattributeaholdsontheentiresequencei.e.,ϕ (y y ) 0,1 . Thatentails
+a 1:i i+1:T
+◦ ∈ { }
+samplingagenerationthatfulfillstwodistinctdesiderata: weexpectthegenerationtobe
+linguisticallysound,orfluentasmeasuredbyamodel’sperplexity,andtosatisfyattributea.
+Thatis,weareinterestedinsamplingfromtheLLMdistributionconditionedontheevent
+thatthesamplebelongstothesetofallsequencesy thatsatisfytheattributea,whichwe
+1:T
+denoteby := y ϕ (y ) =1 . Wecanthenwritethetargetsamplingdistributionas
+1:T a 1:T
+A { | }
+p(y ,y ) ( = a) p(y i+1:T , A | y 1:i ) ( = b) p(y i+1:T , | y 1:i ) · ϕ a (y 1:i ◦ y i+1:T ) , (2)
+i+1:T | A 1:i p( y ) ∑ p(y y ) ϕ (y y )
+A | 1:i yi+1:T i+1:T | 1:i · a 1:i ◦ i+1:T
+where equality (a) follows by the definition of conditional probability, and equality (b)
+followsbythedefinitionofmarginalprobability. Intuitively,Equation(2)givesusasimple,
+albeitimpractical,recipeforsamplingfromtheLMdistributionconditionedonattribute
+a: weenumerateallpossiblegenerationsgiventheprefix,zeroingoutallgenerationsthat
+violateaaccordingtoϕ ,followedbyrenormalization. Inpractice,foragiveninputy
+a 1:T
+andattributea,thereissomeuncertaintyassociatedwithϕ (y ). Thatis,wewillassume
+a 1:T
+accesstoamodel’sestimate p(ϕ (y ) = 1) [0,1]ofwhethery satisfiesattribute a.
+a 1:T 1:T
+∈
+Consequently,inaslightabuseofnotation,wewillredefineϕ ( )tobe p(ϕ (y ) = 1),
+a a 1:T
+·
+whichshouldhenceforthbethoughtofasaprobabilisticverifierfortheattributea. Under
+thisnewdefinitionofϕ ( ), Equation(2)canbeseenasreweighingeachcontinuationwith
+a
+·
+theprobabilityofsatisfyingattributea,followedbyrenormalizingthedistribution.
+State-of-the-art LMs, such as Llama 3 (Grattafiori et al., 2024) and GPT-4 (Achiam et al.,
+2024))areautoregressive,soitisusefultorewriteEquation(2)intermsofthenexttokens,
+p(y y ) p( y y )
+p(y ,y ) = i+1 | 1:i · A | 1:i ◦ i+1 (3)
+i+1 | A 1:i p( y )
+1:i
+A |
+p(y y )E [ϕ (y y )]
+= i+1 | 1:i p(. | y1:i+1 ) a 1:i ◦ i+1:T , (4)
+E [ϕ (y y )]
+p(. | y1:i ) a 1:i ◦ i+1:T
+whereEquation(3)followsbythedefinitionofconditionalprobabilityandEquation(4)
+followsbythedefinitionofmarginalprobabilityandexpectations. Itisimportanttonote
+that,since isdefinedasthesetofallsequencesy thatsatisfya,theexpectations,both
+1:T
+A
+inthenumeratorandinthedenominatorrangeoversequencesoflengthT,requiringthat
+wemarginalizeoverallfuturecontinuationsoflengthT iandT (i+1),respectively.
+− −
+Intuitively,ateverygenerationstepweneedto“lookahead”todeterminetheprobability
+thattheconstraintisviolatedgiventhecurrentchoiceofnexttoken. Iftheprobabilityis
+high,wediscountthecurrentchoice,andifitislow,thenwereinforcethecurrentchoice.
+Previous methods have approached this intractable expectation by either learning look-
+aheadfunctionsparameterizedbyneuralnetworks,orbysampling. Next,wewillshow
+howtocomputetheaboveexpectationinclosedformbyrelaxingthetargetdistribution.
+4
+Preprint. Underreview.
+samples:[he’s, full, of, shit] p˜(y I, think)
+∼ |
+he’s: 0.5 full: 0.3 of: 0.8 shit: 0.4
+it’s: 0.25 made: 0.5 on: 0.1 crap: 0.4
+she’s: 0.25 smell: 0.2 from: 0.1 hate: 0.2
+s′eh
+s′ti
+s′ehs
+×
+fo
+no
+morf
+×
+lluf
+ekam
+llems
+×
+tihs
+parc
+etah
+0.5 52.0 52.0 0.3 5.0 2.0 0.8 1.0 1.0 0.4 4.0 2.0
+)1.4,5.0-,1.0(
+)2.1-,6.2-,9.2(
+)7.0,4.3,6.1-( )9.2-,2.0-,8.3(
+)1.3,7.2-,5.1-(
+)6.0-,3.1,6.2( )8.0,5.3-,2.1(
+)7.1,0.4,1.2-(
+)3.2,9.1,5.0( )4.1,9.0,2.4-(
+)3.3-,0.2-,1.1(
+)8.2,6.3,7.0(
+(1.3,-1.4,2.5) (-0.3,-1.9,1.2)
+(0.4,-0.2,
+1.9) (0.9,-1.2,0.6) (0.8,-2.2,1.0) (-1.1,0.3,0.2)
+×
+×
+×
+Ep˜(
+·|
+y1:i) emb(y1:T) =(1.0,-3.3,3.7)/4
+(cid:2) (cid:3)
+0.5 52.0 52.0 0.3 5.0 2.0 0.8 1.0 1.0 0.4 4.0 2.0
+Figure 2: A technical overview of our approach. (top left) We start by sampling an
+approximate generation s using Gibbs sampling p˜ conditioned on the prefix from the
+model’s marginal conditionals, p(y y ) . Conditioned on s, the models marginal
+i i i
+conditionals induce a distribution on | all−ge ∀ nerations, assigning higher probabilities to
+similar sentences and lower probabilities for dissimilar sentences, which we visualize
+forthetop-3tokensforclarityofexposition. (bottomleft)Wecanparameterizeacircuit
+usingtheabovedistribution,yieldingaclosed-form,tractablerepresentationofprobability
+distributiondefinedinEquation(6),wherereadlefttoright,everyleafnodecorresponds
+to a categorical distribution on y (right) Such a representation enables us to compute
+i
+the expected embeddings w.r.t. the distribution in the neighborhood of the sample s by
+substituting token embedding for corresponding embeddings at leaf nodes, computing
+weightedsumsofembeddingsatsumnodes,andtakingsumsatproductnodes.Thisallows
+ustoplugtheexpectedembeddingintoEquation(8)toyieldtheconstraintprobability.
+4 SemanticProbabilisticControl
+The computational hardness of the expectations that we introduced in Equation (4) can
+intuitivelybeattributedtothelackofstructurealongtwodistinctdimensions.
+First, isthelackofstructuretothedistribution. Considercomputingtheprobabilitythata
+sequenceoflength T endsintheword“love”. Computingsuchaprobabilityunderthe
+autoregressivedistributionrequiresthatwemarginalizeoverallpossiblesequencesending
+in“love”,roughlyO( V T).Infact,computingsuchprobabilityisknowntobecomputation-
+| |
+allyintractable(Roth,1993). Contrastthatwithafully-independent3distribution,wherewe
+cansimplyquerythenetworkfortheprobabilityofagiventokeninconstanttime. Clearly
+thereisatensionhere: fully-independentdistributions,whileeasiertoreasonabout,arenot
+expressiveandthereforedonotmakeforgoodLMs,whereasautoregressivedistributions
+arehardertoreasonabout,butalotmoreexpressive,andachieveSoTAlanguagemodeling.
+Theseconddimensionisthelackofstructuretotheconstraint. Recallthatwehaveassumed
+ϕ tobeaneuralnetwork,whichpriorworkhasshowntobecomputationallyintractable
+a
+todecomposeoversequences(Shietal.,2020)4. Thatis,givenϕ (y )foraprefixy ,we
+a 1:i 1:i
+knowofnowayofefficientlyextendingϕ (y )toϕ (y y )byonlyprocessingthe
+a 1:i a 1:i ◦ i+1
+newelementy andreusingtheresultofthepreviousevaluationϕ (y ).
+i+1 a 1:i
+3wherep(y )=∏T p(y),i.e.,theprobabilityofatokenisindependentfromallothertokens.
+1:T i=1 i
+4infact,theproblemremainsintractableevenassumingϕaisasingleneuron(Khosravietal.,2019).
+5
+Preprint. Underreview.
+Algorithm1SConE Algorithm2LinearizeVerifier
+1: Input:Verifierϕa,LMdistribution 1: Input:Verifierϕa,Samples
+p(y i | y 1:i ),prefixy 1:i ,maxlengthT 2: Output:Gradientofϕaw.r.t.sembedding
+2: Output: p(y i+1 | y 1:i ,A) ▷Obtainembeddingsfors
+▷Expandthebatchtoincludetop-ktokens 3: emb layer=ϕa.get input embeddings()
+4: emb=emb layer(s)
+4 3 : : y to 1: p i+ k 1 = = a y rg 1:i m .e a x x p k a p n ( d y (n i , | t y o 1 p :i k ) ) 5 ▷ : C s o c l o le r c e t = gra ϕ d a i ( e e n m t b o ). f s ϕ u a m( w ) .r.t.toemb
+▷GetNsampless˜from p(y i+2:T
+|
+y 1:i+1 ) 6: grad=autograd.grad(score,emb)
+5: s˜1,...,s˜N
+∼
+GibbsSampler(y 1:i+1 ,p) 7: returngrad
+▷Estimateprobqofsatisfyingconstraint
+Algorithm3EstimateProb
+6: q=zeros(top )
+k
+7: foreachs˜ins˜1,...,s˜N do 1: Input: Conditional marginals p˜cond, Ver-
+8: p˜cond =CondMarginals(p,s˜ i+2:T )
+ifier ϕa, Gradient
+∇ emb(s)
+ϕa, embs :=
+9:
+∇
+ϕa =LinearizeVerifier(ϕa,s˜) [emb(y i,1 ),...,emb(y i,
+|
+V
+|
+)],scoreϕa (s),T
+1 1 0 1 : : en q d [s˜ f i o + r 1 ]+=EstimateProb(p˜cond,ϕa, ∇ ϕa ) 2 ▷ : C O o u m tp p u u t t : e p e ( x A pe | ct y e 1 d :i ) embedding
+▷Renormalizeq 3: exe=0
+12: logq=q.log sofmax() 4: foriin1,...,Tdo
+▷ReweighttheLMdistribution
+5: exe+=embs[...,None]
+·
+p˜cond [:,i:i+1,:]
+6: endfor
+13: w=logp(y i+1| y 1:i )+logq 7: exe=exe.mean(0)
+14: p ∗ =Categorical(weights=w) ▷First-orderTaylorexpansionabouts
+15: return p ∗ 8: returnϕa (s)+
+∇
+emb(s) ϕa
+·
+(exe
+−
+emb(s))
+4.1 LocallyContextualizedDistribution
+Tosidestepthehardnessoftheautoregressivedistribution,wemovetowardsthetractability
+offully-independentdistributions,whileretainingasmuchofthecontextualinformation.
+Therefore,weconsiderthepseudolikelihoodofasentence(Besag,1975;Ahmedetal.,2023),
+∏
+p(y ) p˜(y ) := p(y y ), (5)
+1:T 1:T i i
+≈ | −
+i
+wherey denotesy ,...,y ,y ,...,y . Unfortunately,Equation(5)doesnotensure
+i 1 i 1 i+1 n
+tractabil−ity,seeingthatdiffer−entsentenceswoulddependondifferentsetsofconditionals.
+Wedefinethepseudolikelihoodofasentenceyinthesemanticneighborhoodofasentencey˜
+∏
+p˜ (y) := p(y y˜ ) (6)
+y˜ i i
+| −
+i
+whichcanbethoughtofasthecontextualizedprobabilityofasentenceygiventhecontext
+y˜. Thatis,Equation(6)calculatestheprobabilityofsequenceybytakingtheproductof
+probabilities ofeachtoken y, cruciallyconditioning eachtoken y noton thepreceding
+i i
+tokensofy,butonthecontextsurroundingpositioniwithiny˜ (specifically,y˜ excludingits
+i-thtoken,denotedy˜ ). Therefore,y˜ actsasacontextualanchorforevaluatingyunderthis
+i
+measure.Intuitively,−sentencesythatsemanticallyorstructurallyalignwellwiththespecific
+token-levelcontextsprovidedbyy˜ areexpectedtoyieldahigherpseudolikelihood p˜ (y).
+y˜
+4.2 BridgingSamplesandExpectations: ATangentialView
+Next, weturnourattentiontoaddressthehardnessoftheverifier ϕ . Inparticular, given
+a
+anLMsamples p(y y )andaccesstoaverifierϕ ,weleveragegradientinforma-
+i+1:T 1:i a
+∼ |
+tionobtainedduringtheevaluationofϕ (s),coupledwiththecontextualizedprobability
+a
+distributioninEquation(6),toapproximateE [ϕ (y )],theconstraintprobability.
+p(.
+|
+y1:i ) a 1:T
+6
+Preprint. Underreview.
+We denote by emb : V Rd an embedding function that maps each token onto a d-
+(cid:55)→
+dimensionvectorandletemb(y)denotetheaveragetoken-wiseembedding.5 Then,wecan
+approximateEquation(4)usingafirst-orderTaylorexpansionofϕ abouttheLMsamples
+a
+E [ϕ (y )] E [ϕ (s)+ ϕ (s) (emb(y ) emb(s))]. (7)
+p˜( ·| y1:i ) a 1:T ≈ p˜( ·| y1:i ) a ∇ a · 1:T −
+Usingthelinearityofexpectation,wecanfurthersimplifyexpression,obtaining
+E [ϕ (y )] ϕ (s)+ ϕ (s) (E [emb(y )] emb(s)). (8)
+p˜( ·| y1:i ) a 1:T ≈ a ∇ a · p˜( ·| y1:i ) 1:T −
+Wehavenowmanagedtoreducetheproblemofestimatingtheconstraintprobability,given
+bytheexpectationsinEquation(4)totheproblemofcomputinganaveragesentenceembed-
+dingw.r.t.anapproximateLMdistribution p˜,followedbysimplearithmeticoperations. We
+willnextshowhowwecanefficientlycomputetheexpectedsentenceembedding.
+4.3 FromSequenceProbabilitiestoAverageEmbeddings
+Weappealtoknowledgecompilation,aclassofmethodsthattransform,orcompile,afunc-
+tionintoatractabletargetformwhichrepresentsfunctionsasparameterizedcomputational
+graphs,orcircuits. Byenforcingcertainstructuralpropertiesonthecompiledcircuits,we
+canenablethetractablecomputationofcorrespondingclassesofprobabilisticqueries. Thus,
+circuitsprovidealanguageforconstructingandreasoningabouttractablerepresentations.
+Formally,acircuit povervariablesYisaparameterizedcomputationalgraphencodinga
+function p(Y). Eachnodeninthegraphencodesaparameterizedfunction p (vars(n))over
+n
+variablesvars(n) Y,alsoknownasitsscope. Eachinnernodeinthegraphisasumora
+⊆
+productnode,andeachleafnodeencodesatractableinputdistributionoveritsscope. Each
+innerunitn(i.e.,productorsumnode)receivesinputsfromotherunits,denotedin(n).
+Acircuitisdecomposableiftheinputsofeveryproductnodedependsondisjointsetsofvari-
+ables,i.e.,forn = c
+1
+c
+2
+,vars(c
+1
+) vars(c
+2
+) =∅. Intuitively,decomposableproductnodes
+⊗ ∩
+encodelocalfactorizationsovervariablesofthefunction. Weassumethatdecomposable
+product nodes always have two inputs, a condition that is enforceable on any circuit in
+exchangeforapolynomialincreaseinitssize(Vergarietal.,2015;Peharzetal.,2020).
+Asecondpropertyissmoothness. Acircuitissmoothiftheinputsofeverysumnodedepend
+onthesamesetofvariables,i.e.,forn = θ c,vars(c ) =vars(c ) i,j. Decomposability
+i i · i i j ∀
+andsmoothnessaresufficientandnecessaryfortractableintegrationoverarbitrarysetsof
+(cid:76)
+variablesinasinglepass, astheyallowlargerintegralstodecomposeintosmallerones.
+Given a circuit for a distribution p˜, the expected embedding can then be computed by
+traversingthecircuitbottom-up,substitutingtokenembeddingforcorrespondingembed-
+dingsatleafnodes,computingweightedsumsofembeddingsatsumnodes,andtaking
+sums(inessence,concatenatingembeddings)atproductnodes,ascanbeseeninFigure2.
+4.4 ClosingtheLoop
+OurfullalgorithmisgiveninAlgorithm1.Westartbytruncatingthenext-tokendistribution
+usingtop-kortop-p, asiscommonplaceinmodernautoregressiveLMs, whereweuse
+top-kforclarityofexposition. Wethenproceedbysimulatingacontinuationforeachofthe
+possibletop-ktokens,eachproducedusingamaskedLMandHogwild!Gibbssampling6,to
+avoidexpensiveautoregressivesamplingfromtheLM.Wethenproceedbycomputingthe
+contextualizedprobabilityofeachsampleV andthegradientoftheverifierw.r.t.thesample
+i
+embedding ϕ ,usedtoestimatetheconstraintprobability. Havingcomputedthe
+∇
+emb(s) a
+constraintprobability,wereweighthenext-tokendistributiontoaccountfortheconstraint
+beingsatisfied,andrenormalizetoobtaintheconditionalnext-tokendistribution.
+5w.l.o.g,weassumethisembeddingcanbeextracteddirectlyfromtheembeddinglayerofthe
+verifier,i.e.,ϕa (s):=ϕa (emb(s
+1
+),
+···
+,emb(s
+T
+)).
+6WereferthereadertoAppendixDformoredetails.
+7
+Preprint. Underreview.
+5 RelatedWork
+Recent advances in controllable generation with LMs have spurred a wide range of ap-
+proaches, whichwesummarizebelow. Theseapproachescanberoughlyclassifiedinto
+threedifferentcategories: training-time,prompting,anddecoding-timeapproaches.
+Training-timeapproaches. Asubsetoftheapproachesseekstoexertcontrolbyfine-tuning
+orreinforcementlearningviasomesetofdatathatmorecloselymirrorsthetargettask,such
+asviareinforcementlearningfromhumanfeedback(RLHF)(Ziegleretal.,2020;Stiennon
+et al., 2020b; Bai et al., 2022; Ouyang et al., 2022) or from symbolic knowledge (Ahmed
+etal.,2023),buttheseapproachescomewithchallengessuchashyperparametersensitivity
+and distributional collapse (Zheng et al., 2023; Zhu et al., 2023; Xiong et al.). Some of
+these drawbacks can be mitigated by utilizing on-policy data (Tajwar et al., 2024) and
+imposing a KL penalty that penalizes shifting an LM too far from its prior distribution,
+castingoptimizationasvariationalinference(Korbaketal.,2022;Aminietal.,2025).
+Promptingapproaches. Anotherclassofapproachesfocusesonguidingthedistribution
+implicitlyviamodificationsintheprompt(Ashok&Poczos,2024). Tothisend,controlcan
+beexertedbyeitherverballyexpressingtheconstraintsintheprompt(Chenetal.,2022;
+Zhouetal.,2023;Ashok&Poczos,2024),orthroughtheuseofexamples(Poesiaetal.,2022;
+Zhouetal.,2023). Inadditiontointroducingminimalcomputationoverheadandproducing
+goodqualitytext(Zhouetal.,2023;Ashok&Poczos,2024),promptingapproachesarealso
+more flexible, since complex constraints can be easily integrated in the prompt without
+further training or expensive data curation. Nonetheless, constraint satisfiability using
+prompting-basedmethodsisnotguaranteed(Zhouetal.,2023)anddependsheavilyonthe
+instructionfollowingcapabilitiesoftheLM(Jiangetal.,2024;Heetal.,2024).
+Decoding-timeapproaches. Apopulardecoding-timeapproachistoperformtoken-level
+modificationsateachstepand,forthatreason,frequentlyreferredtoaslocallyconstrained
+decoding (Loula et al., 2025). Methods to locally constrained decoding either mask out
+specifictokensorheuristicallyreweightokenssuchthattheconstraintsaremorelikelytobe
+satisfied. Examplesincludebanningspecificwords(Gehmanetal.,2020),usingcontext-free
+grammars(Poesiaetal.,2022;Gengetal.,2023;Willard&Louf,2023;Beurer-Kellneretal.,
+2023; Lundberg et al., 2024; Beurer-Kellner et al., 2024), or through the combination of
+booleanalgebrawithsearchalgorithms(Hokamp&Liu,2017;Andersonetal.,2017;Post&
+Vilar,2018;Huetal.,2019;Luetal.,2021;2022;Qinetal.,2022). Note,however,thatwhile
+settingtoken-levelrestrictionscanbeeffectiveatexertingsyntacticcontroloverLMs,these
+areinsufficienttocapturethericherandsubtlernuancesofsemanticconstraints.
+In fact, semantic control approaches resort to attribute “scorers” to estimate how likely
+the constraint is under a given input, and then use those estimates to reweigh the per-
+tokendistributionofthebaseLM.Previouslyproposedmethodsincludecombiningthe
+conditionaldistributionsofdifferentLMswithopposingbehaviors,suchasatoxicexpert
+andanon-toxicexpert(Schicketal.,2021;Liuetal.,2021;Lietal.,2023;Dekonincketal.,
+2024), and using an attribute discriminator (i.e., constraint verifier) to reweigh the base
+LMconditionaldistribution(Holtzmanetal.,2018;Krauseetal.,2021). Thegradientsof
+attributediscriminatorshavealsobeentoinducechangesthebaseLMthroughchanges
+totheLMweights(Dathathrietal.,2020;Liuetal.,2020;Wallaceetal.,2019;Zhangetal.,
+2024b). Althougheffective,locallyconstraineddecodingapproachesoftenintroducegreedy
+(potentiallysub-optimal)approximationsthatdistortthedistribution(Loulaetal.,2025;
+Maetal.,2025). Conversely,sample-reweighapproachesconsistoffirstsamplingcomplete
+sequencesandthenreweighthemusingaconstraintverifier(Stiennonetal.,2020a;Krishna
+etal.,2022;Sunetal.,2024;Ichiharaetal.,2025;Aminietal.,2025). Whileconstraintsare
+imposedgloballyinsamplereweighingapproaches,theydonotbenefitfromfiner-grained
+constraintinformationduringgenerationand,hence,requirealargernumberofsamplesto
+findhigh-qualitygenerationsthatcomplywiththeconstraints(Loulaetal.,2025).
+Anotherlineofworkperformsapproximateinferenceinexactmodelsviasampling(Miao
+etal.,2019;Zhangetal.,2020;Kumaretal.,2022;Poesiaetal.,2022;Qinetal.,2022;Duetal.,
+2024),and,morerecently,viamoreeffectiveSequentialMonteCarlo(SMC)methods,which
+maintainasetofsamplesthatevolvethroughtime. Theevolutionofthesamplesaccounts
+8
+Preprint. Underreview.
+Table 1: Evaluation of the quality and toxicity of Llama-3.2 (1B) generations when
+steered to be non-toxic and toxic, respectively. Toxicity is evaluated on 400 prompts
+RealToxicityPrompts using the toxicity verifier ϕtoxicity (Logacheva et al., 2022). PPL
+referstotheperplexityofMeta-Llama-3-70Bonthemodelgenerations. WereportExpected
+MaximumToxicity: themaximumtoxicityacrossgenerations,andToxicityProbability:
+theprobabilityofatoxicgeneration,bothcomputedacross10generationsperprompt. We
+expectbothmetricstobelower( )whensteeringthebaseLMtowardsnon-toxicgenerations
+↓
+(detoxify)andhigher( )whensteeringthebaseLMtowardsnon-toxicgenerations(toxify).
+↑
+ToxicProb.( , ) Exp.Max.Toxicity( , )
+Objective Method ↓ ↑ ↓ ↑ PPL( )
+↓
+Full Non-toxic Toxic Full Non-toxic Toxic
+random 37.25 10.00 64.50 37.11 13.17 61.05 12.18
+beamsearch 17.25 3.00 31.50 18.22 4.34 32.09 8.00
+BoN 2.75 1.00 4.50 4.90 1.91 7.89 15.46
+detoxify
+SConE(ours) 00.25 00.50 00.00 01.85 1.30 2.40 14.88
+BoN 62.50 37.00 88.00 61.36 39.62 83.11 13.97
+toxify
+SConE(ours) 93.75 88.00 99.50 91.15 85.75 96.55 23.87
+notonlyforthesamplelikelihoodunderthebaseLM,butalsoforconstraintinformation
+thatcanbeprovidedeitherbylearnabletwistfunctions(Zhaoetal.,2024)orbyevaluating
+theconstraintverifieronpartialsequences (Lewetal.,2023;Loulaetal.,2025).
+6 Experiments
+Weempiricallyevaluatetheeffectivenessoftheproposedmethodacrossnumerousopen-
+endedgenerationtasks,includingtextdetoxification,controlledsentimentgeneration,and
+topicsteering. Section6introducesspecificdetailsofourmethods,baselines,andmetrics.
+Task-specificdetails, suchasdatasetandconstraintverifiers, andresultsforthetoxicity,
+sentiment,andtopicexperimentsaredescribedinSections6.1,6.2,C.1,respectively.
+ExperimentalSetup
+Baselines. To validate our method, we compare it against two sampling-based base-
+lines: random,whichconsistsofsamplingoutputsautoregressivelyfromabaseLM,and
+beamsearch,whichleveragesinformationaboutthetopKmostlikelycontinuationsundera
+baseLMtogreedilyselectthenexttoken. Additionally,weevaluateBest-of-Nrejection
+sampling(BoN) (Stiennonetal.,2020a),apopulartraining-freemethodforlanguagemodel
+controlwhichhasbeenshowntobecompetitivetoRLHF-basedmethods(Aminietal.,2025).
+Likeourproposedmethod,BoNexploitsnon-lexicalconstraintverifierstoexertsemantic
+controlonthebaseLM.However,itdoessobyfirstsamplingNcontinuationsfromthebase
+LMandselectingonethatmaximizestheverifier.7 WerefertoAppendixBformoredetails.
+Metrics. In line with prior work (Gehman et al., 2020; Ahmed et al., 2025), we report
+Perplexity (PPL) as a measure of sample quality, specifically, we use Meta-Llama-3-70B.
+Intuitively,effectivecontrolmethodsshouldyieldgenerationsthatsatisfythecontraintbut
+thatarealsohighquality,i.e.,lowperplexity.
+The primary constraint satisfaction metric that we report is the Average ϕ score. This
+a
+metriccanbedefinedastheaverageverifierscoreacrossallmodelgenerations. Intuitively,
+becausethisverifierisbeingusedtosteercontrolduringgeneration,itcanbeinterpretedas
+thegroundtruthmeasureofthedesiredsemanticattributea(e.g.,toxicity,positivesentiment,
+topic). As such, we expect effective control methods to achieve high Average ϕ scores,
+a
+especiallywhencomparedtouncontrolledbaselineslikerandom.
+7Forafaircomparison,weusethesamedecodingsettingsasinourmethod’sinitialization.
+9
+Preprint. Underreview.
+Table2:EvaluationofqualityandsentimentofGPT2-IMDBgenerationswhensteeredusing
+apositivesentimentconstraintϕsentiment. Sentimentisevaluatedon600promptsfromthe
+IMDBtestsetusingasentimentverifier(Maasetal.,2011),spanningequalnumberofpositive
+andnegativereviews. ResultsarediscriminatedbytheFullsetofprompts,theNegative
+subset,andthePositivesubset. Allmetricsarecalculatedusing10differentgenerations
+perprompt. PPLreferstotheperplexityofMeta-Llama-3-70Bonthemodelgenerations
+using10differentseeds;InlinewithRafailovetal.(2023);Aminietal.(2025),wereport
+theaveragesentimentscore,thesentimentscoreisgreaterthan0.8in9out10generations
+(SentimentProb.),andtheexpectedminimumsentimentscore(Exp. Min. Sentiment).
+Avgϕsentiment( ) SentimentProb.( ) Exp.Min.Sentiment( ) PPL( )
+↑ ↑ ↑ ↓
+Method Full Neg Pos Full Neg Pos Full Neg Pos Full
+random 57.10 53.16 61.04 95.50 95.33 95.67 12.83 10.78 14.87 21.18
+beamsearch 58.83 50.83 66.82 58.83 48.33 69.33 44.46 37.21 51.71 3.96
+BoN 60.66 55.17 66.14 95.83 93.33 98.33 15.24 11.70 18.77 10.84
+SConE(ours) 93.06 92.73 93.37 100.00 100.00 100.00 84.50 83.18 85.82 20.96
+Asadditionalmeasuresofconstraintsatisfaction,wereportmetricsthatcapturetheexpected
+worst-case and theempirical probability of constraint satisfaction (Gehmanet al., 2020).
+Assumingthateachpromptxisassociatedwithmultiplegenerations,theexpectedworst
+scoremetriciscalculatedbycomputingtheworstconstraintscoreϕ acrossallgenerations
+a
+forx,and,thentakingtheaverageoverallevaluationprompts. Similarly,theconstraint
+probabilitymetricrepresentsthefractionofevaluatedpromptsforwhichatleastoneofits
+generationssatisfiestheconstraintaboveauser-definedthreshold(i.e.,1[ϕ (y) τ ]).
+a a
+≥
+6.1 ControlledToxicityGeneration
+Inthissection,wecomparetheperformanceofdifferentmethodsinsteeringthetoxicityof
+asmallLlama-3.2 (1B)(Grattafiorietal.,2024). WedosobypromptingtheLMwith400
+naturaloccurringpromptsfromRealToxicityPrompts(Gehmanetal.,2020). Werandomly
+select200Toxicand200Non-toxicpromptsfromRealToxicityPromptsandusetheminboth
+toxification and detoxification settings, sampling 10 generations of up to 25 tokens per
+prompt. EvaluationandtoxicitysteerabilityarebothconductedusingaRoBERTa-based
+binaryclassifierϕtoxicity,finetunedfortoxicitydetection(Logachevaetal.,2022). Tosteer
+modelstogeneratenon-toxicoutputs,wesetthemtomaximize1 ϕtoxicity.
+−
+DetoxificationTask. Table1summarizestheresultsforthedetoxificationtask,discrim-
+inatedbyprompttype. Intuitively,effectivesemanticcontrolmethodsshouldbeableto
+generate non-toxic outputs, i.e., minimize the toxicity metrics, irrespective of the toxic-
+ity of the prompt type. Overall, we observe that the uncontrolled baselines random and
+beamsearch, stillleadtotoxiccontinuationsevenwhenpromptedwithnon-toxicinputs.
+Whilebeamsearchseemstolowerbothtoxicityandperplexity,wefindthatthisisexplained
+bydegenerateoutputscharacterizedbyrepetition(Holtzmanetal.,2020). Contrastingly,
+we find that BoN is very effective at detoxifying LM generations: reducing the average
+worst-casetoxicitydown4.90withminimalpenaltyinperplexity(3.28points). Whilethis
+representsabigimprovementovertheuncontrolledbaselines,wefindthatourmethodis
+abletofurtherachievea3-foldreductionintermsoftheaverageworstcasetoxicityintoxic
+promptandreducetheprobabilityofatoxicgenerationtoanegligibleamount(upto0.50).
+ToxificationTask. Wenowmovetotheoppositetask: givenanaturallyoccurringprompt,
+aremethodsabletosteerthebaseLMtowardsmoretoxicinputs?Table6.1showsthetoxicity
+results for the semantic control methods. While both methods are able to substantially
+increase both the worst-case toxicity and the likelihood of sampling toxic outputs from
+Llama-3.2 (1B),wefindthatSConEsystematicallyisfarmoreeffectivethanBoNwith+30%
+gaptoxicityincreaseacrossbothtoxicitymetrics. Muchofthisperformancegapappearsto
+stemfromthenon-toxicsubset,forwhichthebaseLMislesspredisposedtogeneratetoxic
+outputs. Assuch,methodslikerejectionsamplingthatusetheconstraintverifierϕtoxicity
+10
+Preprint. Underreview.
+Table3: EvaluationofqualityandtopicadherenceofLlama-3.2 (1B)generationswhen
+controlledforspecifictopics. Topicadherenceisevaluatedon300promptsspanning6
+topicsϕtopic(Wettigetal.,2025). Wereportperplexity(PPL),theaverageϕtopicscore(Avg
+ϕtopic),thefractionofexamplesforwhichthetopicscoreisgreaterthan0.8in90%ormore
+ofthegenerations(TopicProb.),andtheexpectedminimumtopicscore(Exp. Min. Topic).
+Method TopicProb. ( ) Exp. Min. Topic( ) Avgϕtopic( ) PPL
+↑ ↑ ↑
+random 86.20 83.91 91.87 6.16
+beamsearch 87.47 90.35 91.63 3.78
+BoN 95.40 95.18 97.52 8.42
+SConE(ours) 98.40 96.71 99.07 7.39
+torerankthebaseLMgenerationsarelesslikelytosucceedforlowprobabilitysemantic
+constraints. ThisalsoprovidesanexplanationfortheincreaseinperplexityforSConE.
+6.2 ControlledSentimentGeneration
+Next,wecomparethesteerabilityofthedifferentmethodswhengeneratingreviewswith
+positivesentiment(Rafailovetal.,2023;Zhaoetal.,2024;Aminietal.,2025). Focusingon
+moviereviews,wepromptGPT2-IMDBwith600arbitrarilychosenpromptsfromtheIMDB
+testset(Maasetal.,2011). Buildingonpreviouswork(Rafailovetal.,2023;Aminietal.,
+2025),weusetheoriginalreviewsintheIMDBdatasettocreatethepromptsbyrandomly
+splittingthemintoprefixesof2to8words. WealsoadoptthesameBERT-basedclassifier
+as our sentiment verifier ϕsentiment.8 Given that this model was fine-tuned on the IMDB
+trainingdata,weexpectittobeastrongandreliablesentimentpredictorforthistask.
+PositiveMovieReviewGenerationTask. Inthecontextofpositivemoviereviewgen-
+eration,wewouldliketoensurethatmostofGPT2-IMDB’sgenerationsarepositive.9 Once
+more,asobservedinTable2,theuncontrolledbaselines—randomandbeamsearch—struggle
+togeneratepositivereviews. Specifically,asemphasizedbytheworstcasemetric,Expected
+MinimumSentiment,GPT2-IMDB-generatedreviewswithnocontrolcanbefairlynegative
+(<52acrossallprompts),especiallyinthenegativesubset(<38%).BoNdrasticallyimproves
+upontheuncontrolledbaselines,increasingtheSentimentProbabilitytoabout70.83%and
+improvingtheaveragelowestsentimentscoreto70.79%. Still,wefindthatSConEfurther
+improves(about14%pointsaverageimprovementinbothmetrics)theoverallworst-case
+sentimentandthechancesofproducingpositivereviewsatleast90%ofthetime.
+6.3 ControlledTopicGeneration
+Lastly,weevaluatethemethodsontheirabilitytocontrolforthetopicofLMgenerations.
+Wechoose6diversetopicsfromtherecentlytaxonomyconcerningthewebstructure(Wettig
+etal.,2025),includingfreque(e.g.,Finance&BusinessandPolitics)andlessfrequenttopics
+(e.g., History, Industrial). For each topic, we randomly select 50 different examples from
+theTopicAnnotations-Llama-3.1-405B-FP8(Wettigetal.,2025)testset,breakingtheminto
+prefixesof8to12words. Eachprefixisusedtosampleamaximumof60tokens.
+TopicGenerationTask. Ingeneral,wefindthatuncontrolledbaselinesachieveafairlyhigh
+averageconstraintscore( 91%),whichmaybeexplainedbytheuseoflongerprefixes
+≥
+duringgeneration. Wefindthistobethecaseformostexamples(seeexamplesinAppendix
+C.1). Nonetheless,thediscrepancybetweenuncontrolledandcontrolledmethodsisstill
+visiblewiththelatterachieving7%-8%higheraverageconstraintscores. Remarkably,we
+findSConEisnotonlyabletoimproveuponBoN,achievinganaveragescoreof98.89%but
+alsoproduceshigherqualitygenerationsasemphasizedbythelowerperplexity.
+8https://huggingface.co/lvwerra/distilbert-imdb
+9Inlinewith Maasetal.(2011),weconsiderareviewtobepositiveiffϕsentiment(y) 0.8.
+≥
+11
+Preprint. Underreview.
+7 Conclusion
+Inthispaper,weintroducedatraining-freeapproachtosemanticcontrolofautoregressive
+language models. Our approach uses exact inference on an approximate distribution
+induced by an LM generation, using first-order information from a verifier to compute
+the expected constraint satisfaction for each of the possible next tokens. Our approach
+demonstratedasubstantialimprovementcomparedtopreviousapproachonthetasksof
+controllingthetoxicity,sentimentandtopicofLMgenerations.
+EthicsStatement
+OurworkinvestigatestheproblemofexertingsemanticcontroloverLMgenerations. While
+ourmethodcanbeverysocietallybeneficial,givingusmorecontroloverlanguagemodels,
+weacknowledgethatourmethodcouldbemisusedtoproduceharmfulcontent. Welook
+forwardtoexploringfutureworkthatplacesguardrailsonLMstopreventthesepitfalls.
+Acknowledgments
+ThisworkissupportedbytheDARPAANSRprogramFA8750-23-2-0004,anNSFCAREER
+awardnumberIIS-2046873andanNSFawardnumber1900644. Theconclusionsareofthe
+authorsanddonotreflecttheofficialpolicyorpositionofDARPAortheU.S.Government.
+StatementofAuthorContributions
+KareemAhmed: Conceivedanddevelopedthecoreresearchideaandtheproposedap-
+proach. Wrote the introduction and technical sections of the paper. Wrote the code for
+computingtheexpectedembeddingandcontributedtodebuggingtheoverallapproach.
+CatarinaG.Belem: Implementedtheprimarycodebase. Conductedallexperimentsand
+wrotethecorrespondingexperimentalsectionofthepaperinadditiontotherelatedworks.
+Padhraic Smyth and Sameer Singh: Senior project leadership. Provided mentorship,
+supervision,andadvisorysupportthroughouttheproject. Offeredcriticalfeedbackonthe
+methodologyandthemanuscript. Allauthorsreadandapprovedthefinalmanuscript.
+References
+JoshAchiam,StevenAdler,SandhiniAgarwal,etal. GPT4TechnicalReport,2024.
+KareemAhmed,StefanoTeso,Kai-WeiChang,GuyVandenBroeck,andAntonioVergari.
+Semanticprobabilisticlayersforneuro-symboliclearning. InNeurIPS,2022.
+KareemAhmed, Kai-WeiChang, andGuyVandenBroeck. Apseudo-semanticlossfor
+autoregressivemodelswithlogicalconstraints. InThirty-seventhConferenceonNeuralIn-
+formationProcessingSystems,2023. URLhttps://openreview.net/forum?id=hVAla2O73O.
+KareemAhmed, Kai-WeiChang, andGuyVandenBroeck. Controllablegenerationvia
+locally constrained resampling. In The Thirteenth International Conference on Learning
+Representations,2025. URLhttps://openreview.net/forum?id=8g4XgC8HPF.
+AfraAmini,TimVieira,ElliottAsh,andRyanCotterell. Variationalbest-of-nalignment.
+InTheThirteenthInternationalConferenceonLearningRepresentations, 2025. URLhttps:
+//openreview.net/forum?id=W9FZEQj3vv.
+Peter Anderson, Basura Fernando, Mark Johnson, and Stephen Gould. Guided open
+vocabularyimagecaptioningwithconstrainedbeamsearch. InMarthaPalmer,Rebecca
+Hwa,andSebastianRiedel(eds.),Proceedingsofthe2017ConferenceonEmpiricalMethods
+in Natural Language Processing, pp. 936–945, Copenhagen, Denmark, September 2017.
+12
+Preprint. Underreview.
+Association for Computational Linguistics. doi: 10.18653/v1/D17-1098. URL https:
+//aclanthology.org/D17-1098/.
+DhananjayAshokandBarnabasPoczos. Controllabletextgenerationintheinstruction-
+tuningera,2024. URLhttps://arxiv.org/abs/2405.01490.
+YuntaoBai,SauravKadavath,SandipanKundu,AmandaAskell,JacksonKernion,Andy
+Jones,AnnaChen,AnnaGoldie,AzaliaMirhoseini,CameronMcKinnon,CarolChen,
+Catherine Olsson, Christopher Olah, Danny Hernandez, Dawn Drain, Deep Ganguli,
+DustinLi,EliTran-Johnson,EthanPerez,JamieKerr,JaredMueller,JeffreyLadish,Joshua
+Landau,KamalNdousse,KamileLukosuite,LianeLovitt,MichaelSellitto,NelsonElhage,
+NicholasSchiefer,NoemiMercado,NovaDasSarma,RobertLasenby,RobinLarson,Sam
+Ringer,ScottJohnston,ShaunaKravec,SheerElShowk,StanislavFort,TameraLanham,
+TimothyTelleen-Lawton,TomConerly,TomHenighan,TristanHume,SamuelR.Bowman,
+ZacHatfield-Dodds,BenMann,DarioAmodei,NicholasJoseph,SamMcCandlish,Tom
+Brown,andJaredKaplan. Constitutionalai: Harmlessnessfromaifeedback,2022. URL
+https://arxiv.org/abs/2212.08073.
+JulianBesag. Statisticalanalysisofnon-latticedata. JournaloftheRoyalStatisticalSociety.
+SeriesD(TheStatistician),pp.pp.179–195,1975.
+LucaBeurer-Kellner,MarcFischer,andMartinVechev. Promptingisprogramming: Aquery
+languageforlargelanguagemodels. Proc.ACMProgram.Lang.,7(PLDI),June2023. doi:
+10.1145/3591300. URLhttps://doi.org/10.1145/3591300.
+LucaBeurer-Kellner,MarcFischer,andMartinVechev. Guidingllmstherightway: fast,
+non-invasiveconstrainedgeneration. InProceedingsofthe41stInternationalConferenceon
+MachineLearning,ICML’24.JMLR.org,2024.
+HowardChen,HuihanLi,DanqiChen,andKarthikNarasimhan. Controllabletextgenera-
+tionwithlanguageconstraints,2022. URLhttps://arxiv.org/abs/2212.10466.
+YooJungChoi,AntonioVergari,andGuyVandenBroeck. Probabilisticcircuits: Aunifying
+frameworkfortractableprobabilisticmodeling. 2020.
+AdnanDarwicheandPierreMarquis. Aknowledgecompilationmap. JournalofArtificial
+IntelligenceResearch,17:229–264,2002.
+Sumanth Dathathri, Andrea Madotto, Janice Lan, Jane Hung, Eric Frank, Piero Molino,
+JasonYosinski,andRosanneLiu. Plugandplaylanguagemodels: Asimpleapproach
+tocontrolledtextgeneration. InInternationalConferenceonLearningRepresentations,2020.
+URLhttps://openreview.net/forum?id=H1edEyBKDS.
+JasperDekoninck,MarcFischer,LucaBeurer-Kellner,andMartinVechev. Controlledtext
+generation via language model arithmetic. In The Twelfth International Conference on
+LearningRepresentations,2024. URLhttps://openreview.net/forum?id=SLw9fp4yI6.
+LiDu,AfraAmini,LucasTorrobaHennigen,XinyanVelocityYu,HoldenLee,JasonEisner,
+andRyanCotterell. Principledgradient-basedMCMCforconditionalsamplingoftext.
+In Ruslan Salakhutdinov, Zico Kolter, Katherine Heller, Adrian Weller, Nuria Oliver,
+JonathanScarlett,andFelixBerkenkamp(eds.),Proceedingsofthe41stInternationalConfer-
+enceonMachineLearning,volume235ofProceedingsofMachineLearningResearch,pp.11663–
+11685.PMLR,21–27Jul2024. URLhttps://proceedings.mlr.press/v235/du24a.html.
+Samuel Gehman, Suchin Gururangan, Maarten Sap, Yejin Choi, and Noah A. Smith.
+RealToxicityPrompts: Evaluating neural toxic degeneration in language models. In
+Trevor Cohn, Yulan He, and Yang Liu (eds.), Findings of the Association for Compu-
+tational Linguistics: EMNLP 2020, pp. 3356–3369, Online, November 2020. Associa-
+tionforComputationalLinguistics. doi: 10.18653/v1/2020.findings-emnlp.301. URL
+https://aclanthology.org/2020.findings-emnlp.301/.
+13
+Preprint. Underreview.
+SaiboGeng,MartinJosifoski,MaximePeyrard,andRobertWest. Grammar-constrained
+decodingforstructuredNLPtaskswithoutfinetuning.InHoudaBouamor,JuanPino,and
+KalikaBali(eds.),Proceedingsofthe2023ConferenceonEmpiricalMethodsinNaturalLanguage
+Processing,pp.10932–10952,Singapore,December2023.AssociationforComputational
+Linguistics. doi: 10.18653/v1/2023.emnlp-main.674. URLhttps://aclanthology.org/
+2023.emnlp-main.674/.
+Saibo Geng, Hudson Cooper, Michał Moskal, Samuel Jenkins, Julian Berman, Nathan
+Ranchin, Robert West, Eric Horvitz, and Harsha Nori. Jsonschemabench: A rigorous
+benchmarkofstructuredoutputsforlanguagemodels,2025. URLhttps://arxiv.org/
+abs/2501.10868.
+AaronGrattafiori,AbhimanyuDubey,AbhinavJauhri,etal. Thellama3herdofmodels,
+2024. URLhttps://arxiv.org/abs/2407.21783.
+QianyuHe,JieZeng,QianxiHe,JiaqingLiang,andYanghuaXiao. Fromcomplextosim-
+ple: Enhancingmulti-constraintcomplexinstructionfollowingabilityoflargelanguage
+models. InYaserAl-Onaizan,MohitBansal,andYun-NungChen(eds.),Findingsofthe
+AssociationforComputationalLinguistics: EMNLP2024,pp.10864–10882,Miami,Florida,
+USA,November2024.AssociationforComputationalLinguistics. doi: 10.18653/v1/2024.
+findings-emnlp.637. URLhttps://aclanthology.org/2024.findings-emnlp.637/.
+ChrisHokampandQunLiu. Lexicallyconstraineddecodingforsequencegenerationusing
+grid beam search. In Regina Barzilay and Min-Yen Kan (eds.), Proceedings of the 55th
+AnnualMeetingoftheAssociationforComputationalLinguistics(Volume1: LongPapers),pp.
+1535–1546,Vancouver,Canada,July2017.AssociationforComputationalLinguistics. doi:
+10.18653/v1/P17-1141. URLhttps://aclanthology.org/P17-1141/.
+AriHoltzman,JanBuys,MaxwellForbes,AntoineBosselut,DavidGolub,andYejinChoi.
+Learningtowritewithcooperativediscriminators. InIrynaGurevychandYusukeMiyao
+(eds.),Proceedingsofthe56thAnnualMeetingoftheAssociationforComputationalLinguistics
+(Volume1: LongPapers),pp.1638–1649,Melbourne,Australia,July2018.Associationfor
+Computational Linguistics. doi: 10.18653/v1/P18-1152. URL https://aclanthology.
+org/P18-1152/.
+Ari Holtzman, Jan Buys, Li Du, Maxwell Forbes, and Yejin Choi. The curious case of
+neuraltextdegeneration. InInternationalConferenceonLearningRepresentations,2020. URL
+https://openreview.net/forum?id=rygGQyrFvH.
+J.EdwardHu,HudaKhayrallah,RyanCulkin,PatrickXia,TongfeiChen,MattPost,and
+BenjaminVanDurme. Improvedlexicallyconstraineddecodingfortranslationandmono-
+lingualrewriting. InJillBurstein,ChristyDoran,andThamarSolorio(eds.),Proceedings
+of the 2019 Conference of the North American Chapter of the Association for Computational
+Linguistics: HumanLanguageTechnologies,Volume1(LongandShortPapers),pp.839–850,
+Minneapolis, Minnesota, June 2019. Association for Computational Linguistics. doi:
+10.18653/v1/N19-1090. URLhttps://aclanthology.org/N19-1090/.
+YukiIchihara,YuuJinnai,TetsuroMorimura,KenshiAbe,KaitoAriu,MitsukiSakamoto,
+andEijiUchibe.Evaluationofbest-of-nsamplingstrategiesforlanguagemodelalignment.
+TransactionsonMachineLearningResearch,2025.ISSN2835-8856.URLhttps://openreview.
+net/forum?id=H4S4ETc8c9.
+Yuxin Jiang, Yufei Wang, Xingshan Zeng, Wanjun Zhong, Liangyou Li, Fei Mi, Lifeng
+Shang, Xin Jiang, Qun Liu, and Wei Wang. FollowBench: A multi-level fine-grained
+constraints following benchmark for large language models. In Lun-Wei Ku, Andre
+Martins,andVivekSrikumar(eds.),Proceedingsofthe62ndAnnualMeetingoftheAssociation
+forComputationalLinguistics(Volume1: LongPapers),pp.4667–4688,Bangkok,Thailand,
+August2024.AssociationforComputationalLinguistics. doi: 10.18653/v1/2024.acl-long.
+257. URLhttps://aclanthology.org/2024.acl-long.257/.
+PashaKhosravi,YitaoLiang,YooJungChoi,andGuyVanDenBroeck. Whattoexpectof
+classifiers? reasoningaboutlogisticregressionwithmissingfeatures. InProceedingsofthe
+28thInternationalJointConferenceonArtificialIntelligence,IJCAI’19,2019.
+14
+Preprint. Underreview.
+DaphneKollerandNirFriedman. Probabilisticgraphicalmodels: principlesandtechniques. MIT
+press,2009.
+TerryKoo,FrederickLiu,andLuhengHe. Automata-basedconstraintsforlanguagemodel
+decoding,2024.
+Tomasz Korbak, Ethan Perez, and Christopher Buckley. RL with KL penalties is better
+viewed as Bayesian inference. In Yoav Goldberg, Zornitsa Kozareva, and Yue Zhang
+(eds.),FindingsoftheAssociationforComputationalLinguistics: EMNLP2022,2022.
+BenKrause,AkhileshDeepakGotmare,BryanMcCann,NitishShirishKeskar,ShafiqJoty,
+RichardSocher, andNazneenFatemaRajani. GeDi: Generativediscriminatorguided
+sequence generation. In Marie-Francine Moens, Xuanjing Huang, Lucia Specia, and
+ScottWen-tauYih(eds.),FindingsoftheAssociationforComputationalLinguistics: EMNLP
+2021, pp. 4929–4952, Punta Cana, Dominican Republic, November 2021. Association
+forComputationalLinguistics. doi: 10.18653/v1/2021.findings-emnlp.424. URLhttps:
+//aclanthology.org/2021.findings-emnlp.424/.
+KalpeshKrishna,YapeiChang,JohnWieting,andMohitIyyer. RankGen: Improvingtext
+generationwithlargerankingmodels. InYoavGoldberg,ZornitsaKozareva,andYue
+Zhang(eds.),Proceedingsofthe2022ConferenceonEmpiricalMethodsinNaturalLanguage
+Processing,pp.199–232,AbuDhabi,UnitedArabEmirates,December2022.Association
+for Computational Linguistics. doi: 10.18653/v1/2022.emnlp-main.15. URL https:
+//aclanthology.org/2022.emnlp-main.15/.
+Sachin Kumar, Biswajit Paria, and Yulia Tsvetkov. Gradient-based constrained sam-
+pling from language models. In Yoav Goldberg, Zornitsa Kozareva, and Yue Zhang
+(eds.), Proceedings of the 2022 Conference on Empirical Methods in Natural Language Pro-
+cessing, pp. 2251–2277, Abu Dhabi, United Arab Emirates, December 2022. Associa-
+tion for Computational Linguistics. doi: 10.18653/v1/2022.emnlp-main.144. URL
+https://aclanthology.org/2022.emnlp-main.144/.
+YanivLeviathan,MatanKalman,andYossiMatias. Fastinferencefromtransformersvia
+speculativedecoding.InProceedingsofthe40thInternationalConferenceonMachineLearning,
+2023.
+AlexanderK.Lew,TanZhi-Xuan,GabrielGrand,andVikashK.Mansinghka. Sequential
+montecarlosteeringoflargelanguagemodelsusingprobabilisticprograms,2023. URL
+https://arxiv.org/abs/2306.03081.
+XiangLisaLi,AriHoltzman,DanielFried,PercyLiang,JasonEisner,TatsunoriHashimoto,
+Luke Zettlemoyer, and Mike Lewis. Contrastive decoding: Open-ended text gener-
+ation as optimization. In Anna Rogers, Jordan Boyd-Graber, and Naoaki Okazaki
+(eds.), Proceedings of the 61st Annual Meeting of the Association for Computational Lin-
+guistics (Volume 1: Long Papers), pp. 12286–12312, Toronto, Canada, July 2023. As-
+sociation for Computational Linguistics. doi: 10.18653/v1/2023.acl-long.687. URL
+https://aclanthology.org/2023.acl-long.687/.
+AlisaLiu,MaartenSap,XimingLu,SwabhaSwayamdipta,ChandraBhagavatula,NoahA.
+Smith,andYejinChoi. DExperts: Decoding-timecontrolledtextgenerationwithexperts
+and anti-experts. In Chengqing Zong, Fei Xia, Wenjie Li, and Roberto Navigli (eds.),
+Proceedingsofthe59thAnnualMeetingoftheAssociationforComputationalLinguisticsandthe
+11thInternationalJointConferenceonNaturalLanguageProcessing(Volume1: LongPapers),
+pp. 6691–6706, Online, August 2021. Association for Computational Linguistics. doi:
+10.18653/v1/2021.acl-long.522. URLhttps://aclanthology.org/2021.acl-long.522/.
+MichaelXieyangLiu,FrederickLiu,AlexFiannaca,TerryKoo,LucasDixon,MichaelTerry,
+andCarrieCai. “weneedstructuredoutput”’: Towardsuser-centeredconstraintsonlarge
+languagemodeloutput. pp. 9,2024.
+RuiboLiu,GuangxuanXu,ChenyanJia,WeichengMa,LiliWang,andSoroushVosoughi.
+Databoost: Textdataaugmentationthroughreinforcementlearningguidedconditional
+15
+Preprint. Underreview.
+generation. InBonnieWebber,TrevorCohn,YulanHe,andYangLiu(eds.),Proceedings
+ofthe2020ConferenceonEmpiricalMethodsinNaturalLanguageProcessing(EMNLP),pp.
+9031–9041, Online, November 2020. Association for Computational Linguistics. doi:
+10.18653/v1/2020.emnlp-main.726. URLhttps://aclanthology.org/2020.emnlp-main.
+726/.
+VarvaraLogacheva,DarynaDementieva,SergeyUstyantsev,DaniilMoskovskiy,DavidDale,
+IrinaKrotova,NikitaSemenov,andAlexanderPanchenko.ParaDetox:Detoxificationwith
+paralleldata. InProceedingsofthe60thAnnualMeetingoftheAssociationforComputational
+Linguistics(Volume1: LongPapers),pp.6804–6818,Dublin,Ireland,May2022.Association
+forComputationalLinguistics. URLhttps://aclanthology.org/2022.acl-long.469.
+Joa˜oLoula,BenjaminLeBrun,LiDu,BenLipkin,ClementePasti,GabrielGrand,Tianyu
+Liu,YahyaEmara,MarjorieFreedman,JasonEisner,RyanCotterell,VikashMansinghka,
+AlexanderK.Lew,TimVieira,andTimothyJ.O’Donnell.Syntacticandsemanticcontrolof
+largelanguagemodelsviasequentialmontecarlo.InTheThirteenthInternationalConference
+onLearningRepresentations,2025. URLhttps://openreview.net/forum?id=xoXn62FzD0.
+XimingLu, PeterWest, RowanZellers, RonanLeBras, ChandraBhagavatula, andYejin
+Choi. NeuroLogicdecoding: (un)supervisedneuraltextgenerationwithpredicatelogic
+constraints. InKristinaToutanova,AnnaRumshisky,LukeZettlemoyer,DilekHakkani-
+Tur,IzBeltagy,StevenBethard,RyanCotterell,TanmoyChakraborty,andYichaoZhou
+(eds.),Proceedingsofthe2021ConferenceoftheNorthAmericanChapteroftheAssociationfor
+ComputationalLinguistics: HumanLanguageTechnologies,pp.4288–4299,Online,June2021.
+AssociationforComputationalLinguistics. doi: 10.18653/v1/2021.naacl-main.339. URL
+https://aclanthology.org/2021.naacl-main.339/.
+XimingLu,SeanWelleck,PeterWest,LiweiJiang,JungoKasai,DanielKhashabi,Ronan
+LeBras,LianhuiQin,YoungjaeYu,RowanZellers,NoahA.Smith,andYejinChoi. Neuro-
+Logica*esquedecoding:Constrainedtextgenerationwithlookaheadheuristics.InMarine
+Carpuat,Marie-CatherinedeMarneffe,andIvanVladimirMezaRuiz(eds.),Proceedings
+of the 2022 Conference of the North American Chapter of the Association for Computational
+Linguistics: HumanLanguageTechnologies,pp.780–799,Seattle,UnitedStates,July2022.
+AssociationforComputationalLinguistics. doi: 10.18653/v1/2022.naacl-main.57. URL
+https://aclanthology.org/2022.naacl-main.57/.
+ScottLundberg,MarcoRibeiro,RichardEdgar,andHarsha-Nori. Guidance: aguidance
+languageforcontrollinglargelanguagemodels.,2024.
+ChangMa,HaitengZhao,JunleiZhang,JunxianHe,andLingpengKong. Non-myopic
+generationoflanguagemodelsforreasoningandplanning. InTheThirteenthInternational
+Conference on Learning Representations, 2025. URL https://openreview.net/forum?id=
+OoNazl6T7D.
+Andrew L. Maas, Raymond E. Daly, Peter T. Pham, Dan Huang, Andrew Y. Ng, and
+Christopher Potts. Learning word vectors for sentiment analysis. In Dekang Lin,
+Yuji Matsumoto, and Rada Mihalcea (eds.), Proceedings of the 49th Annual Meeting of
+theAssociationforComputationalLinguistics: HumanLanguageTechnologies, pp.142–150,
+Portland, Oregon, USA, June 2011. Association for Computational Linguistics. URL
+https://aclanthology.org/P11-1015/.
+NingMiao, HaoZhou, LiliMou, RuiYan, andLeiLi. Cgmh: constrainedsentencegen-
+eration by metropolis-hastings sampling. In Proceedings of the Thirty-Third AAAI Con-
+ference on Artificial Intelligence and Thirty-First Innovative Applications of Artificial Intelli-
+gence Conference and Ninth AAAI Symposium on Educational Advances in Artificial Intel-
+ligence, AAAI’19/IAAI’19/EAAI’19. AAAI Press, 2019. ISBN 978-1-57735-809-1. doi:
+10.1609/aaai.v33i01.33016834. URLhttps://doi.org/10.1609/aaai.v33i01.33016834.
+NguyenNhatMinh,AndrewBaker,ClementNeo,AllenGRoush,AndreasKirsch,and
+RavidShwartz-Ziv. Turninguptheheat: Min-psamplingforcreativeandcoherentLLM
+outputs. InTheThirteenthInternationalConferenceonLearningRepresentations,2025. URL
+https://openreview.net/forum?id=FBkpCyujtS.
+16
+Preprint. Underreview.
+FengNiu,BenjaminRecht,ChristopherRe,andStephenJ.Wright. Hogwild! alock-free
+approachtoparallelizingstochasticgradientdescent.InProceedingsofthe25thInternational
+ConferenceonNeuralInformationProcessingSystems,2011.
+LongOuyang,JeffreyWu,XuJiang,DiogoAlmeida,CarrollWainwright,PamelaMishkin,
+ChongZhang,SandhiniAgarwal,KatarinaSlama,AlexRay,JohnSchulman,JacobHilton,
+Fraser Kelton, Luke Miller, Maddie Simens, Amanda Askell, Peter Welinder, Paul F
+Christiano,JanLeike,andRyanLowe. Traininglanguagemodelstofollowinstructions
+withhumanfeedback. InAdvancesinNeuralInformationProcessingSystems,2022.
+RobertPeharz,StevenLang,AntonioVergari,KarlStelzner,AlejandroMolina,MartinTrapp,
+Guy Van den Broeck, Kristian Kersting, and Zoubin Ghahramani. Einsum networks:
+Fastandscalablelearningoftractableprobabilisticcircuits. InInternationalConferenceof
+MachineLearning,2020.
+GabrielPoesia, AlexPolozov, VuLe, AshishTiwari, GustavoSoares, ChristopherMeek,
+andSumitGulwani. Synchromesh: Reliablecodegenerationfrompre-trainedlanguage
+models. In International Conference on Learning Representations, 2022. URL https://
+openreview.net/forum?id=KmtVD97J43e.
+MattPostandDavidVilar. Fastlexicallyconstraineddecodingwithdynamicbeamallo-
+cationforneuralmachinetranslation. InMarilynWalker,HengJi,andAmandaStent
+(eds.), Proceedings of the 2018 Conference of the North American Chapter of the Association
+for Computational Linguistics: Human Language Technologies, Volume 1 (Long Papers), pp.
+1314–1324,NewOrleans,Louisiana,June2018.AssociationforComputationalLinguistics.
+doi: 10.18653/v1/N18-1119. URLhttps://aclanthology.org/N18-1119/.
+LianhuiQin,SeanWelleck,DanielKhashabi,andYejinChoi.COLDdecoding:Energy-based
+constrainedtextgenerationwithlangevindynamics. InAliceH.Oh, AlekhAgarwal,
+DanielleBelgrave,andKyunghyunCho(eds.),AdvancesinNeuralInformationProcessing
+Systems,2022. URLhttps://openreview.net/forum?id=TiZYrQ-mPup.
+RafaelRafailov,ArchitSharma,EricMitchell,ChristopherDManning,StefanoErmon,and
+ChelseaFinn. Directpreferenceoptimization: Yourlanguagemodelissecretlyareward
+model. InThirty-seventhConferenceonNeuralInformationProcessingSystems,2023. URL
+https://openreview.net/forum?id=HPuSIXJaa9.
+Dan Roth. On the hardness of approximate reasoning. In IJCAI, pp. 613–619. Morgan
+Kaufmann,1993.
+ChristopherDeSa,ChrisRe,andKunleOlukotun. Ensuringrapidmixingandlowbias
+forasynchronousgibbssampling. InProceedingsofThe33rdInternationalConferenceon
+MachineLearning.
+Timo Schick, Sahana Udupa, and Hinrich Schu¨tze. Self-diagnosis and self-debiasing:
+A proposal for reducing corpus-based bias in NLP. Transactions of the Association for
+Computational Linguistics, 9:1408–1424, 2021. doi: 10.1162/tacl a 00434. URL https:
+//aclanthology.org/2021.tacl-1.84/.
+WeijiaShi,AndyShih,AdnanDarwiche,andArthurChoi. Ontractablerepresentationsof
+binaryneuralnetworks. InProceedingsofthe17thInternationalConferenceonPrinciplesof
+KnowledgeRepresentationandReasoning(KR),2020.
+AlexanderSmolaandShravanNarayanamurthy. Anarchitectureforparalleltopicmodels.
+ProceedingsofVLDBEndow.,2010.
+NisanStiennon,LongOuyang,JeffWu,DanielM.Ziegler,RyanLowe,ChelseaVoss,Alec
+Radford, Dario Amodei, and Paul Christiano. Learning to summarize from human
+feedback. In Proceedings of the 34th International Conference on Neural Information Pro-
+cessingSystems,NeurIPS’20,RedHook,NY,USA,2020a.CurranAssociatesInc. ISBN
+9781713829546.
+17
+Preprint. Underreview.
+NisanStiennon,LongOuyang,JeffreyWu,DanielZiegler,RyanLowe,ChelseaVoss,Alec
+Radford, Dario Amodei, and Paul F Christiano. Learning to summarize with human
+feedback. InAdvancesinNeuralInformationProcessingSystems,2020b.
+HanshiSun,MominHaider,RuiqiZhang,HuitaoYang,JiahaoQiu,MingYin,MengdiWang,
+PeterBartlett,andAndreaZanette. Fastbest-of-ndecodingviaspeculativerejection,2024.
+URLhttps://arxiv.org/abs/2410.20290.
+JiaoSun,YufeiTian,WangchunshuZhou,NanXu,QianHu,RahulGupta,JohnFrederick
+Wieting,NanyunPeng,andXuezheMa. Evaluatinglargelanguagemodelsoncontrolled
+generationtasks,2023.
+FahimTajwar,AnikaitSingh,ArchitSharma,RafaelRafailov,JeffSchneider,TengyangXie,
+StefanoErmon,ChelseaFinn,andAviralKumar. Preferencefine-tuningofllmsshould
+leveragesuboptimal,on-policydata. InProceedingsofthe41stInternationalConferenceon
+MachineLearning,2024.
+AntonioVergari,NicolaDiMauro,andFlorianaEsposito. Simplifying,regularizingand
+strengtheningsum-productnetworkstructurelearning. InJointEuropeanConferenceon
+MachineLearningandKnowledgeDiscoveryinDatabases,pp.343–358.Springer,2015.
+Antonio Vergari, YooJung Choi, Anji Liu, Stefano Teso, and Guy Van den Broeck. A
+compositionalatlasoftractablecircuitoperationsforprobabilisticinference. InNeurIPS,
+2021.
+Eric Wallace, Shi Feng, Nikhil Kandpal, Matt Gardner, and Sameer Singh. Universal
+adversarialtriggersforattackingandanalyzingNLP. InKentaroInui,JingJiang,Vin-
+cent Ng, and Xiaojun Wan (eds.), Proceedings of the 2019 Conference on Empirical Meth-
+ods in Natural Language Processing and the 9th International Joint Conference on Natural
+Language Processing (EMNLP-IJCNLP), pp. 2153–2162, Hong Kong, China, November
+2019. Association for Computational Linguistics. doi: 10.18653/v1/D19-1221. URL
+https://aclanthology.org/D19-1221/.
+BenjaminWarner,AntoineChaffin,BenjaminClavie´,OrionWeller,OskarHallstro¨m,Said
+Taghadouini,AlexisGallagher,RajaBiswas,FaisalLadhak,TomAarsen,NathanCooper,
+GriffinAdams,JeremyHoward,andIacopoPoli. Smarter,better,faster,longer:Amodern
+bidirectionalencoderforfast,memoryefficient,andlongcontextfinetuningandinference,
+2024. URLhttps://arxiv.org/abs/2412.13663.
+Alexander Wettig, Kyle Lo, Sewon Min, Hannaneh Hajishirzi, Danqi Chen, and Luca
+Soldaini. Organizetheweb: Constructingdomainsenhancespre-trainingdatacuration,
+2025. URLhttps://arxiv.org/abs/2502.10341.
+BrandonT.WillardandRe´miLouf. Efficientguidedgenerationforlargelanguagemodels.
+ArXiv,abs/2307.09702,2023.
+WeiminXiong,YifanSong,XiutianZhao,WenhaoWu,XunWang,KeWang,ChengLi,Wei
+Peng,andSujianLi. Watcheverystep! LLMagentlearningviaiterativestep-levelprocess
+refinement. InProceedingsofthe2024ConferenceonEmpiricalMethodsinNaturalLanguage
+Processing.
+Honghua Zhang, Po-Nien Kung, , Masahiro Yoshida, Nanyun Peng, and Guy Van den
+Broeck. Adaptablelogicalcontrolforlargelanguagemodels. InNeurIPS,2024a.
+MaosenZhang,NanJiang,LeiLi,andYexiangXue. Languagegenerationviacombinatorial
+constraintsatisfaction: AtreesearchenhancedMonte-Carloapproach. InTrevorCohn,
+Yulan He, and Yang Liu (eds.), Findings of the Association for Computational Linguistics:
+EMNLP2020, pp.1286–1298, Online, November2020. Association forComputational
+Linguistics. doi: 10.18653/v1/2020.findings-emnlp.115. URL https://aclanthology.
+org/2020.findings-emnlp.115/.
+18
+Preprint. Underreview.
+Yuansen Zhang, Xiao Wang, Tianze Chen, Jiayi Fu, Tao Gui, and Qi Zhang. P4: Plug-
+and-playdiscretepromptingforlargelanguagemodelspersonalization. InLun-WeiKu,
+AndreMartins,andVivekSrikumar(eds.),FindingsoftheAssociationforComputational
+Linguistics: ACL 2024, pp. 9129–9144, Bangkok, Thailand, August 2024b. Association
+for Computational Linguistics. doi: 10.18653/v1/2024.findings-acl.541. URL https:
+//aclanthology.org/2024.findings-acl.541/.
+StephenZhao,RobBrekelmans,AlirezaMakhzani,andRogerGrosse. Probabilisticinfer-
+enceinlanguagemodelsviatwistedsequentialmontecarlo. InProceedingsofthe41st
+InternationalConferenceonMachineLearning,ICML’24.JMLR.org,2024.
+RuiZheng,ShihanDou,SongyangGao,YuanHua,WeiShen,BinghaiWang,YanLiu,Senjie
+Jin, Qin Liu, Yuhao Zhou, Limao Xiong, Lu Chen, Zhiheng Xi, Nuo Xu, Wenbin Lai,
+MinghaoZhu,ChengChang,ZhangyueYin,RongxiangWeng,WensenCheng,Haoran
+Huang,TianxiangSun,HangYan,TaoGui,QiZhang,XipengQiu,andXuanjingHuang.
+Secretsofrlhfinlargelanguagemodelsparti: Ppo,2023. URLhttps://arxiv.org/abs/
+2307.04964.
+WangchunshuZhou,YuchenEleanorJiang,EthanWilcox,RyanCotterell,andMrinmaya
+Sachan.Controlledtextgenerationwithnaturallanguageinstructions.InAndreasKrause,
+Emma Brunskill, Kyunghyun Cho, Barbara Engelhardt, Sivan Sabato, and Jonathan
+Scarlett(eds.),Proceedingsofthe40thInternationalConferenceonMachineLearning,volume
+202ofProceedingsofMachineLearningResearch,pp.42602–42613.PMLR,23–29Jul2023.
+URLhttps://proceedings.mlr.press/v202/zhou23g.html.
+BanghuaZhu,MichaelJordan,andJiantaoJiao. Principledreinforcementlearningwithhu-
+manfeedbackfrompairwiseork-wisecomparisons. InProceedingsofthe40thInternational
+ConferenceonMachineLearning,2023.
+DanielM.Ziegler,NisanStiennon,JeffreyWu,TomB.Brown,AlecRadford,DarioAmodei,
+PaulChristiano,andGeoffreyIrving. Fine-tuninglanguagemodelsfromhumanprefer-
+ences,2020. URLhttps://arxiv.org/abs/1909.08593.
+19
+Preprint. Underreview.
+Table4: Breakdownoftheaverageϕtopic,TopicProb,andExp.Min.Topicfor6topics
+when steering Llama-3.2 (1B) generations to adhere to each given topic. Topics are
+orderedleft-to-rightaccordingtotheirreportedfrequencyinWettigetal.(2025).
+Metric Method Politics Finance&Business Science&Tech Food&Dining History Industrial
+random 90.89 95.79 91.21 89.83 92.13 91.40
+beamsearch 90.94 97.54 86.02 90.18 91.14 93.95
+ϕtopic
+BoN 97.40 98.98 98.64 94.36 98.30 97.46
+SConE 98.99 99.70 99.42 97.14 99.60 99.56
+random 84.00 92.80 84.80 84.40 84.40 86.80
+beamsearch 83.60 95.60 77.60 86.80 89.20 92.00
+TopicProb
+BoN 96.00 98.00 97.20 89.60 97.20 94.40
+SConE 98.40 100.00 99.20 93.60 99.60 99.60
+random 82.51 92.03 81.55 82.46 82.48 82.41
+beamsearch 88.51 97.08 84.61 87.64 90.36 93.89
+Exp.Min.Topic
+BoN 94.93 97.74 95.58 91.52 96.21 95.13
+SConE 96.42 99.08 95.60 93.37 97.47 98.23
+A ExperimentDetails
+SConE. Asatrade-offbetweenefficiencyandperformance,weperformexactinferenceover
+the top-10 tokens of the base LM. For each prefix, we run 2 independent, non-blocking
+GibbsSamplingchainsfor20iterations,applyingathinningfactorof5. Eachchainstartsby
+sampling 25 tokens from the base LM using a combination of nucleus and min-p sam-
+pling (top p=0.9, min p=0.1) (Holtzman et al., 2020; Minh et al., 2025). A BERT-based
+model(Warneretal.,2024)isusedtoefficientlyapproximatetheconditionals p˜cond.
+B HyperparametersConfigurations
+Inthissection,wedescribethehyperparametersusedforeachofthedecodingalgorithms
+andbaselinesusedinthiswork. ExceptwhereexplicitlymentionedwerelyontheHug-
+gingFace’simplementation10andthedefaultconfigurations.
+• RandomSearch(random): do sample=True
+• BeamSearch(beamsearch): do sample=True,num beams=5andtemperature=0.3.
+• Best-of-N (BoN) (BoN): We implement a custom best-of-n rejection sampling ap-
+proach (Stiennon et al., 2020a), that independently generates N = 10 sequences
+using HuggingFace’s generate method, parameterized with do sample=True,
+top p=0.9, min p=0.1. A verifier ϕ is used to choose the final generation, pick-
+a
+ing the generation out of the N that maximizes the constraint verifier. For the
+detoxification experiments where the goal is to minimize toxicity as measured
+by ϕtoxicity, we chose the generation that minimizes ϕtoxicity (in practice, we
+maximize1 ϕtoxicity).
+−
+ExperimentswererunonRTXA6000(48GBRAM)GPUsusingHuggingFaceandPyTorch.
+C AdditionalResults
+C.1 ControlledTopicGeneration
+Lastly,weevaluatethemethodsontheirabilitytocontrolforthetopicofLMgenerations.
+Wechoose6diversetopicsfromtherecentlytaxonomyconcerningthewebstructure(Wettig
+etal.,2025),includingfrequent(e.g.,Finance&BusinessandPolitics)andlessfrequenttopics
+(e.g., History, Industrial). For each topic, we randomly select 50 different examples from
+theTopicAnnotations-Llama-3.1-405B-FP8(Wettigetal.,2025)testset,breakingtheminto
+prefixesof8to12words. Eachprefixisusedtosampleamaximumof60tokens.
+10https://huggingface.co/(version4.49.0)
+20
+Preprint. Underreview.
+Topic Generation Task. In general, we find that uncontrolled baselines achieve a fairly
+high average constraint score ( 91%), which may be explained by the use of longer
+≥
+prefixesduringgeneration. Wefindthistobethecaseformostexamples. Nonetheless,
+thediscrepancybetweenuncontrolledandcontrolledmethodsisstillvisiblewiththelatter
+achieving7%-8%higheraverageconstraintscores. Remarkably,wefindthatSConEisnot
+onlyabletoimproveuponBoN,achievinganaveragescoreof98.89%butalsoproduces
+higherqualitygenerationsasemphasizedbythelowerperplexity.
+D EfficientLookaheadGenerationviaApproximateGibbsSampling
+Ourapproachrequiresaccesstoplausible Algorithm4Hogwild! GibbsSampling
+future continuations, or lookahead sam-
+ples, y , given a prefix y . However, 1: Input: ModernBert,prefixy 1:i ,lookahead∆,
+i+1:T 1:i blocksizeB,numworkersW,iterationsN
+we would like to avoid expensive autore-
+gressivesampling,especiallysinceweare 2: Output: y˜ 1:T drawnapproximatelyfrom p
+happy to trade off sample quality for effi- 3:
+ciency. Intuitively,weareonlyinterestedin 4: ▷Randomlyinitializecontinuationy i+1:T
+acrudeprojectionofwherethecurrenttra- 5: s InitializeSequence(y 1:i ,∆)
+←
+jectorymightleadus,asopposedtoaper- 6: ▷LaunchW workersforN/W updates
+fectlycoherentnaturallanguagesentence. 7: forallworkersw =1toW inparalleldo
+8: foriter =1to N/W do
+Taking cue from speculative decod- ⌈ ⌉
+ing (Leviathan et al., 2023), given a 9: ▷Sampleblockstartjincontinuation
+prefix y we start with a guess for the 10: j (i+1,T B+1)
+1:i ∼ U −
+continuation y , either by padding 11: blk idx [j : j+B 1]
+i+1:T ← −
+with [MASK] tokens or crudely sampling 12: ▷Read(potentiallystale)states local
+p(y
+j |
+y
+1:i
+)for j = i+1to T. Wecanthen 13: slocal
+←
+ReadSharedState(s)
+refine these crude continuations using 14: ▷Getapproximateblockconditionals
+Gibbs Sampling (Koller & Friedman, 2009), 15: pblk ModernBert(slocal,blk idx)
+←
+a Markov chain Monte Carlo (MCMC) 16: ▷Samplenewtokensfortheblock
+a to p k p e r n oac in hth th a e tst s o e c q h u a e s n ti c c e a , lly as s y a m m p p t l o es tic e a a l c l h y 1 1 7 8 : : y ▷ ′b U lk p ← da S te am sh pl a e re F d ro s m e B q l u o e c n k c D e is (H t( o p g b w lk i ) ld!)
+convergingtothetruedistribution. There- 19: WriteSharedState(s,blk idx,y b′lk )
+fore, by setting a cutoff, or a maximum
+20: endfor
+number of iterations, we can control how
+21: endfor
+crude of a lookahead sample we desire.
+22: WaitForAllWorkers()
+Unfortunately,thisintroducesamultitude
+of computational challenges. First, the 23: y˜ 1:T ← ReadSharedState(s)
+Gibbssamplerassumesefficientaccessthe 24: returny˜ 1:T
+the full conditionals p(y y i) i, which
+i
+requiresO( V )forwardpa | ss − eso ∀ ftheLMforasinglepositioni,whichisuntenablegiven
+| |
+thevocabularysizeofmodernLMs. Second,initsmostbasicform,Gibbssamplingrequires
+manyiterationsthroughthesentence,computingtheconditionalandresamplingasingle
+tokenperiteration,whichisquiteslow.
+Toovercomethesechallengesandenableefficientgeneration,weutilizeseveralstrategies:
+ApproximateConditionalswithMaskedLanguageModels(MLMs) Inplaceofanalyti-
+callycomputingtheconditionalscomputation,weleverageefficientpretrainedMLMsto
+approximatetheconditionalprobability p(y y ). Thesemodelsareinherentlydesignedto
+predictmaskedtokensgiventheirbidirectio
+i|
+na−l
+i
+context,providingafastapproximationof
+therequiredconditionaldistributionswithoutexpensiveanalyticalmarginalization.
+Parallel and Asynchronous Updates (Hogwild! Style) Standard Gibbs sampling up-
+datestokenssequentially. Inabidtoacceleratesampling,weemployparallel,potentially
+asynchronousupdatesinspiredbyHogwild!(Smola&Narayanamurthy,2010;Niuetal.,
+2011)approaches. Multipletokenpositionsjcanbeupdatedsimultaneously,possiblyusing
+slightlystalecontextinformationy .ThistradesofftheunbiasednessofGibbssampling(Sa
+j
+−
+etal.) forsubstantialgainsinwall-clocktimethtarecrucialforinference-timeapplications.
+21
+Preprint. Underreview.
+BlockedGibbsSampling Ratherthansamplingindividualtokensoneatatime,wecan
+updatecontiguousblocksoftokenssimultaneously. Thisreducesthenumberofsampling
+iterationsrequiredforconvergenceofthechainwhileallowingustobetterleveragethe
+parallelprocessingcapabilitiesofmodernhardware,especiallywhencombinedwithMLM-
+basedapproximateconditionalsthatexcelatprocessingmultiplepositionsefficiently.
+ControllingtheEfficiency-AccuracyTrade-off Theuseofapproximateconditionalsin-
+troducesanaturaldialtobalanceefficiencyandsamplequality. InverymuchaHogwild!
+fashion,thefrequencyatwhichwere-computeorsynchronizetheseapproximatecondi-
+tionalsusingthelatestcontextinfluencesthistrade-off. Lessfrequentupdatesleadtofaster
+samplingusingpotentially moreoutdatedcontextualinformation, whilemorefrequent
+updatesimprovefidelitytothetargetdistributionatthecostofincreasedcomputation.
+BycombiningGibbssamplingwiththeseefficiency-focusedtechniques—approximating
+conditionals via MLMs, parallelizing updates Hogwild! style, and employing blocked
+sampling—wecanrapidlygeneratediverseandplausiblelookaheadsamplesy suitable
+i+1:T
+forourinference-timealgorithm,effectivelytransformingthecomputationallydemanding
+taskofsamplingfromthejointdistributionintoamanageableandefficientprocedure.
+ThepseudocodefortheapproachelucidatedabovecanbeseeninAlgorithm4.Furthermore,
+anefficientPyTorchimplementationwillbemadeavailableinourGitHubRepository.
+22

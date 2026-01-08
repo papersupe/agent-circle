@@ -1,0 +1,1112 @@
+5202
+nuJ
+61
+]LC.sc[
+1v90131.6052:viXra
+Leveraging In-Context Learning for Language Model Agents
+ShivanshuGupta1* SameerSingh1 AshishSabharwal2 TusharKhot* BenBogin*
+1UniversityofCaliforniaIrvine 2AllenInstituteforAI
+{shivag5,sameer}@uci.edu, ashishs@allenai.com
+Abstract
+In-Context Learning (ICL) with dynamically
+selecteddemonstrationscombinestheflexibil-
+ityofpromptinglargelanguagemodels(LLMs)
+withtheabilitytoleveragetrainingdatatoim-
+proveperformance. WhileICLhasbeenhighly
+successfulforpredictionandgenerationtasks,
+leveragingitforagentictasksthatrequirese-
+quentialdecisionmakingischallenging—one
+mustthinknotonlyabouthowtoannotatelong
+trajectoriesatscaleandhowtoselectdemon-
+strations,butalsowhatconstitutesdemonstra-
+tions,andwhenandwheretoshowthem. To
+addressthis,wefirstproposeanalgorithmthat
+leveragesanLLMwithretriesanddemonstra-
+tionselectiontoautomaticallyandefficiently Figure1: Differenttypesofdemonstrationsforagentic
+annotateagentictaskswithsolutiontrajectories. tasks. TopUsingLLMstosimulateagenticbehavior
+Wethenshowthatset-selectionoftrajectories involvesrepeatedlypromptingitwiththegeneralsetup,
+ofsimilartasksasdemonstrationssignificantly a task description, and an execution trace recording
+improvesperformance,reliability,robustness, theagent’sthoughts(r),actions(a),andobservations
+and efficiency of LLM agents. However, tra- (o). MiddleGivenapooloftaskspairedwithsolution
+jectorydemonstrationshavealargeinference trajectories,onewaytoshowdemonstrationsistouse
+costoverhead. Weshowthatthiscanbemiti- entiretrajectoriesforsimilartasksintheprompt. While
+gatedbyusingsmalltrajectorysnippetsatev- effective, this has a large overhead. Bottom Another
+erystepinsteadofanadditionaltrajectory. We way is to use smaller trajectory snippets with similar
+findthatdemonstrationsobtainedfromlarger reasoningthatarepost-fixedtotheprompt.
+models(intheannotationphase)alsoimprove
+smallermodels,andthatICLagentscaneven for complex tasks with long trajectories. Prior
+rivalcostliertrainedagents. Thus,ourresults
+workonenhancingLLMagentsthroughstructured
+revealthatICL,withcarefuluse,canbevery
+prompting-based workflows with explicit reason-
+powerfulforagentictasksaswell.
+ing,planning,orreflectionsteps(Shinnetal.,2023;
+1 Introduction Kim et al., 2023; Sun et al., 2024) used a fixed
+promptforeverytaskinstance,withoutleveraging
+Due to advances in pretraining, instruction tun-
+trainingdata. Ontheotherhand,approachesbased
+ing,andscaling,LargeLanguageModels(LLMs)
+ontask-specificsupervisedfinetuningorreinforce-
+arenowincreasinglypoweringautonomousagents
+mentlearning(Chenetal.,2023;Mitraetal.,2024;
+to perform complex real-world tasks that require
+Chen et al., 2025) are too expensive to apply to
+actinginanenvironmentandsequentialdecision-
+larger,morepowerfulLLMsandtoupdatewiththe
+making. Using LLMs to simulate such agentic
+knowledgeneededfornewtasksaftertraining.
+behaviorinvolvesrepeatedlypromptingandasking
+Inthiswork,weexploreanalternativeapproach
+them to generate the next action to be executed.
+that is prompting-based yet takes advantage of
+However,LLMagentscanbeunreliable,especially
+training data, namely In-Context Learning (ICL)
+*WorkdonewhileauthorswereatAllenInstituteforAI. with Demonstration Selection, where demonstra-
+tionsrelevanttoeachinstanceareselectedatinfer- notationalgorithm,weautomaticallyannotateover
+encetimefromapoolofannotations. WhileICLis 95% of training tasks with solutions to create a
+alreadyeffective(Brownetal.,2020),demonstra- demonstrationpool. Weshowthatusingtheanno-
+tion selection can dramatically boost it for tradi- tatedtrajectoryofevenasinglemostsimilartask
+tionalNLPtasks(Guptaetal.,2024,2023;Yeetal., asademonstrationboostsazero-shotagent’sper-
+2023a). However,unlikesuchnon-sequentialtasks formanceby29points,16pointsmorethanusing
+wheredemonstrationscansimplybeinput-output afixed,manuallywrittentrajectory. Further,when
+pairs from a train set, for agentic tasks, the train- additional trajectories can be included, selecting
+ing sets of tasks, even when available, are rarely them jointly as a set (Gupta et al., 2023) is more
+annotatedwithsolutionsthatcanserveasdemon- effectivethanindependentranking-basedselection.
+strations. Moreover, due to context length limits Selecting trajectory demonstrations is particu-
+andrecencybiasofLLMs,oneneedstothinknot larlyeffectiveatimprovingreliability(acrossmul-
+justofhowtoselectdemonstrations,butalsowhat tiplerunsofthesametask)androbustness(across
+thesedemonstrationscomprise(e.g.,entiretrajec- variationsofthesametasks),outperformingtheuse
+toriesorsnippetsthereof),whentoshowthem(i.e., ofafixedtrajectoryby20.8and23.2points,respec-
+whatstep),andwheretoplacethemintheprompt. tively. However,whileeffective,trajectorydemon-
+Toaddressthesechallenges,weproposeaniter- strations also have a large overhead in terms of
+ativeannotationalgorithmthatleveragesICLand inferencecosts—eachadditionaltrajectoryadding
+demonstrationselectionitselftoautomaticallyand ontheorderof100Ktokensonaverageininference
+efficiently annotate training tasks with solutions costs. Instead, asweshow, providingsmall, rele-
+that can be used as demonstrations. We then use vantsnippetsofthetrajectoriesasdemonstrations
+theseannotationstostudydifferentdemonstration ateverystepisalsoeffectiveatimprovingperfor-
+granularities and placements. We begin with the mance,notablywithnegligibleoverhead. Wefind
+simplestapproach,whichistoshowentiretrajecto- a combination of trajectory and snippet demon-
+riesofsimilartasks. AsshowninFig. 1(middle), strations to be the optimal approach, and with
+theseareplacedbeforethetesttaskandshownat these, a prompted LLM agent can be made com-
+everystep. Sincetrajectoriestendtobelongand petitive with most state-of-the-art training-based
+onlyalimitednumberofthemcanfitintheprompt, approaches(Chenetal.,2025). Overall,ourresults
+we explore how to select optimal sets of trajecto- showthat,similartotraditionalNLPtasks,demon-
+ries. Finally,astrajectorydemonstrationscanhave strationselectioncanyieldsignificantperformance
+a large overhead in terms of inference costs, we gains for LLM agents and can enable prompted
+exploretwoformsofsmallerdemonstrations. First, LLMagentstorivaleventrainedones.
+weconsidersmallersubtasktrajectoriesbyswitch-
+ingtoaPlan-and-Execute(PnE)solver(Yangetal., 2 RelatedWork
+2023;Sunetal.,2024)thatdecomposestasksinto
+asequenceofsubtasksandexecutesthemoneby LLMAgents. LLMsareincreasinglybeingused
+one. Second, we show small relevant snippets of topowerautonomousagentsforavarietyofagentic
+trajectoriesateverystep(Fig. 1(bottom)). These tasksinvolvingsequentialdecision-making. These
+areselectedbasedontheagent’sreasoninginthe include web navigation to answer user queries
+lateststepandshownattheendofthepromptfor (Zhou et al., 2024b; Drouin et al., 2024) and e-
+asinglestep,thusaccountingforLLMs’recency commerce(Yaoetal.,2022),playinggames(Shrid-
+biasandalsohavingaminimaloverhead. haretal.,2021),interactingwithapplicationsand
+For our testbed, we use the AppWorld bench- APIstocarryoutusertasks(Trivedietal.,2024),
+mark (Trivedi et al., 2024), which evaluates an runningMLexperiments(Boginetal.,2024),and
+LLMagent’sabilitytocarryoutcomplexday-to- more. Prior work on improving agent perfor-
+day user tasks involving sending emails, making manceonsuchtaskshaslookedinto(1)prompting
+payments,playingmusic,shopping,etc.,byinter- basedapproachestoinducingstructuredworkflows
+acting with a variety of apps via their APIs. Ap- with explicit reasoning, planning, and reflection
+pWorld’s rich code-based action space, varying steps (Yao et al., 2023; Shinn et al., 2023; Wang
+observation sizes, and complex tasks make it an et al., 2023; Kim et al., 2023; Sun et al., 2024),
+idealtestbedforstudyingvariousdesigndecisions (2)training-basedapproachesincludingsupervised
+relatingtodemonstrationselection. Usingouran- finetuningonagenttrajectoriesandreinforcement
+learning (Nakano et al., 2021; Yao et al., 2022; its progress and an action (denoted a), to be ex-
+Deng et al., 2023; Chen et al., 2023; Qin et al., ecuted in the environment to obtain the next ob-
+2024;Mitraetal.,2024;Chenetal.,2025). servation (denoted o). Formally, given (1) a con-
+In-ContextLearning(ICL)(Brownetal.,2020) text c = ⟨p,q⟩ comprising a general context p
+istheabilityofLLMstosolveunseentaskswith- which describes the setup, provides demonstra-
+outtrainingbymerelyconditioningonafewtask tionsandguidelines,etc.,andatask-specificcon-
+demonstrationsandwithoutanytask-specifictrain- text q describing the task to be carried out, and
+ing. However, ICL performance is highly sensi- (2) a trace of past thoughts, actions, and observa-
+tive to the choice of demonstrations (Zhao et al., tionsh t = ⟨r 1 ,a 1 ,o 1 ,...,r t ,a t ,o t ⟩,theLLMis
+2021), and can be significantly improved by dy- promptedtogeneratethenextthoughtandaction:
+namically selecting demonstrations for each test
+r ,a ∼ P (· | c,h ) (1)
+input(Liuetal.,2022). Thereisnowalargebody t+1 t+1 LM t
+ofworkonselectingbetterdemonstrations,explor-
+Thenextobservationo isthenobtainedbyex-
+ing among other things, better metrics for scor- t+1
+ecuting the action a in the environment. This
+ingdemonstrationcandidates(Rubinetal.,2022; t+1
+processisrepeateduntilaterminalstateisreached.
+Gupta et al., 2023, 2024; Askari et al., 2025), se-
+We will refer to the complete execution trace h
+lectingdemonstrationsasaset(Guptaetal.,2023; T
+asatrajectoryτ.
+Yeetal.,2023a),selectingdiversedemonstrations
+toreduceredundancyamongthem(Suetal.,2023; Plan&Execute(PnE).TheReActapproach,as
+Levy et al., 2023; Agrawal et al., 2023; Ye et al., described above, tries to solve the entire task in
+2023b),etc. one go and retains the entire execution trace in
+theprompt. However,thiscanbeexpensiveasthe
+Demonstration Selection for Agentic Tasks.
+trajectoriesforcomplexagentictasksareoftenvery
+PriorworkondemonstrationselectionforICLhas
+long. One way to address this is to use a Plan &
+primarily focused on traditional, non-sequential
+Execute (PnE) approach (Yang et al., 2023; Sun
+NLPtasksthatinvolvemappinginputstooutputs.
+etal.,2024). PnEtakesadvantageofthefactthat
+Thetwopriorworksthathavestudieddemonstra-
+ataskmayinvolvemultiplesimplersubtasks,and
+tion selection in the context of agentic tasks are
+howeachsubtaskiscarriedoutmaynotberelevant
+Synapse (Zheng et al., 2024) and TRAD (Zhou
+to the other subtasks. It incorporates a planning
+etal.,2024a). However,theyprimarilyfocusedon
+step that breaks down the original task t into a
+webnavigationtaskswherethemainchallengewas
+sequenceofsubtaskst1,...,tm. Eachsubtaskis
+the size of individual HTML observations rather
+then executed by a ReAct-styled executor agent,
+thantaskcomplexity(intermsofnumberofsteps).
+optionallywiththeplanandsummariesofprevious
+Incontrast,wefocusonmorecomplextaskswhich
+subtasks’trajectoriesprovidedinthetask-specific
+involvenumerousstepswithlong-rangedependen-
+promptq.
+cies,butnoteverystepyieldsalargeobservation,
+allowing an entire trajectory or two can fit in the
+3.2 In-ContextLearningandDemonstration
+context. Thissetupallowsustostudytheimpact
+Selection
+ofdifferentgranularities,selection,andplacements
+In-ContextLearning(ICL)istheabilityofLLMs
+ofdemonstrations. Notably,thiswillalsobecome
+to solve unseen tasks by conditioning on a few
+anincreasinglycommonscenarioasLLMcontext
+taskdemonstrations. Formally,fortraditionalNLP
+lengthsincrease,butthecost-benefittrade-offswe
+tasks, given demonstrations in the form of input-
+explorewillremain.
+output pairs {(x ,y )}k and the test input x ,
+i i i=1 test
+3 Preliminaries it involves prompting the LLM with the context
+c = ⟨x ,y ,...,x ,y ,x ⟩ and letting it gen-
+1 1 k k test
+3.1 LLMAgents
+erate the output y . Although using the same
+test
+ReAct. The predominant approach to creating demonstrations for all test inputs allows ICL to
+LLM-powered agents for agentic tasks is ReAct work even for tasks lacking any training data,
+(Yao et al., 2023). As shown in Fig. 1 (Top), when a training set T = {(x ,y )}N is avail-
+i i i=1
+it involves repeatedly prompting the LLM with able,performancecanbeboostedusingsomeform
+atraceofpastexecutionandaskingittoproducea ofdemonstrationselection(Liuetal.,2022;Rubin
+thought(denotedr)describingitsreasoningabout et al., 2022; Gupta et al., 2023, 2024). Using the
+trainingsetasapoolofdemonstrationcandidates, Algorithm 1 Iterative Annotation for Agentic
+it involves selecting k ≪ N demonstrations that, Tasks
+whenplacedinthecontext,increasethelikelihood Require: TaskpoolT;DemonstrationselectorD;SolverS;
+SolutionCheckerC;NumberofRoundsR
+of the correct output being generated. Some ap-
+1: U ←T ▷Unannotatedtasks
+proachesfordemonstrationselectionproposedfor 2: T∗ ←∅ ▷Annotatedtasks
+traditionalNLPtasksthatwewillexperimentwith 3: forr=1toRdo
+4: fort∈U do
+include:
+5: D←D(t,T∗) ▷Selectdemonstrations
+Ranking-basedSelection. Thisinvolvesscoring 6: s←S(t,D) ▷Generatesolutionwith
+demonstrations
+allthecandidatesfortheirrelevancewithrespect
+7: ifC(t,s)then
+tothetestinstanceandusingthetop-Kcandidates 8: T∗ ←T∗∪(t,s) ▷Addtoannotatedtasks
+as demonstrations. Formally, given the training 9: U ←U−{t} ▷Removefromunannotated
+setT = {(x ,y )}N andthetestinputx , the tasks
+i i i=1 test 10: endif
+demonstrationsareselectedastopk sim(x ,x ), 11: endfor
+i test i
+where sim(·) is a similarity metric. Note that the 12: ifU =∅then
+13: break ▷Alltasksannotated
+metricoperatesononlytheinputsthatproxyasthe
+14: endif
+retrieval key for the demonstrations. Prior work 15: endfor
+16: returnT∗ ▷Annotatedtasks
+has explored Cosine Similarity (Liu et al., 2022)
+andBERTScore-Recall(BSR)(Zhangetal.,2020;
+Gupta et al., 2023) as metrics, both of which in-
+S that is used to generate solutions s ∼ S(t,D)
+volveencodingtheretrievalkeyusingadenseen-
+given a task t and some demonstrations D, and
+coderandusingittoidentifytheclosestcandidate.
+(3)acheckerthatverifiessolutioncorrectness,the
+Set Selection. Gupta et al. (2023) showed that algorithm returns tasks annotated with solutions
+ranking-based selection can be sub-optimal for T∗ = {t ,s }N . Further,insteadofnaivelyretry-
+i i i=1
+complex compositional tasks as it may select ing the solver, the algorithm also leverages cur-
+demonstrationsthatareindividuallyrelevanttothe rentlyannotatedtasksasdemonstrations. Thisnot
+testinputyetfailtoprovidealltherelevantinfor- onlyimprovesefficiencyintermsofthenumberof
+mationneededtosolveit. Instead,theyarguethat retriesneededbutalsoensuresthatmoreinstances
+demonstrations should be selected as a set such arecorrectlyannotated.
+that they cover all the reasoning patterns. They Finally, note that the algorithm, as described
+proposedSet-BSR,aset-extensionofBSR,thatis above, is agnostic to the kind of solver (and so-
+submodularandhencegreedilyoptimizable. lutions), e.g., for the ReAct solver, the solutions
+would be trajectories, i.e. s = τ , while for the
+i i
+4 AutomaticTrajectoryAnnotation
+PnEsolver,theywouldcompriseaplanintheform
+of a sequence of subtasks and the corresponding
+Given the success of demonstration selection for
+trajectories,i.e. s = {tj,τj}mi . Wewillreferto
+ICL for traditional NLP tasks, in this work, we i i i j=1
+thesetoftasktrajectoryannotationsforReActas
+explorehowtoeffectivelyandefficientlyleverage
+D∗ ,theplanandsubtasktrajectoryannotations
+itforagentictasks. However,thisrequiresapool task
+oftasksannotatedwithagent-stylesolutions1 (as forPnEasD p ∗ lan andD s ∗ ubtask ,respectively.
+describedin§3.1)thatcanserveasdemonstrations.
+5 DemonstrationsforAgents
+Whilesomeagenticbenchmarksprovidetraining
+sets of tasks, most do not provide task solutions Having annotated a pool of tasks with solutions
+in a form that can be used as demonstrations for thatcanserveasdemonstrations,wenowdiscuss
+theagent;rather,theyonlyprovideafinalanswer different demonstration granularities, along with
+or a checker that can be used to verify solution howtoselectthem,whentoshowthem,andwhere
+correctness. toplacethemintheprompt.
+Sincemanuallyannotatingtaskswithsolutions
+isintractableatscale,weproposeasimpleiterative 5.1 Task-levelTrajectoryDemonstrations
+algorithm (Algorithm 1) to do this automatically. Similar to traditional ICL, a natural way to show
+Given(1)apooloftasksT = {t i }N i=1 ,(2)asolver demonstrationsisintheformoftrajectoriesforsim-
+ilartasksfromthepoolD∗ . Thesetask-trajectory
+1Inreal-worldsettings,thesecouldalsobeobtainedfrom task
+anexistingsystem. pairsareselectedfromD∗ beforeexecutionand
+task
+areusedinthepromptateverystep. Specifically,
+theyareplacedinthegeneralpromptpbeforethe
+descriptionofthetesttasktanditsexecutiontrace
+h . Toselectthesedemonstrations,weexperiment
+t
+with both ranking-based and set-selection meth-
+Figure2: Snippetdemonstrationsareselectedbasedon
+ods described in § 3.2 using the task statement thethoughtatthecurrentstep(how)andonlyusedto
+as the retrieval key. Since, similarly to the tasks predictthenextthought-action(when)byplacingafter
+exploredbyGuptaetal.(2023),theoptimaldemon- the execution trace in the prompt (where). E.g., the
+strations for agentic tasks would demonstrate all snippets S 2 are selected based on the thought r 1 and
+usedtopredictr anda andsoon.
+necessarysteps,webelievethatset-selectionmight 2 2
+bemoreappropriateforagentictasksascompared
+theyareplacedearlyintheprompt,theystilldon’t
+toranking-basedselection.
+completely address the problem of recency bias.
+5.2 Fine-grainedDemonstrations Thus,weexperimentwithshowingsmallsnippets
+oftrajectoriesthatarerelevanttothecurrentstep
+Asnotedin§3.1,thetrajectoriesforcomplexagen-
+asdemonstrations. Toidentifythesesnippets,we
+tic tasks can be very long. Thus, using them as
+use the thought produced at the current step as a
+demonstrations may be very expensive, if at all
+retrievalkeytofindsimilarthoughtsintrajectory
+feasible with limited context lengths. Moreover,
+annotations D∗ . A similar thought suggests a
+thetrajectoriesforeventhemostsimilartasksmay task
+similarstep,andwecanuseasnippetofthetrajec-
+have irrelevant steps while not being helpful for
+tory comprising this step as a demonstration. As
+everystepofthetesttask. Finally,LLMshaveare-
+showninFig. 3,theselectedsnippetsareappended
+cencybias(Liuetal.,2024),thusasmallerdemon-
+to the promptafter the executiontrace h , which
+stration,closertothestepsitisrelevantfor,maybe t
+helps account for the recency bias. See Fig. 12
+moreeffectivethananentiretrajectoryearlyinthe
+foranexampleofaprompttemplateforshowing
+prompt. Weexploretwowaystoachievethis: (1)
+snippetdemonstrations. Thesnippetsselectedfor
+usingtrajectoriesforsimilarsubtaskswithaPnE
+the current step are only shown for predicting a
+solver and (2) using snippets of the trajectories
+single next step, as they may not be relevant for
+relevanttothecurrentstep.
+subsequentsteps,forwhichweselectnewsnippets
+5.2.1 Subtask-levelTrajectory anyway. Finally,notethatsnippetdemonstrations
+Demonstrations as described above do not require any additional
+annotations,astheyarederivedfromthetrajectory
+Onewaytousesmallerdemonstrationsistousethe
+annotations.
+PnEsolverinsteadof§3.1thatbreakstheoriginal
+task down to a sequence of subtasks t1,...,tm
+6 ExperimentalSetup
+andexecuteseachsubtaskseparatelyusingaReact-
+style executor. The demonstrations for the PnE 6.1 AppWorldBenchmark
+executorcanbethetrajectoriesofsimilarsubtasks
+AppWorld2 (Trivedi et al., 2024) is a benchmark
+fromthepoolD∗ . Thisissimilartothetrajec-
+subtask designed to evaluate an autonomous agent’s abil-
+torydemonstrationsfromthe§5.1inthattheyare
+itytocarryoutcomplexusertasksbyinteracting
+selectedpriortosubtaskexecutionandincludedin
+with 457 APIs associated with 9 simulated apps,
+thegeneralpromptpforeverystepofthesubtask.
+viz. Gmail,Venmo,Spotify,SimpleNote,Splitwise,
+However,theselectionusesthesubtaskstatement
+Amazon, Todoist, Phone, and File System. It pro-
+as the retrieval key, and demonstrations for dif-
+vides a stateful Python interpreter that the agent
+ferent subtasks of the current task may be from
+can use to interact with the various APIs and a
+different tasks. In this way, it allows for a more
+Supervisor app and an ApiDoc app it can use to
+fine-graineddemonstrationtobeshownforthelim-
+obtaintheinformationabouttheuserandthevari-
+itedscopeofthesubtask.
+ousApps/APIs,respectively. Notethat,although
+5.2.2 Step-levelSnippetDemonstrations due to cost constraints, we only experiment with
+AppWorld, its code-based action space, varying
+A major drawback of using a PnE solver is that
+it introduces a planning step prior to execution,
+2OuruseofAppworldispermittedbyitslicense(Apache
+which may yield inaccurate plans. Moreover, as License2.0).
+observation sizes, and complex tasks make it the 6.2 Methods
+idealtestbedforourexperiments.
+Asdiscussedin§5,weexplorethefollowingthree
+The benchmark comprises a total of 244 task differenttypesofdemonstrations:
+templates,orscenarios,eachwiththreevariantsfor
+Task Trajectory Demonstrations. We experi-
+atotalof722tasks. Thetasksaresplitintoatrain
+ment with the following selection methods to se-
+set (90 tasks), a dev set (57 tasks), and two test
+lectk trajectories: (1)ranking-basedselectionus-
+sets: test-normal(Test-N,168tasks),whichevalu-
+ing Cosine Similarity (COS[k]) and BertScore-
+atesin-distributionperformance,andtest-challenge
+Recall(BSR[k]),and(2)set-selectionusing SET-
+(Test-C,417tasks),containingmorecomplextasks
+BSR[k](Guptaetal.,2023). FollowingGuptaetal.
+involvingunseenapps. Eachtaskisassociatedwith (2023), for COS, we use all-mpnet-base-v2 as
+asuiteofunitteststhatcheck(1)whetheronlythe
+theencoder,whilefor BSR and SET-BSR,weuse
+requisitechanges,andnoextraneouschanges,were deberta-base-mnli-v2. For COS and BSR,we
+madetotheenvironmentstate,and(2)ifrequired
+reportresultsfork = 1andk = 2,whilefor SET-
+bythetask,thefinalanswerproducedmatchesthe
+BSR,weonlyreportresultsfork = 2asselection
+ground truth. A task is considered solved only if
+using it reduces to BSR for k = 1. As baselines,
+allitsunittestspass.
+weexperimentwithusingtheagentzero-shotwith-
+Annotation. Tocreateourdemonstrationpool,we outanytrajectorydemonstrations(ZEROSHOT[0]),
+usetheiterativeannotationalgorithm(Alg.§1)to and using a single fixed manually written trajec-
+automaticallyannotate146tasksinthecombined toryfromTrivedietal.(2024)asdemonstrationfor
+trainanddevsets. Asdescribedin§4,wespedup everytestinput(FIXED[1]).
+theprocessbyusingalreadyannotatedinstancesas Subtask Trajectory Demonstrations. We use
+demonstrationsforsubsequentiterations. Specifi- BSR to select subtasks whose trajectories to in-
+cally,forReAct,weusedonetask-trajectorypairas clude in the executor’s prompt. Additionally, we
+ademonstration,andforPnE,weused4task-plan use four task-plan pairs selected using BSR as
+pairsand3subtask-trajectorypairsfortheplanner demonstrationsfortheplanner.
+andexecutor,respectively. Forannotation,allthe
+Snippetdemonstrations. Weuse BSR forselec-
+demonstrationswereselectedusingCosineSimilar- tionofupto3 k = 2annotatedthoughtsbasedon
+itybasedonall-mpnet-base-v2encoder. Ofthe
+the thought at every step of the current task. For
+147tasks,weannotated141tasksspanning48sce-
+eachselectedthought,wecreatethesnippetsusing
+narioswithReActsolutions. With PnE,wewere
+thestep(thought-action-observationtriple)corre-
+abletoannotate134tasksspanning46scenarios.
+spondingtotheselectedthoughtandasubsequent
+ThePnEsolutionshadanaverageof 6.2subtasks
+stepifthereisone.
+pertaskforatotalof833subtasks.
+Evaluation. WeevaluateonboththeTest-Nand Method TGC↑ RTGC↑ SGC↑ Steps↓
+Test-Csets. AppWorldrecommendstwometrics: ZEROSHOT[0] 35.1 22.0 15.2 21.9
+(1) Task Goal Completion (TGC), which is the FIXED[1] 50.6 40.5 30.4 14.6
+percentageoftaskssolved,and(2)ScenarioGoal RANDOM[1] 58.9 43.5 37.5 14.8
+COS[1] 64.0 57.1 44.6 13.4
+Completion (SGC), which is the percentage of
+BSR[1] 61.0 52.4 44.6 13.5
+scenariosforwhichallthreetaskvariantspassed.
+RANDOM[2] 58.9 45.8 33.9 13.8
+While TGC measures an agent’s overall perfor- COS[2] 63.7 57.1 44.6 12.6
+mance, SGC measures its robustness across vari- BSR[2] 64.9 59.5 50.0 12.2
+ations of a task. Additionally, to assess whether
+SETBSR[2] 65.8 61.3 53.6 11.5
+agentssolvetasksreliably,ratherthanbychance,
+Table1: Impactofdifferentnumbersandselectionof
+we also report the percentage of tasks for which
+trajectorydemonstrationsonaGPT-4oReActagenton
+multiplerunssucceeded,calledReliableTaskGoal the Test-N. Even a single manually written trajectory
+Completion (RTGC). We also report the average significantlyimprovesperformance. Further,gainsare
+Token Usage during execution of each task as a obtained using actual agent trajectories, by selecting
+measure of efficiency and the average number of themostrelevanttrajectoriesasdemonstrations,andby
+usingset-selectionwhenusingmultipletrajectories.
+Stepstakentocompletetasksasameasureofinfer-
+encecosts. Notethattokenusagewouldaggregate
+3Topreventspuriousmatches,wefilteroutthoughtsthat
+theinputandoutputtokencountsacrossallsteps. scorelessthan0.85.
+TGC
+40
+w/ Snippets
+35
+Yes
+No
+30
+25
+FIXED[1] BSR[1] SETBSR[2]
+Figure 4: Effect of trajectory and snippet demonstra-
+tions(selectedusingBSR)onTGCofGPT-4oReAct
+agentonTest-C.
+more reliable, robust, and efficient. Trajectory
+demonstrations have an even greater impact on
+Figure 3: Effect of trajectory and snippet demonstra- RTGC and SGC (e.g. SETBSR[2] improves on
+tions(selectedusingBSR)ontheperformanceinterms FIXED’s RTGC and SGC by 20.8 and 23.2 abso-
+ofTGC(Top)andinferencecostintermsoftokenusage lutepoints,respectively). Thissuggeststhatusing
+pertask(Bottom)ofGPT-4oReActagentsonTest-N. relevant demonstrations is especially effective at
+While trajectory demonstrations are most effective at
+making the agent more reliable (across multiple
+improvingperformance,theydosoatahighcost. Snip-
+runsofthesametask)androbust(acrossmultiple
+petdemonstrationsarealsogenerallyeffectivebuthave
+averyminimaloverhead.
+variants of the task). Further, SETBSR[2] also
+takes21%fewerstepsthan FIXEDand47%fewer
+6.3 AgentImplementationDetails stepsthanZEROSHOT,implyinggreaterefficiency
+WeuseOpenAI’sGPT-4o(gpt-4o-2024-08-06) andsolutionspeed.
+astheprimaryLLMbothforannotatingourdemon- Snippetdemonstrationsgenerallyimproveper-
+stration pool as well as for our ICL experiments. formancewithminimaloverhead. Fig.3shows
+Detailed hyperparameters and prompt templates theresultsfortheReActsolverwithandwithout
+fortheReActsolver,PnEplanner,andexecutorare snippet demonstrations for varying selections of
+provided in the App. A. To see if the annotation trajectory demonstrations. Despite all their bene-
+obtained from a larger LLM can benefit smaller fits, trajectories are very costly to use as demon-
+LLMs,wealsoexperimentwiththesmallerGPT- strations,andusingtwotrajectoriesinsteadofone
+4o-mini(gpt-4o-mini-2024-07-18). increases the average cost per task by 40%. On
+theotherhand,snippetdemonstrationshavevery
+7 Results
+minimaloverheadwhilegenerallyimprovingper-
+formance. However,sincetheyarenotaseffective
+Trajectorydemonstrationsboostagentperfor-
+as trajectories, the optimal approach is to use as
+mance. Table 1 shows the results on Test-N for
+many trajectories as possible and then sprinkle a
+varyingnumbersandselectionoftrajectorydemon-
+fewsnippetdemonstrations.
+strations. First,itisclearfromtheTGCnumbers
+(taskcompletion)thatevenasinglemanuallywrit- Demonstrations help even on out-of-domain
+tentrajectorydemonstration(FIXED)cangreatly tasks. AsshowninFig.4,demonstrationsimprove
+improveagentperformancecomparedtousingthe performanceevenonTest-C,whichhasmorecom-
+agent ZEROSHOT. Moreover, the LLM agent’s plex tasks involving unseen apps. As expected,
+own trajectory annotations are more effective as the performance is lower than Test-N. However,
+demonstrations than simplified manually written althoughnoneoftheannotationsdemonstratethe
+ones,evenifweselectthemrandomly(RANDOM useoftheunseenapps,weseethatbothtrajectory
+v/s FIXED). Selectingarelevanttrajectory,using andsnippetdemonstrationsimproveperformance.
+any method COS or BSR, remains the most ef- Larger LLMs’ annotations can also improve
+fective. Finally, when using more than one tra- smaller LLM agents. As shown in Fig. 5, GPT-
+jectory,set-selection(SETBSR)ismoreeffective 4o’sannotationsalsoworkwellasdemonstrations
+thanindependentranking-basedselection. Overall, forthesmallerGPT-4o-mini. Asbefore,it’sclear
+SETBSR[2]beats ZEROSHOTand FIXEDby30.7 that both trajectory and snippet demonstrations
+and15.2absolutepointsinTGC,respectively. are effective at improving performance and effi-
+Trajectorydemonstrationsalsomaketheagent ciency. Using SETBSR[2] trajectorieswithsnip-
+TGC
+40
+35 w/ Snippets
+Yes
+30 No
+25
+20
+FIXED[1] BSR[1] BSR[2] SETBSR[2]
+Figure 5: Effect of trajectory and snippet demonstra-
+tions (selected using BSR) on TGC of GPT-4o-mini
+ReActagentonTest-N.
+64
+63
+62
+61
+60
+59
+58
+57
+200 250 300 350 400 450
+Token Usage (in 1000s)
+CGT
+Test-N Test-C
+Approach
+TGC SGC TGC SGC
+SFT-GT 6.2 1.8 0.8 0.1
+SFT RFT 47.9 26.4 26.4 11.4
+EI 58.3 36.8 32.8 17.6
+DPO-MCTS 57.0 31.8 31.8 13.7
+DPO
+DMPO 59.0 36.6 36.3 13.7
+PPO(learnedcritic,token) 50.8 28.9 26.4 10.5
+RLOO(traj) 57.2 35.7 36.7 17.4
+GRPO(token) 58.0 36.8 39.5 22.4
+RL
+LOOP(bandit) 53.3 33.6 27.7 13.0
+2
+Demo Type LOOP(turn) 64.1 43.5 40.8 26.5
+ReAct LOOP(token) 71.3 53.6 45.7 26.6
+PnE[BSR]
+PnE[SetBSR] Traj[Fixed] 50.6 30.4 33.6 18.0
+NFT Traj[SetBSR] 65.8 53.6 38.7 24.8
+Traj[SetBSR]+Snippet 65.8 53.6 38.2 23.4
+1 3
+3
+Table2: Withselectedtrajectoryandsnippetdemonstra-
+1 2 tions,apromptedGPT-4oagentperformscompetitively
+2 withQwen-2.5-32B-basedagentstrainedusingavariety
+ofapproachesspanningsupervisedfinetuning(SFT),di-
+1
+rectpreferenceoptimization(DPO),andreinforcement
+learning(RL).Theresultsfortrainedagentsaretaken
+from Chen et al. (2025). We refer the reader to App.
+Figure6: ComparisonofGPT-4oPnE(withBSRand BforabriefdescriptionofeachapproachandtoChen
+SETBSRplannerdemos)andReActsolverswithvary- etal.(2025)formoredetails.
+ingnumberofBSRtrajectorydemonstrationsonTest-N.
+Astrajectoriesforsubtasksaremuchshorterthanfor
+from Chen et al. (2025). We provide a brief de-
+entire tasks, more of the former can be used with a
+scriptionofeachapproachinApp. Bandreferthe
+PnEexecutorthanthelatterwithReActsolver. How-
+reader to Chen et al. (2025) for more details. It
+ever,PnEstillunderperformsReActlikelybecauseit
+attemptstodecomposethetaskpriortoanyexecution. is clear that with selected trajectory and snippet
+demonstrations,GPT-4oReActagentcanoutper-
+pet demonstrations improves TGC rate by 14.3 formallbutthebest-trainedagents.
+absolutepointsandreducesthenumberofstepsby
+40%comparedtousingjustthe FIXED trajectory
+8 Conclusion
+demonstration.
+Subtask trajectory demonstrations improve
+This work studied different design decisions re-
+PnE solver, but it still underperforms ReAct.
+lating to ICL with demonstration selection for
+Fig. 6 compares the PnE solver with BSR and
+LLM agents. We proposed a novel iterative an-
+SETBSR-selectedplannerdemonstrationsandthe
+notationalgorithmtoautomaticallyannotatetrain-
+ReAct solver for a varying number of trajectory
+ingtaskswithsolutionsforuseasdemonstrations.
+demonstrations. It is clear that subtask trajecto-
+Using these annotations, we showed that trajec-
+ries have much less overhead than task trajecto-
+tory demonstrations can effectively improve per-
+ries. Nevertheless,despiteaddingmoretrajectory
+formance,reliability,robustness,andefficiencyof
+demonstrations for the executor, the PnE solver
+LLMagents. Further,sincetrajectorydemonstra-
+cannot match the ReAct solver. This is likely be-
+tions can have a large overhead in terms of infer-
+causePnEplansbeforeanyexecution,whichmay
+encecosts,wealsoshowedthatsmallsnippetsof
+leadtoinaccurateplans.
+trajectoriescanbeusedasdemonstrationsatevery
+Withdemonstrationselectionpromptedagents steptoboostperformancewithaminimaloverhead.
+canbecompetitivewithtrainedagents. Table2 Overall,ourresultssuggestthattheoptimalICLap-
+comparestheGPT-4oReActagentwithavariety proachistouseasmanytrajectorydemonstrations
+ofsupervisedfinetuning(SFT),directpreference as possible and then sprinkle a few snippets, and
+optimization(DPO),reinforcementlearning(RL) thatthiscanyieldpromptedLLMagentsthatare
+approaches to train Qwen-2.5-32B-based agents competitivewithstate-of-the-arttrainedagents.
+Acknowledgements Gretchen Krueger, Tom Henighan, Rewon Child,
+Aditya Ramesh, Daniel M. Ziegler, Jeffrey Wu,
+ThisworkwasfundedinpartbytheDARPAANSR Clemens Winter, and 12 others. 2020. Language
+programunderawardFA8750-23-2-0004,inpart modelsarefew-shotlearners. InAdvancesinNeural
+InformationProcessingSystems33: AnnualConfer-
+byNSFCAREERaward#IIS-2046873,andinpart
+enceonNeuralInformationProcessingSystems2020,
+byNSFCCRIaward#CNS-1925741. Theviews
+NeurIPS2020,December6-12,2020,virtual.
+expressedarethoseoftheauthorsanddonotreflect
+BaianChen,ChangShu,EhsanShareghi,NigelCollier,
+thepolicyofthefundingagencies.
+KarthikNarasimhan,andShunyuYao.2023. Fireact:
+Towardlanguageagentfine-tuning.
+Limitations
+Kevin Chen, Marco Cusumano-Towner, Brody Hu-
+In this work, we were primarily concerned with
+val,AlekseiPetrenko,JacksonHamburger,Vladlen
+studyingtherightformandplacementofdemon- Koltun, and Philipp Krähenbühl. 2025. Reinforce-
+strations, but used general-purpose encoders for mentlearningforlong-horizoninteractivellmagents.
+theirselection. Further,retrieval-basedapproaches
+Xiang Deng, Yu Gu, Boyuan Zheng, Shijie Chen,
+selectdemonstrationsbasedonaretrievalkey(e.g., SamualStevens,BoshiWang,HuanSun,andYuSu.
+taskstatements)andhencecannottakeadvantage 2023. Mind2web: Towardsageneralistagentforthe
+web. InAdvancesinNeuralInformationProcessing
+of additional solution information that may only
+Systems36: AnnualConferenceonNeuralInforma-
+beavailableforthedemonstrationcandidatesbut
+tionProcessingSystems2023,NeurIPS2023,New
+notforthetesttask. Futureworkcanexplorethus Orleans,LA,USA,December10-16,2023.
+exploredemonstrationselectionapproachesmore
+Alexandre Drouin, Maxime Gasse, Massimo Caccia,
+suitableforagentictasks.
+Issam H. Laradji, Manuel Del Verme, Tom Marty,
+DavidVázquez,NicolasChapados,andAlexandre
+Lacoste. 2024. Workarena: How capable are web
+References agents at solving common knowledge work tasks?
+InForty-firstInternationalConferenceonMachine
+Sweta Agrawal, Chunting Zhou, Mike Lewis, Luke
+Learning,ICML2024,Vienna,Austria,July21-27,
+Zettlemoyer, andMarjanGhazvininejad.2023. In-
+2024.OpenReview.net.
+contextexamplesselectionformachinetranslation.
+In Findings of the Association for Computational Shivanshu Gupta, Matt Gardner, and Sameer Singh.
+Linguistics: ACL2023,pages8857–8873,Toronto, 2023. Coverage-based example selection for in-
+Canada.AssociationforComputationalLinguistics. context learning. In Findings of the Association
+forComputationalLinguistics: EMNLP2023,pages
+Arash Ahmadian, Chris Cremer, Matthias Gallé,
+13924–13950,Singapore.AssociationforComputa-
+MarziehFadaee,JuliaKreutzer,OlivierPietquin,Ah-
+tionalLinguistics.
+metÜstün,andSaraHooker.2024. Backtobasics:
+Revisitingreinforcestyleoptimizationforlearning ShivanshuGupta,ClemensRosenbaum,andEthanR.
+fromhumanfeedbackinllms. Elenberg. 2024. Gistscore: Learning better repre-
+sentationsforin-contextexampleselectionwithgist
+ThomasAnthony,ZhengTian,andDavidBarber.2017. bottlenecks. InForty-firstInternationalConference
+Thinkingfastandslowwithdeeplearningandtree onMachineLearning,ICML2024,Vienna,Austria,
+search. InAdvancesinNeuralInformationProcess- July21-27,2024.OpenReview.net.
+ing Systems 30: Annual Conference on Neural In-
+formationProcessingSystems2017,December4-9, Geunwoo Kim, Pierre Baldi, and Stephen McAleer.
+2017,LongBeach,CA,USA,pages5360–5370. 2023. Languagemodelscansolvecomputertasks. In
+AdvancesinNeuralInformationProcessingSystems
+HadiAskari,ShivanshuGupta,TerryTong,FeiWang, 36: AnnualConferenceonNeuralInformationPro-
+Anshuman Chhabra, and Muhao Chen. 2025. Un- cessingSystems2023,NeurIPS2023,NewOrleans,
+ravelingindirectin-contextlearningusinginfluence LA,USA,December10-16,2023.
+functions.
+ItayLevy,BenBogin,andJonathanBerant.2023. Di-
+Ben Bogin, Kejuan Yang, Shashank Gupta, Kyle verse demonstrations improve in-context composi-
+Richardson,ErinBransom,PeterClark,AshishSab- tionalgeneralization. InProceedingsofthe61stAn-
+harwal,andTusharKhot.2024. Super: Evaluating nualMeetingoftheAssociationforComputational
+agents on setting up and executing tasks from re- Linguistics (Volume 1: Long Papers), pages 1401–
+searchrepositories. 1422, Toronto, Canada. Association for Computa-
+tionalLinguistics.
+TomB.Brown,BenjaminMann,NickRyder,Melanie
+Subbiah, Jared Kaplan, Prafulla Dhariwal, Arvind JiachangLiu,DinghanShen,YizheZhang,BillDolan,
+Neelakantan,PranavShyam,GirishSastry,Amanda Lawrence Carin, and Weizhu Chen. 2022. What
+Askell, Sandhini Agarwal, Ariel Herbert-Voss, makes good in-context examples for GPT-3? In
+ProceedingsofDeepLearningInsideOut(DeeLIO Mohit Shridhar, Xingdi Yuan, Marc-Alexandre Côté,
+2022): The 3rd Workshop on Knowledge Extrac- Yonatan Bisk, Adam Trischler, and Matthew J.
+tionandIntegrationforDeepLearningArchitectures, Hausknecht.2021. Alfworld: Aligningtextandem-
+pages100–114,Dublin,IrelandandOnline.Associa- bodiedenvironmentsforinteractivelearning. In9th
+tionforComputationalLinguistics. International Conference on Learning Representa-
+tions, ICLR 2021, Virtual Event, Austria, May 3-7,
+NelsonF.Liu,KevinLin,JohnHewitt,AshwinParan-
+2021.OpenReview.net.
+jape,MicheleBevilacqua,FabioPetroni,andPercy
+Liang.2024. Lostinthemiddle: Howlanguagemod- HongjinSu,JungoKasai,ChenHenryWu,WeijiaShi,
+elsuselongcontexts. TransactionsoftheAssociation TianluWang,JiayiXin,RuiZhang,MariOstendorf,
+forComputationalLinguistics,12:157–173. LukeZettlemoyer,NoahA.Smith,andTaoYu.2023.
+Selectiveannotationmakeslanguagemodelsbetter
+Arindam Mitra, Luciano Del Corro, Guoqing Zheng,
+few-shotlearners. InTheEleventhInternationalCon-
+Shweti Mahajan, Dany Rouhana, Andres Codas,
+ference on Learning Representations, ICLR 2023,
+Yadong Lu, Wei ge Chen, Olga Vrousgos, Corby
+Kigali,Rwanda,May1-5,2023.OpenReview.net.
+Rosset,FillipeSilva,HamedKhanpour,YashLara,
+andAhmedAwadallah.2024. Agentinstruct: Toward
+SimengSun,YangLiu,ShuohangWang,DanIter,Chen-
+generativeteachingwithagenticflows.
+guangZhu,andMohitIyyer.2024. PEARL:Prompt-
+ReiichiroNakano,JacobHilton,SuchirBalaji,JeffWu, ing large language models to plan and execute ac-
+Long Ouyang, Christina Kim, Christopher Hesse, tions over long documents. In Proceedings of the
+18thConferenceoftheEuropeanChapteroftheAs-
+ShantanuJain,VineetKosaraju,WilliamSaunders,
+sociationforComputationalLinguistics(Volume1:
+Xu Jiang, Karl Cobbe, Tyna Eloundou, Gretchen
+Krueger,KevinButton,MatthewKnight,Benjamin Long Papers), pages 469–486, St. Julian’s, Malta.
+Chess,andJohnSchulman.2021. Webgpt: Browser- AssociationforComputationalLinguistics.
+assistedquestion-answeringwithhumanfeedback.
+HarshTrivedi,TusharKhot,MareikeHartmann,Ruskin
+Pranav Putta, Edmund Mills, Naman Garg, Sumeet Manku, Vinty Dong, Edward Li, Shashank Gupta,
+Motwani,ChelseaFinn,DivyanshGarg,andRafael Ashish Sabharwal, and Niranjan Balasubramanian.
+Rafailov.2024. Agentq: Advancedreasoningand 2024. AppWorld: Acontrollableworldofappsand
+learningforautonomousaiagents. peopleforbenchmarkinginteractivecodingagents.
+In Proceedings of the 62nd Annual Meeting of the
+YujiaQin,ShihaoLiang,YiningYe,KunlunZhu,Lan AssociationforComputationalLinguistics(Volume1:
+Yan,YaxiLu,YankaiLin,XinCong,XiangruTang, LongPapers),pages16022–16076,Bangkok,Thai-
+BillQian,SihanZhao,LaurenHong,RunchuTian,
+land.AssociationforComputationalLinguistics.
+Ruobing Xie, Jie Zhou, Mark Gerstein, Dahai Li,
+ZhiyuanLiu,andMaosongSun.2024. Toolllm: Fa- ZihaoWang,ShaofeiCai,GuanzhouChen,AnjiLiu,Xi-
+cilitating large language models to master 16000+ aojianMa,andYitaoLiang.2023. Describe,explain,
+real-world apis. In The Twelfth International Con- planandselect: Interactiveplanningwithlargelan-
+ference on Learning Representations, ICLR 2024, guagemodelsenablesopen-worldmulti-taskagents.
+Vienna,Austria,May7-11,2024.OpenReview.net.
+John Yang, Akshara Prabhakar, Karthik Narasimhan,
+Ohad Rubin, Jonathan Herzig, and Jonathan Berant.
+and Shunyu Yao. 2023. Intercode: Standardizing
+2022. Learning to retrieve prompts for in-context
+andbenchmarkinginteractivecodingwithexecution
+learning. InProceedingsofthe2022Conferenceof
+feedback. InAdvancesinNeuralInformationPro-
+theNorthAmericanChapteroftheAssociationfor
+cessingSystems36: AnnualConferenceonNeural
+ComputationalLinguistics: HumanLanguageTech-
+InformationProcessingSystems2023,NeurIPS2023,
+nologies, pages 2655–2671, Seattle, United States.
+NewOrleans,LA,USA,December10-16,2023.
+AssociationforComputationalLinguistics.
+Shunyu Yao, Howard Chen, John Yang, and Karthik
+JohnSchulman,FilipWolski,PrafullaDhariwal,Alec
+Narasimhan.2022. Webshop: Towardsscalablereal-
+Radford,andOlegKlimov.2017. Proximalpolicy
+worldwebinteractionwithgroundedlanguageagents.
+optimizationalgorithms.
+InAdvancesinNeuralInformationProcessingSys-
+Zhihong Shao, Peiyi Wang, Qihao Zhu, Runxin Xu, tems35: AnnualConferenceonNeuralInformation
+JunxiaoSong,XiaoBi,HaoweiZhang,Mingchuan Processing Systems 2022, NeurIPS 2022, New Or-
+Zhang, Y. K. Li, Y. Wu, and Daya Guo. 2024. leans,LA,USA,November28-December9,2022.
+Deepseekmath: Pushingthelimitsofmathematical
+reasoninginopenlanguagemodels. Shunyu Yao, Jeffrey Zhao, Dian Yu, Nan Du, Izhak
+Shafran,KarthikR.Narasimhan,andYuanCao.2023.
+Noah Shinn, Federico Cassano, Ashwin Gopinath, React: Synergizingreasoningandactinginlanguage
+Karthik Narasimhan, and Shunyu Yao. 2023. Re- models. InTheEleventhInternationalConference
+flexion: languageagentswithverbalreinforcement on Learning Representations, ICLR 2023, Kigali,
+learning. In Advances in Neural Information Pro- Rwanda,May1-5,2023.OpenReview.net.
+cessingSystems36: AnnualConferenceonNeural
+InformationProcessingSystems2023,NeurIPS2023, JiachengYe,ZhiyongWu,JiangtaoFeng,TaoYu,and
+NewOrleans,LA,USA,December10-16,2023. Lingpeng Kong. 2023a. Compositional exemplars
+forin-contextlearning. InInternationalConference
+onMachineLearning,ICML2023,23-29July2023,
+Honolulu,Hawaii,USA,volume202ofProceedings
+ofMachineLearningResearch,pages39818–39833.
+PMLR.
+XiYe,SrinivasanIyer,AsliCelikyilmaz,VeselinStoy-
+anov,GregDurrett,andRamakanthPasunuru.2023b.
+Complementaryexplanationsforeffectivein-context
+learning. InFindingsoftheAssociationforCompu-
+tational Linguistics: ACL 2023, pages 4469–4484,
+Toronto,Canada.AssociationforComputationalLin-
+guistics.
+Zheng Yuan, Hongyi Yuan, Chengpeng Li, Guanting
+Dong,KemingLu,ChuanqiTan,ChangZhou,and
+JingrenZhou.2023. Scalingrelationshiponlearning
+mathematicalreasoningwithlargelanguagemodels.
+Tianyi Zhang, Varsha Kishore, Felix Wu, Kilian Q.
+Weinberger,andYoavArtzi.2020. Bertscore: Evalu-
+atingtextgenerationwithBERT. In8thInternational
+ConferenceonLearningRepresentations,ICLR2020,
+AddisAbaba,Ethiopia,April26-30,2020.OpenRe-
+view.net.
+Zihao Zhao, Eric Wallace, Shi Feng, Dan Klein, and
+SameerSingh.2021. Calibratebeforeuse: Improv-
+ing few-shot performance of language models. In
+Proceedingsofthe38thInternationalConferenceon
+MachineLearning,ICML2021,18-24July2021,Vir-
+tualEvent,volume139ofProceedingsofMachine
+LearningResearch,pages12697–12706.PMLR.
+Longtao Zheng, Rundong Wang, Xinrun Wang, and
+Bo An. 2024. Synapse: Trajectory-as-exemplar
+prompting with memory for computer control. In
+The Twelfth International Conference on Learning
+Representations,ICLR2024,Vienna,Austria,May
+7-11,2024.OpenReview.net.
+RuiwenZhou,YingxuanYang,MuningWen,YingWen,
+WenhaoWang,ChunlingXi,GuoqiangXu,YongYu,
+andWeinanZhang.2024a. TRAD:enhancingLLM
+agentswithstep-wisethoughtretrievalandaligned
+decision. InProceedingsofthe47thInternational
+ACMSIGIRConferenceonResearchandDevelop-
+mentinInformationRetrieval,SIGIR2024,Washing-
+tonDC,USA,July14-18,2024,pages3–13.ACM.
+Shuyan Zhou, Frank F. Xu, Hao Zhu, Xuhui Zhou,
+RobertLo,AbishekSridhar,XianyiCheng,Tianyue
+Ou,YonatanBisk,DanielFried,UriAlon,andGra-
+ham Neubig. 2024b. Webarena: A realistic web
+environmentforbuildingautonomousagents. InThe
+TwelfthInternationalConferenceonLearningRep-
+resentations,ICLR2024,Vienna,Austria,May7-11,
+2024.OpenReview.net.
+A AgentDetails • Direct Preference Optimization + MCTS
+(DPO-MCTS)(Puttaetal.,2024). Collects
+Table 3 shows various hyperparameters used for
+preference pairs into a replay buffer using
+aReActsolverandPnEexecutorwhensolvinga
+Monte-CarloTreeSearch.
+taskorsubtask,respectively.
+• Proximal Policy Optimization (PPO)
+A.1 PromptFormats
+(Schulmanetal.,2017). PPOwithalearned
+ReActSolverFig.7showstheformatofthetask advantageestimate.
+contextweusefortheReActsolver. Italsoshows
+• REINFORCEleave-one-out(RLOO)(Ah-
+theJSONformatinwhichtheagentisconstrained
+madian et al., 2024). On-policy trajectory-
+to generate its reasoning and action. The hyper-
+levelREINFORCEwithleave-one-outadvan-
+parametersusedfortheReActsolveraregivenin
+tageestimate.
+Table3.
+PnEPlannerTheprompttemplatefortheplanner • Grouprelativepolicyoptimization(GRPO)
+isgiveninFig. 9. Theplannerisalsoconstrained (Shaoetal.,2024). On-policyPPOwithnor-
+togeneratetheplanusingaJSONformat. Forthe malizedleave-one-outadvantageestimate.
+planner, we use temperature 0.1 and top_p 0.5
+• Leave-one-out PPO (LOOP) (Chen et al.,
+bothduringannotationandevaluation.
+2025). Off-policy PPO with unnormalized
+PnEExecutorThePnEexecutorissimilartothe
+leave-one-outadvantageestimate.
+ReActsolver. Theformatofthetaskcontextused
+for the PnE executor is given in Fig. 8. A The
+executorisalsoconstrainedtogenerateitsreason-
+ingandusingthesameJSONformatastheReAct
+solver. ThehyperparametersusedforthePnEex-
+ecutoraregiveninTable3.
+Prompt Truncation When the ReAct solver or
+PnEexecutor’spromptexceedsthecorresponding
+contextlengthlimit,wetruncateditbyfirsthiding
+theolderandlongerobservationsandthenhiding
+anyremainingolderobservations.
+A.2 DemonstrationTemplates
+The templates used to show the task-trajectory,
+subtask-trajectory,andsnippetdemonstrationsare
+giveninFigs. 10,11,and12,respectively.
+B TrainedBaselines
+Wecomparewiththefollowingtraining-basedap-
+proachesbaselinesfromChenetal.(2025):
+• Groundtruthsupervisedfine-tuning(SFT-
+GT). SFT on ReAct-style transformation of
+goldsolutions.
+• Rejection sampling fine-tuning (RFT)
+(Yuan et al., 2023). Collects rollouts gen-
+eratedwiththebasemodelandfinetuneson
+successfulones.
+• Expertiteration(EI)(Anthonyetal.,2017).
+RunsmultiplesmalleriterationsofRFTusing
+thecurrentbestmodel.
+Annotation Evaluation
+Hyperparameter
+ReAct PnEExecutor ReAct PnEExecutor
+temperature 0.1 0.3 0.1 0.1
+top_p 0.5 0.5 0.5 0.5
+max_context_length 40000 20000 1000000 1000000
+max_steps 50 20 50 50
+max_tokens 2000 2000 2000 2000
+Table3: DecodinghyperparametersforAnnotationandICLEvaluationexperimentsforReActsolverandPnE
+Executor. max_context_lengthlimitsthelengthoftheinputpromptwhilemax_tokenslimitsthelengthofthe
+output. max_stepsisthemaximumnumberofstepsfortheagenttotake.
+I am your supervisor and you are a super-intelligent AI Assistant whose job is to assist with my day-to-day
+tasks involving various apps (e.g., amazon.com, gmail, calendar, etc.). To do this, we will take part in a *
+multi-turn conversation* with a Python REPL environment that will let you interact with the apps using their
+APIs.
+At every step of the conversation, you will need to reason about your current progress on the task and
+propose the next action in the form of a Python code snippet for the environment to execute. Your response
+needs to be in the following JSON format {"thought": <thought>, "action": <action>} where <thought> is your
+reasoning and <action> the Python code snippet (without any enclosing ```).
+The environment will then execute your code and respond with the output. The environment will maintain state
+across multiple interactions for the on-going task so that any variables defined in one step can be used in
+subsequent steps. Additionally, since you'll be solving a lot of tasks, it is possible that your reasoning
+on the current step matches with the reasoning at some step of a task you have solved before. When this
+happens, I will provide you with the relevant snippet of your conversation solving that task. These may be
+helpful for your next step.
+Here are three key APIs that you can use to get more information about apps and APIs:
+# To get a list of apps that are available to you:
+print(apis.api_docs.show_app_descriptions())
+# To get the list of apis under any app listed above, e.g. amazon
+print(apis.api_docs.show_api_descriptions(app_name='amazon'))
+# To get the full input-output specification of a particular api, e.g. amazon app's login api
+print(apis.api_docs.show_api_doc(app_name='amazon', api_name='show_cart'))
+<task_trajectory_demonstrations>
+Now, here is the actual task you need to solve using a fresh environment.
+My name is Joyce Weaver. My personal email is joyce-weav@gmail.com and phone number is 3155673041.
+Task: Request $13 publicly on Venmo from my friend, Stacy, with a note, "For yesterday's meal".
+Here are some key guidelines that you need to follow:
+(1) Make sure to produce a *single* thought and action at every step and correctly format them as {"thought
+": <thought>, "action": <action>}. In particular,
+- the JSON should be valid with any quotes, newlines, etc., properly escaped.
+- <action> should be just code without any enclosing backticks (```).
+(2) Always look at API specifications (using apis.api_docs.show_api_doc) before calling an API.
+(3) Remember you can use the variables in your code in subsequent code blocks.
+(4) Remember that the email addresses, access tokens and variables (e.g. amazon_password) in the example
+above are not valid anymore. You will be provided a fresh environment to work with. Note, however, that the
+APIs remain the same so if it's been shown in an example above, you don't need to look at its specification
+again.
+(5) You can use the "supervisor" app to get information about my accounts and use the "phone" app to get
+information about friends and family.
+(6) Many APIs return items in "pages". Make sure to run through all the pages by looping over `page_index`.
+(7) If your action produces output that is too long, the environment will truncate it with '... [HIDDEN FOR
+BREVITY] ...' replacing the middle part. E.g., this will happen if you print a large number of items
+returned by a search API. In such cases, you should consider using a more precise query to reduce the number
+of items returned.
+(8) Once you have completed the task, make sure to call apis.supervisor.complete_task(). If the task asked
+for some information, return it as the answer argument, i.e., call apis.supervisor.complete_task(answer=<
+answer>). Many tasks do not require an answer, so in those cases, just call apis.supervisor.complete_task()
+i.e. do not pass any argument.
+Figure7:TaskcontextfortheReActsolver. Eachboxisaseparatemessage. <task trajectory_demonstrations
+istheplaceholderforanytrajectorydemonstrations(seeFig. 10forthecorrespondingtemplate).
+I am your supervisor and you are a super intelligent AI Assistant whose job is to assist with my day-to-day
+tasks involving various apps (e.g., amazon.com, gmail, calendar, etc.). As the tasks can be complex, I will
+break them down into a sequence of subtasks that you will need to carry out one at a time. To do this, you
+will take part in a *multi-turn conversation* with a Python REPL environment that will let you interact with
+the apps using their APIs.
+At every step of the conversation, you will need to reason about your current progress on the subtask and
+propose the next action in the form of a Python code snippet for the environment to execute. Your response
+needs to be in the following JSON format {"thought": <thought>, "action": <action>} where <thought> is your
+reasoning and <action> the Python code snippet (without any enclosing ```).
+Finally, when you have completed the subtask, you will need to say FINISH as action in a separate response
+in the same format, i.e.,
+{"thought": <thought>, "action": FINISH}
+The environment will then execute your code and respond with the output. The environment will maintain state
+across multiple interactions for the on-going task so that any variables defined in one step can be used in
+subsequent steps. Additionally, when your reasoning for the current step matches with a task you have
+solved previously, I will also provide you with the relevant portion of the conversation that solved that
+task to help you on subsequent steps for the current task.
+Here are three key APIs that you can use to get more information about apps and APIs:
+# To get a list of apps that are available to you:
+print(apis.api_docs.show_app_descriptions())
+# To get the list of apis under any app listed above, e.g. amazon
+print(apis.api_docs.show_api_descriptions(app_name='amazon'))
+# To get the full input-output specification of a particular api, e.g. amazon app's login api
+print(apis.api_docs.show_api_doc(app_name='amazon', api_name='show_cart'))
+<subtask_trajectory_demonstrations>
+Now, here is the actual task you need to solve using a fresh environment.
+My name is Joyce Weaver. My personal email is joyce-weav@gmail.com and phone number is 3155673041.
+Task: Request $13 publicly on Venmo from my friend, Stacy, with a note, "For yesterday's meal".
+The above task can be decomposed into the following subtasks that need to be carried out one by one
+1. Login to Venmo and save access token in `venmo_access_token` variable.
+2. Use the `venmo_access_token` to search for Stacy in my Venmo contacts and save her user ID in `
+stacy_user_id`.
+3. Use the `venmo_access_token` to create a payment request to `stacy_user_id` for $13 with the note 'For
+yesterday's meal'. Ensure the request is set to public.
+4. Complete task.
+Let's start by solving Subtask 1: Login to Venmo and save access token in `venmo_access_token` variable.
+Here are some key guidelines that you need to follow:
+(1) Do not worry about the entire task. Focus ONLY on the current subtask and carry it out carefully and
+correctly.
+(2) Make sure to produce a *single* thought and action at every step and correctly format them as {"thought
+": <thought>, "action": <action>}. In particular,
+- the JSON should be valid with any quotes, newlines, etc., properly escaped.
+- <action> should be just code without any enclosing backticks (```).
+(3) When finished with the current subtask, make sure to say FINISH in a SEPARATE response in the format
+described above. Also, if it's the last subtask, make sure to call `apis.supervisor.complete_task()` with
+the answer, if any, before finishing.
+(4) Always look at API specifications (using apis.api_docs.show_api_doc) before calling an API.
+(5) Remember you can use the variables in your code in subsequent code blocks.
+(6) Remember that the email addresses, access tokens and variables (e.g. amazon_password) in the example
+above are not valid anymore. You will be provided a fresh environment to work with. Note, however, that the
+APIs remain the same so if it's been shown in an example above, you don't need to look at its specification
+again.
+(7) You can use the "supervisor" app to get information about my accounts and use the "phone" app to get
+information about friends and family.
+(8) Many APIs return items in "pages". Make sure to run through all the pages by looping over `page_index`.
+(9) If your action produces output that is too long, the environment will truncate it with '... [HIDDEN FOR
+BREVITY] ...' replacing the middle part. E.g., this will happen if you print a large number of items
+returned by a search API. In such cases, you should consider using a more precise query to reduce the number
+of items returned.
+Figure 8: Task context for the PnE executor. Each box is a separate message. <subtask
+trajectory_demonstrations is the placeholder for any trajectory demonstrations (see Fig. 11 for the corre-
+spondingtemplate).
+I am your supervisor and you are a super intelligent AI Assistant whose job is to autonomously perform my
+day-to-day tasks involving various apps (e.g., spotify, simple_note, etc.).
+To do this, you will need to interact with apps using their associated APIs on my behalf.
+Here are the apps:
+{ app_descriptions }
+To help with this, I will provide you with an executor model that will take care of interacting with the
+APIs. Your job is to produce a plan on how to solve the task given access to this executor. You should
+respond in the following JSON format:
+{
+"thought": <thought>,
+"plan": [
+"<subtask_1>",
+"<subtask_2>",
+...
+"<subtask_n>"
+]
+}
+Here, <thought> is a brief description of how you plan to solve the task and <subtask_i> is a description of
+the ith subtask in your plan.
+**Key instructions**:
+(1) Make sure to respond in the JSON format provided above. Don't enclose your response with ```.
+(2) Make sure to define all the relevant variables.
+(3) Each subtask in the plan should be clear and complete so that it can be executed independently. E.g. don
+'t use references such as "previous list" or "repeat subtask 1".
+(4) When unsure, use more subtasks in the plan rather than fewer subtasks.
+(5) The final subtask should be "Complete task." unless the task requires an answer, in which case, it
+should be "Complete task with answer: <answer>" where <answer> is the answer to the task.
+Figure9: PromptforthePnEplanner. Itisfollowedbyafewdemonstrativetask-planpairsandthetesttask.
+Here is an example of a task and how you can interact with the environment to solve it
+My name is Joyce Weaver. My personal email is joyce-weav@gmail.com and phone number is 3155673041.
+Task: How many playlists do I have in Spotify?
+Lets first find which APIs are available to use in Spotify.
+```python
+print(apis.api_docs.show_api_descriptions(app_name='spotify'))
+```
+Output:
+```
+[
+...
+{
+"name": "login",
+"description": "Login to your account."
+},
+{
+"name": "logout",
+"description": "Logout from your account."
+},
+...
+]
+```
+.
+.
+.
+Now that the task is completed, I need to mark the task as complete and return the number of playlists found
+.
+```python
+apis.supervisor.complete_task(answer=num_playlists)
+```
+Output:
+```
+Marked the active task complete.
+```
+Figure10: Templateusedfortrajectorydemonstrations. Yellowboxesareusermessagesorenvironmentresponses,
+whileblueboxesareagentmessages(originallyinJSONformat).
+Here is an example of a subtask and how you can interact with the environment to solve it
+My name is Jennifer Powell. My personal email is jepowell@gmail.com and phone number is 4288705164.
+Task: Add a comment, "Thank you!", to all the venmo payments I received from my coworkers in the last 5 days
+(including today), and like those payments.
+The above task can be decomposed into the following subtasks that need to be carried out one by one
+1. Login to Venmo and save access token in `venmo_access_token` variable.
+2. Use the `venmo_access_token` variable to retrieve a list of coworkers from the Phone app and save it in `
+coworker_list`.
+3. Use the `venmo_access_token` variable to get all payments received in the last 5 days and save them in `
+recent_payments`.
+4. Filter `recent_payments` to find payments from `coworker_list` and save them in `coworker_payments`.
+5. For each payment in `coworker_payments`, add the comment 'Thank you!' and like the payment using the `
+venmo_access_token`.
+6. Complete task.
+Let's start by solving Subtask 1: Login to Venmo and save access token in `venmo_access_token` variable.
+To login to Venmo, I need to find the appropriate API and its specifications. Let's start by checking the
+available APIs for the Venmo app.
+```python
+print(apis.api_docs.show_api_descriptions(app_name='venmo'))
+```
+.
+.
+.
+I have successfully logged into Venmo and obtained the access token, which is stored in the `
+venmo_access_token` variable. This completes the first subtask.
+```python
+FINISH
+```
+Figure11: Templateusedforsubtasktrajectorydemonstrations. Yellowboxesareusermessagesorenvironment
+responses,whileblueboxesareagentmessages(originallyinJSONformat). Themaindifferencewiththetask
+trajectorydemonstrations(Fig. 10)isthattheagentisadditionallyprovidedtheplanandasummaryofcodeusedto
+solveprevioussubtasks.
+Your reasoning (thought) in the previous step is similar to your reasoning solving some other tasks.
+Providing you with the relevant snippets of your conversation solving those tasks as they may be helpful for
+your next step. Each snippet comprises the task statement along with the thought, the action taken, and the
+output for the matching step as well as the following step (if there is one).
+# Snippet 1:
+Matching Step:
+Thought: {thought}
+Action:
+```python
+{action}
+```
+Output:
+```
+{output}
+```
+Following Step:
+Action:
+```python
+{action}
+```
+Output:
+```
+{output}
+```
+# Snippet 2:
+...
+Figure12: Templateusedforshowingsnippetdemonstrations. Thisisasinglemessageappendedaftertoallthe
+messages.

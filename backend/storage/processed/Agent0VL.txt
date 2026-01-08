@@ -1,0 +1,1202 @@
+Agent0-VL: Exploring Self-Evolving Agent for
+Tool-Integrated Vision-Language Reasoning
+JiaqiLiu1 KaiwenXiong1 PengXia1 YiyangZhou1 HaonianJi1
+LuFeng1 SiweiHan1 MingyuDing1 HuaxiuYao1
+1UNC-ChapelHill
+Abstract and Vision-Language Models (VLMs) are trained using
+human-annotated preference data [20, 48, 57] or external-
+Vision-languageagentshaveachievedremarkableprogress reward signals. However, such training paradigms are in-
+inavarietyofmultimodalreasoningtasks;however,their herently constrained by the limitations of human anno-
+learningremainsconstrainedbythelimitationsofhuman- tators’ preferences and the sparsity or incompleteness of
+annotatedsupervision. Recentself-rewardingapproaches environment-generatedfeedback,ultimatelycappingtheup-
+attempttoovercomethisconstraintbyallowingmodelsto per bound of the agent’s capabilities [54, 55]. To enable
+actastheirowncriticsorrewardproviders. Yet,purelytext- agentstomovebeyondstatichumansupervisionandachieve
+basedself-evaluationstrugglestoverifycomplexvisualrea- continuousself-evolution,recentresearchhasexploredself-
+soningstepsandoftensuffersfromevaluationhallucinations. rewarding learning [63, 81], in which the agent or model
+Toaddressthesechallenges,inspiredbyrecentadvancesin itselfactsasaCriticorRewardModel,providingfeedback
+tool-integrated reasoning, we propose Agent0-VL, a self- andrewardsignalsforitsownlearning[9,55].
+evolvingvision-languageagentthatachievescontinualim- Nevertheless,formanycomplexvisualreasoningtasks,
+provementwithtool-integratedreasoning. Agent0-VLincor- purelytext-basedself-evaluationfacestwokeylimitations.
+poratestoolusagenotonlyintoreasoningbutalsointoself- First,limitedevaluationcapability: whenrelyingsolelyon
+evaluationandself-repair,enablingthemodeltointrospect, textualreflection,modelsstruggletoverifycomplexmulti-
+verify,andrefineitsreasoningthroughevidence-grounded stepcomputations,spatialreasoning,orprecisephysicaland
+analysis. It unifies two synergistic roles within a single geometric calculations, abilities that are critical for tasks
+LVLM:aSolverthatperformsmulti-turntool-integratedrea- such as visual geometry and chart analysis [64]. Second,
+soning,andaVerifierthatgeneratesstructuredfeedbackand unreliableevaluationprocess: excessivetextualreasoning
+fine-grained self-rewards through tool-grounded critique. causesmodelstorelyonlanguageshortcuts,bypassingfine-
+TheserolesinteractthroughaSelf-EvolvingReasoningCy- grainedvisualunderstandinganddependinginsteadonlin-
+cle,wheretool-basedverificationandreinforcementlearn- guisticpriorsorcontextualbias[27,81]. Thisoftenleads
+ingjointlyalignthereasoningandevaluationdistributions toevaluationhallucination,wherethemodelincorrectlyre-
+for stable self-improvement. Through this zero-external- wardsalinguisticallyplausibleyetvisuallyincorrectanswer,
+rewardevolution,Agent0-VLalignsitsreasoningandveri- orpenalizesavisuallycorrectanswerthatfailstoalignwith
+ficationbehaviorswithoutanyhumanannotationorexter- itslanguage-basedexpectations.
+nalrewardmodels, achievingcontinualself-improvement. Toaddressthesechallenges,inspiredbyrecentadvances
+Experimentsongeometricproblemsolvingandvisualsci- in tool-integrated reasoning [13, 48, 65, 76], we propose
+entific analysis show that Agent0-VL achieves an 12.5% a simple yet effective idea: enable the model to employ
+improvementoverthebasemodel. Ourcodeisavailableat external tools not only during reasoning, but also during
+https://github.com/aiming-lab/Agent0. its own self-evaluation and self-repair. By doing so, the
+modelcanperformclosed-loopself-improvementunderzero
+external reward supervision, learning to analyze, critique,
+1.Introduction and refine its reasoning in a verifiable manner. Building
+onthisidea,wepresentAgent0-VL,aself-evolvingvision-
+Vision-languageagentshaveshownremarkablecapabilities languageagentframeworkthatintegratestool-useparadigms
+intacklingcomplexmultimodaltasks[54],includingrobotic into both the reasoning and self-evaluation processes. As
+manipulation[21],visualquestionreasoning[80],andscien- illustratedinFigure1,Agent0-VLunifiesreasoning,verifica-
+tificdiscovery[28]. Currently,mostvision-languageagents tion,andself-repairwithinasingleLVLM,whichalternates
+5202
+voN
+62
+]VC.sc[
+2v00991.1152:viXra
+Base Policy Self-Evolution Agent0-VL
+Solver Self-Repair Solver
+…
+Evaluation Verifier Verifier
+…
+Iteration 1 Iteration N
+（a) （b)
+)1@ssaP(ecnamrofreP
+Qwen2.5-VL-7B
+Qwen2.5-VL-7B-TIR
+80 Agent0-VL-7B (Ours)
++11.5% +12.2%
+75.6
+70 72.9
+67.2
+67.868.1
++4.3% 65.0
+60 61.1
++14.7% 58.659.6
+50 53.1
+46.347.2
+40
+MathVerse MMMU HallBench MathVista
+Figure1.TheevolveloopofAgent0-VLanditsperformancecomparison.TheleftpartillustratestheiterativeevolutionbetweentheSolver
+andVerifier,wheretheSolverprogressivelyrefinesreasoningstrategiesunderVerifierfeedback.Therightpartpresentsresultsshowingthat
+Agent0-VLoutperformstool-integratedreasoningmethodsacrossmultiplerepresentativebenchmarks.TIR:Tool-IntegratedReasoning.
+between two synergistic roles: (1) the Solver, which per- apartiallyobservableMarkovdecisionprocess(POMDP):
+formsmulti-turnreasoningandselectivelyinvokesexternal M = (S,A,O,T,R,γ), where γ is the discount factor,
+toolsforgroundedcomputationandvisualperception;and Ristherewardfunction,whichwillbeintroducedinsec-
+(2)theVerifier,whichvalidatesintermediatereasoningsteps tion3. Thewholemultimodalreasoningdynamicsandtool
+throughgenerativecritiqueandtool-basedfeedback,gener- feedbackareexplicitlymodeledthroughthefollowingcom-
+atingfine-grainedrewardsignalsandrepairinstructions. ponents:
+By alternating between these roles, the model forms
+StateSpace.s ∈Sdenotesthelatentmultimodalreasoning
+t
+a closed feedback loop that supports continual self-
+state,encodingthetextualreasoningcontext,visualfeatures,
+improvement. Weformalizethisiterativelearningparadigm
+andpasttoolinputandoutputtraces.
+asaSelf-EvolvingReasoningCycle(SERC).Intheinner
+loop,themodelperformsmulti-turnreasoning,tool-based ActionSpace. Eachactiona t ∈Acanbeeither: (1)atex-
+verification,andselectiverepairtoprogressivelyrefineits
+tualreasoningstepa(text),or(2)astructuredtoolinvocation
+t
+reasoning trajectory. In the outer loop, we employ rein- a(tool),whichexecutesanexternalprogram,suchasPython
+t
+forcementlearning,specifically,GroupRelativePolicyOpti- code. Hence,A=A ∪A .
+text tool
+mization(GRPO)[44],toupdatethesharedpolicy,jointly
+ObservationSpace. Anobservationo ∈Ocontainsfeed-
+enhancingreasoningandverificationcapabilitiesovertime. t
+backfromexternaltoolsorenvironment,suchasreturned
+Thisprocesstransformsthelearningobjectivefromstatic
+numericalresultsortextualretrievals. Thetransitionfunc-
+reward maximization into a process of distributional self-
+tionT(s |s ,a ,o )captureshowstateevolvesgivengen-
+consistency,wherereasoningandevaluationbehaviorsare t+1 t t t
+eratedresponseanditscorrespondingtoolfeedback.
+jointlyalignedandcontinuallyoptimized.
+Our main contribution is Agent0-VL, a unified self- Trajectory. Given an input x = (I,q), the
+evolvingLVLMthatintegratesreasoning,verification,and model generates a multimodal trajectory: τ =
+self-repair into a single model trained entirely from zero {(s 1 ,a 1 ,o 1 ),(s 2 ,a 2 ,o 2 ),...,(s T ,a T ,o T )}, where each
+externalrewards. Experimentsongeometricreasoningand transitionencodesonereasoning-tool-feedbackinteraction.
+visual scientific analysis demonstrate that Agent0-VL-7B
+achieves stable multi-iteration performance improvement, 3.Methodology
+showinganaverage12.5%improvementovertheQwen-VL
+basemodel. Furthermore,whenusedindependentlyasapro- In this section, we introduce Agent0-VL, a self-evolving
+cessrewardmodel,Agent0-VLalsoimprovesthemodel’s vision-languageagentthatintegratestool-useparadigmsinto
+test-timescalingperformancebyanaverageof7.3%. boththereasoningandself-evaluationprocesses. Thecore
+ideaistoenableaVLMtonotonlyreasonandsolveprob-
+2.Preliminaries lems,butalsotoverify,critique,andrepairitsownreasoning
+trajectoriesthroughaunified,self-evolvingloop. Wefirstde-
+Multi-turnTool-IntegratedReasoning(TIR)agentstrained scribethedual-rolearchitecturecomposedofaSolveranda
+viaReinforcementLearning(RL)presentsubstantialchal- Verifier,thenpresenthowthemodelperformstool-grounded
+lenges,primarilyduetotheinherentlycompositionalnature reasoning,verification,andconfidence-gatedself-repair. Fi-
+ofreasoningandthepartialobservabilityofmultimodalen- nally,wedetailtheSelf-EvolvingReasoningCycle(SERC),
+vironments. To address these complexities, we formulate wheretheserolesinteractthroughinnerandouteroptimiza-
+thereasoningprocessofouragentwithintheframeworkof tionloopstoachievecontinualself-improvement.
+Verifier
+Agent0-VL
+Input
+Query + Image ReasoningOutput
+Step 1 Step 2 … Step n-1 Step n Answer
+Solver Evaluate
+Tool calling Sandbox
+Think
+Tool List
+Step 1 Step 2 … Step n-1 Step n Answer Score 1 Score2 …Score n-1 Score n Answer Score
+Tool calling Tool calling
+Critique Score Confidence
+𝑜 = 𝑇𝑜𝑜𝑙(𝑎)
+# #
+Self-Repair
+Code Sandbox Fail
+Verification Decision
+𝜏 = { 𝑠 ,𝑎 ,𝑜 ,…,(𝑠 ,𝑎 ,𝑜 )}
+! ! ! " " "
+Pass
+Policy
+Update
+g(𝜏) = 𝛼!·𝑟"#$ + ·𝛴$(𝛼%.𝑟&'()*++ 𝛼,·𝑟$""- − 𝛼.·𝐶)
+Reinforcement Optimization
+Reward • Tool reward 𝑟!""# • Verify reward 𝑟%&'()*
+• Outcome reward 𝑟"$!𝜏 • Cost penalty 𝐶'&+,('
+Figure2.TheFrameworkofAgent0-VL.Theunifiedpolicyπ alternatesbetweentwointernalroles:theSolverthatgeneratesreasoning
+θ
+trajectorieswithtoolcalls,andtheVerifierthatperformsgenerativeverificationusingtoolfeedbacktoproducecritiquesandstep-wise
+rewards.TheserolesarejointlyoptimizedthroughtheSelf-EvolvingReasoningCycle,whereself-generatedrewardsguidepolicyupdates
+viaRL.
+3.1.UnifiedSolver-VerifierArchitecture triplet(s ,a ,o ),theVerifieroutputsafeedbacktuple:
+t t t
+To achieve autonomous evolution, as shown in Figure 2,
+V =(score ,conf ,critique ),
+Agent0-VLadoptsaunifieddual-roledesign,whereasingle t t t t
+LVLM alternates between two internal modes: a Solver where score ∈ [−1,1] measures factual correctness,
+t
+thatperformstool-integratedreasoning,andaVerifierthat conf ∈ [0,1] estimates epistemic certainty, and critique
+t t
+introspectivelyevaluates,critiques,andrepairstheSolver’s providesnatural-languagereflectiondescribingpotentialrea-
+outputs. Wedetailthearchitectureasfollows: soningflaws. TheVerifiercanalsore-invoketoolstocross-
+UnifiedPolicyFormulation. Wedefineasharedpolicyπ checkcorrectness,providingagroundedandinterpretable
+θ
+thatgovernsbothrolesthrougharoleindicatorm∈{S,V}: signalforself-evaluation.
+(cid:40) 3.2.Tool-GroundedVerificationandSelf-Repair
+πS(a |s ), m=Solver,
+π (a |s ,m)= θ t t (1)
+θ t t πV(a |s ,a ,o ), m=Verifier, Withinthedual-roleframework,theSolverperformsmulti-
+θ t t t t
+turnreasoningbyinvokingexternaltools,whiletheVerifier
+where s denotes the multimodal state, a the generated provides process-level feedback and evaluation based on
+t t
+reasoningaction,ando thetoolorenvironmentfeedback. the Solver’s reasoning trajectory and outputs. If the Veri-
+t
+fieridentifiesdeficienciesorinconsistenciesintheSolver’s
+Solver. Whenm = S,themodelperformsmulti-turnrea-
+reasoning, it initiates a self-repair process that leverages
+soningandselectivelyinvokesexternaltools. Theresulting
+self-evaluation signals to revise and refine the reasoning
+observationso areincorporatedintothecontext,allowing
+t
+trajectory,therebyimprovingreasoningaccuracy.
+the agent to iteratively refine its reasoning with grounded
+Specifically, Agent0-VL introduces a structured tool-
+evidence. Formally,theSolverfollows
+grounded generative verification mechanism designed to
+a ∼πS(a |s ), b =f(b ,o ), producedenseandinterpretablefeedbacksignalsforrein-
+t θ t t t+1 t t
+forcement learning. At each step t, the Verifier produces
+whereb representsthelatentbeliefstateencodingaccumu-
+t V . Duringverification,theVerifiercanqueryexternaltools
+t
+latedreasoningcontextandmultimodalinformation.
+toobtainfactualevidence. Bycombininglanguage-based
+Verifier. Whenm=V,themodelswitchesintoagenerative reflectionwithexecutabletool-derivedevidence,themodel
+verificationmodetoevaluateeachreasoningstep. Giventhe transformsverificationfromastaticcorrectnesscheckintoa
+Algorithm1Agent0-VLTrainingProcess Basedontheaboveverificationandself-repairprocesses,
+Require: Unified policy π , reference policy π , confi- theresultingstep-wiserewardisthendefinedas:
+θ θold
+dencethresholdτ c . r =r(t) −g ·C(t) , (4)
+1: Initializeπ θ withsuperviseddatatolearntoolusageand t proc t repair
+verificationformats. whereC(t) penalizesunnecessaryrepairs.
+repair
+2: foreachiterationk =1,...,N iter do 3.3.Self-EvolvingReasoningCycle
+3: //InnerLoop: GenerationandSelf-Evaluation
+4: foreachtaskx i =(I i ,q i )do Having defined the agent’s architecture and verification
+5: Initializetrajectoryτ i ←∅,states 1 . mechanisms,wenowintroducethemodeltrainingprocess
+6: fort=1,...,T do (seeAlgorithm1forthewholeprocess). Specifically, the
+7: Sample action a t ∼ π θ (·|s t ,m = S) and exe- trainingprocessisdividedintotwostages.First,asupervised
+cutetogeto . fine-tuning (SFT) stage for cold-start initialization, ensur-
+t
+8: Generate verification V t = ingthemodellearnspropertoolusageandself-evaluation
+(score ,conf ,critique )∼π (·|s ,a ,o ,EE). formats. Second,aRL-basedself-evolvingreasoningcycle
+t t t θ t t t
+9: Computeprocessrewardr p (t ro ) c (Eq.2). (SERC)thatoperationalizesthisarchitecture,enablingthe
+10: ifconf t <τ c then agenttolearnfromitsowntool-groundedfeedback. SERC
+11: Generate repair ∆ t = f θ (s t ,a t ,V t ); re- consistsoftwonestedloops: aninnerloopfordatagenera-
+samplea′ ∼π (·|s ,∆ ,RA). tionandanouterloopforpolicyevolution.
+t θ t t
+12: endif Theinnerloopisresponsibleforgeneratingexperience
+13: Computeeffectivestepreward(Eq.4). bycouplingreasoningandverification. Foragivenmulti-
+14: endfor modaltaskx,theSolverfirstgeneratesacompletereasoning
+15: Computetotaltrajectoryreturng(τ i )(Eq.5). trajectoryτ = {(s t ,a t ,o t )}T t=1 ,invokingexternaltoolsas
+16: endfor needed. Immediatelyfollowingthis,theVerifierre-evaluates
+17: //OuterLoop: PolicyUpdate eachsteptofthetrajectorytoproducetheverificationtuple
+18: Optimizeπ θ viaGRPOusingallcollectedtrajectories V t andthecorrespondingprocessrewardr p (t ro ) c (usingEq.2).
+(Eq.6). IftheVerifier’sconfidenceforastepisbelowthethreshold
+19: endfor τ c ,theselectiverepairmechanism(Eq.4)istriggered,and
+acostC isapplied. Finally,thetotalreturng(τ)forthe
+repair
+trajectoryisaggregated,integratingboththefinaloutcome
+dynamicevaluationprocedure,enablingiterativerefinement rewardr andtheaccumulatedstep-wiseprocessrewards:
+out
+ofitsreasoningtrajectories.
+T
+BasedontheVerifier’sstep-wiseassessments,wefurther (cid:88)
+g(τ)=α r + γt−1r , (5)
+designacorrespondingprocess-levelrewardthatintegrates out out t
+t=1
+semantic reliability, tool-based validation, and cross-role
+whereα balancesthetworewardtypesandγ isthedis-
+regularization. out
+countfactor.
+r(t) =λ ·r(tool )+score ·conf Theouterloopthenusesthesegeneratedtrajectoriesto
+proc tool t t t
+(cid:124) (cid:123)(cid:122) (cid:125) evolve the unified policy π . We employ Group Relative
+semanticreliability (2) θ
+PolicyOptimization(GRPO)[44],avariantofPPOdesigned
+−β div ·D KL (cid:0) π θ V∥π θ E(cid:1) , forgenerativetasks. ForagroupofGtrajectories{τ }G
+i i=1
+sampledunderthecurrentpolicy,wecomputeanormalized
+whereλ scalestool-basedcorrectness,andβ stabilizes
+tool div
+advantageforeachtrajectory:
+thedual-roledistributionalalignment.
+Aftercompletingself-verification,theVerifierdetermines g(τ )−mean(g ,...,g )
+Aˆ = i 1 G ,
+whether the model should perform self-repair to correct i std(g ,...,g )+ε
+1 G
+its reasoning process based on the confidence score conf
+t whereg =g(τ )andεisanormalizationconstant. Thisrel-
+obtained during verification. Let τ denote a confidence i i
+c ativeadvantageAˆ reframesthelearningobjectiveas”being
+threshold. Therepairgateatsteptisdefinedas: i
+betterthanthegroupaverage.”Thepolicyisthenoptimized
+g =σ (cid:0) κ(τ −conf ) (cid:1) , (3) toincreasethelikelihoodoftrajectorieswithpositiveadvan-
+t c t
+tageswhilemaintainingstabilitythroughaKLregularization
+whereσ(·)isthesigmoidfunction,andκcontrolsthegating term:
+temperature. When g is activated, the Verifier issues a (cid:104) (cid:16) (cid:17)(cid:105)
+t L =−E min ρ Aˆ , clip(ρ ,1−ϵ,1+ϵ)Aˆ
+localrepairinstruction∆ t =f θ (s t ,a t ,V t ),andtheSolver EDLP i i i i i (6)
+regeneratesacorrectedsegmenta′ t ∼π θ (·|s t ,∆ t ,m=S). +β KL D KL (cid:0) π θ ∥π θold (cid:1) ,
+whereρ = πθ(τi) istheimportancesamplingratio.
+i πθold (τi)
+4.Experiments
+Inthissection,weevaluateAgent0-VLacrossmultiplevi-
+sual reasoning benchmarks to answer the following ques-
+tions:(1)Canitimprovereasoningabilityoverexistingopen-
+sourcebaselines? (2)Doesrepeatedself-evolutionthrough
+multipleiterationsyieldconsistentperformancegains? (3)
+Howeffectivearetheproposedcomponents? and(4)Can
+Agent0-VLserveasaprocessrewardmodeltoenhanceother
+LVLMs?
+4.1.ExperimentalSetup
+Benchmarks. Toevaluatetheeffectivenessofourmethod,
+we conducted experiments on a set of seven benchmarks.
+The science and mathematical benchmarks include Math-
+Verse[74],MathVision[53],MathVista[31],WeMath[40],
+andMMMU[70],whileotherbenchmarksconsistofHallu-
+sionBench[16],andChartQA[32].
+Baselines. Additionally,wecomparedAgent0-VLagainst
+threetypesofbaselines: (1)Closed-SourceLVLMs,includ-
+ing GPT-4o [1], o1 [35], Gemini-2.0-pro [7], and Claude-
+3.7-Sonnet[2]; (2) Open-Source General MLLMs, includ-
+ing Qwen2.5-VL-3B [3], Qwen2.5-VL-7B [3], Qwen2.5-
+VL-32B[3],InternVL-2.5-8B[6]andInternVL3-8B[84];
+(3) Open-Source Reasoning MLLMs, including R1-
+VL-7B [71],Vision-R1-7B [20], R1-Onevision-7B [66],
+OpenVLThinker-7B [8], VLAA-Thinker-7B [4], MM-
+Eureka-7B [33], Thyme [76], Qwen3-VL-8B [49], and
+ThinkLite-VL-7B[58]; and(4)self-evolvingmethods, in-
+cludingEvoLMM[51],VisPlay[18],andVision-Zero[55].
+TrainingDatasets. Weconstructalarge-scalemultimodal
+reasoningcorpustailoredforbothSFTandRLstages. The
+SFTdataset(200ksamples)isbuiltfromopen-sourcebench-
+marksincludingGeometry3K[30],GeoQA[5],Mulberry
+dataset[68],MM-Eureka[33],andRetool[11],wherewe
+automaticallygeneratetool-augmentedreasoningtrajecto-
+riesusingGPT-5andQwen2.5-VL-72Basteachermodels.
+For the RL stage, we construct an additional 40k dataset.
+DetaileddataconstructionproceduresareprovidedinAp-
+pendixD.
+4.2.MainResults
+Overall Performance. Table 1 summarizes the perfor-
+manceofAgent0-VLacrossallvisualreasoningbenchmarks.
+Ourmodelconsistentlyachievessubstantialimprovements
+overallopen-sourcebaselines. Specifically,Agent0-VL-7B
+outperformsexistingopen-source7Bmodels,achievinga
+4.29%averagegainoverThinkLite-VL-7B.Agent0-VLalso
+demonstratesclear advantages overexisting self-evolving
+vision–language models, including Vision-Zero [55] and
+EvoLMM[51]. ComparedtothebaseQwen2.5-VL-7B,it
+shows a 12.5% improvement, and a 10.3% gain over its
+ecnamrofreP
+llarevO
+Pass @1
+BoN with Qwen2.5-VL-7B
+BoN with Agent-Zero-VL-7B 69.1 70
+66.9
+64.4
+62.8
+60 58.359.5 57.2
+55.3
+53.6 53.0
+51.2
+50 50.0
+QwenVL2.5-3B QwenVL2.5-7B InternVL-2.5-8B Qwen2.5-VL-32B
+Figure 3. The overall Best-of-8 evaluation results across seven
+multimodal reasoning benchmarks with different critic models.
+Our model greatly enhances the overall performance compared
+withQwen2.5-VL-7Bmodel.
+tool-integratedvariantQwen2.5-VL-7B-TIR.Evenwitha
+stronger base model (Qwen3-VL-8B), Agent0-VL main-
+tainsstrongcompatibilityandfurtherimprovesperformance,
+surpassingthebaseby6.1%anditstool-augmentedvariant
+(Qwen3-VL-8B-TIR)by4.6%.Notably,Agent0-VL-8Balso
+outperformsclosed-sourcesystemssuchasGPT-4oonkey
+benchmarksincludingMathVista,HallBench,andChartQA,
+underscoringthegeneralizationandreasoningstrengthof
+ourapproach.
+PerformanceAcrossTaskDomains. Indomain-specific
+evaluations,Agent0-VLdemonstratesthemostsignificant
+improvementsonmathematicalreasoningbenchmarkssuch
+asMathVistaandWeMath,wheretool-groundedexecution
+andverificationplayacrucialroleinaccuratesymbolicrea-
+soning. Our 7B and 8B models achieve 18.1% and 7.4%
+improvements,respectively,overtheirbasemodelsonmath-
+relatedbenchmarks. Forperception-heavybenchmarkssuch
+asHallusionBenchandChartQA,integratingtheVerifier’s
+factualgroundingsubstantiallyreducesvisualhallucinations,
+leadingto12.2%and3.1%improvementscomparedtothe
+basemodel. TheseresultsindicatethatAgent0-VLenhances
+bothsymbolicreasoningandvisualunderstanding,confirm-
+ingtherobustnessandgeneralityofourframeworkacross
+diversetaskdomains.
+Iterative Self-Evolution. We further investigate how the
+model’sreasoningcapabilitiesevolveacrossmultipleiter-
+ationsofSERC.AsshowninTable2,Agent0-VLdemon-
+stratesasteadyandmonotonicimprovementovertime: in
+thefirstiteration,itsoverallperformanceincreasesby5.2%
+comparedtothebasemodel,followedbyadditionalgains
+of4.0%and2.8%inthesecondandthirditerations,respec-
+tively. Theseresults validate the effectiveness of ourself-
+evolving framework, showing that the model can achieve
+stableandcontinuousperformancegainsthroughiterative
+self-improvement.
+Table1. Comparisonofmodelperformanceacrossrepresentativevisualreasoningbenchmarks. Closed-sourceLVLMsarelistedfor
+reference, while open-source models are grouped by general-purpose and reasoning-oriented categories. The best results among all
+open-sourcedmodelsareboldedandthesecondbestresultsareunderlinedinthetable.Note:Qwen2.5-VL-7B-TIRandQwen3-VL-8B-TIR
+denotetheresultsofintegratingtool-enhancedreasoningintothecorrespondingbasemodels,obtainedfromourlocalfine-tuningand
+evaluation.
+Model MathVerse MathVision MathVista WeMath HallBench ChartQA MMMU Avg.
+val
+Close-sourceMLLMs
+GPT-4o[1] 50.8 30.4 63.8 68.8 55.0 85.7 69.1 60.5
+OpenAI-o1[35] 57.0 60.3 73.9 - - 83.1 77.6 -
+Claude-3.7-Sonnet[2] 52.0 41.3 66.8 72.6 55.4 56.5 75.0 59.9
+Open-SourceGeneralMLLMs
+InternVL-2.5-8B[6] 39.5 19.7 64.4 53.5 61.7 79.1 62.7 54.4
+InternVL-3-8B[84] 39.8 29.3 71.6 58.1 64.3 85.9 60.7 58.5
+Qwen2.5-VL-7B[3] 46.3 25.1 67.8 62.1 65.0 83.5 58.6 58.3
+Qwen2.5-VL-7B-TIR∗ 47.2 26.3 68.1 63.7 67.2 84.1 59.6 59.5
+Qwen3-VL-8B[49] 62.1 53.9 77.2 72.5 72.1 84.6 69.6 70.3
+Qwen3-VL-8B-TIR∗ 63.1 54.7 79.4 73.1 72.8 85.4 70.9 71.3
+Open-SourceReasoningMLLMs
+R1-VL-7B[71] 40.4 24.7 63.5 60.1 54.7 76.1 - -
+Vision-R1-7B[20] 51.9 30.7 73.5 73.9 68.8 79.8 50.5 61.3
+R1-OneVision-7B[66] 46.4 29.9 64.1 61.8 67.5 77.8 - -
+OpenVLThinker-7B[8] 45.7 26.3 71.2 66.7 70.2 78.4 - -
+VLAA-Thinker-7B[4] 52.7 29.2 69.7 70.2 68.2 80.1 - -
+MM-Eureka-Qwen-7B[33] 50.5 27.9 73.6 67.4 66.9 82.1 52.7 60.2
+ThinkLite-VL-7B[58] 52.1 32.9 75.1 69.3 70.9 84.8 55.5 62.9
+Thyme-VL-7B[76] 51.3 27.6 70.0 - 71.0 86.1 - -
+EvoLMM[51] 44.9 27.8 70.5 86.7 52 -
+VisPlay[18] - 31.2 - - 92.3 - - -
+Vision-Zero[55] 52.2 28.1 72.6 - - - - -
+Agent0-VL-7B(Ours) 53.1 37.3 75.6 71.7 72.9 87.3 61.1 65.6
+Agent0-VL-8B(Ours) 65.5 56.2 83.7 79.6 74.3 89.7 73.4 74.6
+Table2.PerformancecomparisonofAgent0-VL-7Bacrossiterativetrainingstages.Eachiteration(Iter1-3)progressivelyrefinesreasoning
+andtool-groundedcapabilities,consistentlyoutperformingthebasemodelacrossallbenchmarks.
+ModelName MathVerse MathVision MathVista WeMath HallBench ChartQA MME-Real MMMU Avg.
+BaseModel 46.3 25.1 67.8 62.1 65.0 83.5 58.3 50.6 57.3
+Iter1 48.4 29.6 69.2 66.8 67.9 84.7 63.9 53.7 60.5
+Iter2 51.1 35.3 72.8 70.1 70.3 86.1 64.7 58.3 63.6
+Iter3 53.1 37.3 75.6 71.7 72.9 87.3 65.3 61.1 65.5
+Table3.AblationstudyofAgent0-VLondifferentbenchmarks.RemovingSelfRepair,Tool-GroundedReward,orSERCnotablydegrades
+performance,highlightingthecomplementaryrolesofthesemodules.
+Setting MathAvg. HallBench ChartQA MME-Real MMMU
+Agent0-VL-7B 59.4 72.9 87.3 65.3 61.1
+w/oSelfRepair 57.5 71.6 86.1 64.1 57.9
+w/oToolUse 53.1 67.5 86.2 61.9 54.7
+w/oSERC(SFTonly) 51.8 65.8 85.4 60.5 52.5
+Qwen2.5-VL-7B(BaseModel) 50.3 65.0 83.5 58.3 50.6
+4.3.AblationStudies learning(ii)ToolUse,and(iii)SelfRepair. Foreachabla-
+tion,weremovethecorrespondingmodulewhilekeeping
+Tounderstandthecontributionofeachmajorcomponentin
+allothercomponentsintact,andretrainthemodelunderthe
+Agent0-VL,weconductcontrolledablationexperimentsfo-
+samesettings. TheresultsaresummarizedinTable3.
+cusingonthreekeymodules:(i)theSERCforreinforcement
+WereporttheresultsinTable3. Accordingtotheresults, tionalLVLMsthatstopafterproducinganincorrectanswer,
+first, we observe that eliminating the outer reinforcement Agent0-VLcontinuestointrospectandrepairitsreasoning.
+learning loop (SERC) and relying solely on SFT training Inthisexample,theSolverinitiallymisinterpretsthe“blind
+leadstothemostsignificantperformancedrop,withanaver- spot”segment,leadingtoanincorrectresult. TheVerifier
+agedecreaseof8.7%acrossallbenchmarks. Thisresultcon- detects this logical error using tool-grounded verification
+firmsthatthebidirectionalinteractionbetweenreasoningand andprovidesstructuredfeedbackpinpointingthefaultystep.
+evaluationisessentialforenablinglong-termself-evolution, TheSelf-Repairmodulethensynthesizesacorrectivepatch,
+whichconstitutesoneofthecorecontributionsofthiswork. whichtheSolverreusestoregenerateavalidreasoningchain
+Second,whentoolusageisremovedandthemodelperforms andreachthecorrectanswer. Thiscasedemonstrateshow
+onlytext-basedreasoningandself-evaluation,theaverage Agent0-VLconvertserrorsintosuccessfulreasoningthrough
+performancedeclinesby6.5%. Thishighlightsthecrucial itsintegratedreasoning–evaluation–repairloop.
+roleoftoolintegrationinenhancingreasoningaccuracy,es-
+peciallyformathematicalandfact-verificationtasks. Finally, 5.RelatedWork
+removingtheself-repairmechanism,allowingthemodelto
+self-evaluatewithoutperformingexplicitcorrection,results Self-EvolvingMethods.Toreducetherelianceoncostlyhu-
+inamoderateaverageperformancedropof2.5%. Inpartic- mansupervision,recentresearchinbothLLMsandVLMs
+ular,formathematicalreasoningbenchmarks,re-executing has explored self-evolving techniques that enable models
+reasoningthroughselectiverepairprovidesadditionaloppor- to improve autonomously using unlabeled data and self-
+tunities for resampling and correction, thereby improving generatedfeedback[62]. InLLMs,acommonstrategyisto
+overallreliability. derivepseudo-rewardsfromthemodel’sownoutputs.Forex-
+ample,self-consistencyleveragesagreementamongmultiple
+4.4.PerformanceasaProcessRewardModel
+generatedsolutionsasalearningsignal[56],whichhasen-
+Tofurtherevaluatethegeneralizationandstandaloneutility hancedreasoningintaskslikemathandcodegeneration,as
+of the Verifier module, we deploy it as a Process Reward seeninTTRL[85],MM-UPT[59],andSRT[43]. MM-UPT
+Model(PRM)toassessreasoningtrajectoriesgeneratedby furtherimprovesspatialreasoningbygeneratingsynthetic
+other VLMs. This experiment serves two key purposes: geometryproblems. Otherapproachesuseastrongmodel
+(i)toexaminewhethertheVerifiercangeneralizebeyond asanautomatedevaluator[38],orrelyoninternalcuessuch
+Agent0-VLandreliablyevaluatethestep-levelcorrectnessof asconfidencescores[25,78]andoutputentropy[73]. Deep-
+externalmodels’outputs,and(ii)tovalidatetheeffectiveness Conf [12], for instance, enhances reasoning efficiency by
+ofourtool-groundedrewardmodelingapproach,evenwhen selectingresponsesbasedontokenentropy.
+decoupledfrompolicylearning. In the VLM domain, self-evolving agents are also pro-
+AsshowninFigure3,ourverifiersignificantlyimproves gressingrapidly. ViPER[72]proposesatwo-stagecoarse-
+Best-of-8(BoN)performancewhenusedasarewardscorer to-fine training framework that integrates instance- and
+acrossvariousLVLMs. ComparedtoQwen2.5-VL-7Bas image-levelreconstructionwithself-critiquingandpredic-
+the critic model, Agent0-VL consistently yields stronger tion. In contrast, Vision-Zero [55] employs a domain-
+trajectoryselectionacrossmodelsofdifferentscales,from agnostic, game-based self-play strategy. By alternating
+Qwen2.5-VL-3B up to Qwen2.5-VL-32B, demonstrating between self-play and reinforcement learning with verifi-
+moreeffectiverewardassignmentandsharperstep-leveldis- able rewards, it achieves scalable and sustained improve-
+crimination. Table4furtherhighlightstheeffectivenessof ment. ThesemethodsdemonstratethatVLMs,likeLLMs,
+ourmodel,showingsubstantialimprovementsinbothstep- canevolvethroughstructuredfeedbackloopsinvolvingun-
+levelrewardcorrelationandoverallaccuracyacrossseven certaintymodeling,taskgeneration,andcurriculum-based
+multimodal reasoning benchmarks. When integrated as a learning. Incomparison,ourworkbuildsontheseadvances
+PRMintodifferentopen-sourceLVLMs,Agent0-VLcon- byintroducingatool-integratedvisualreasoningandself-
+sistentlyenhancesreasoningstabilityandfactualgrounding, evaluationframework,enablingcontinualandstableperfor-
+yieldinganaveragegainof7.3%.Notably,evensmallermod- manceimprovements.
+elssuchasQwen2.5-VL-3Bbenefitsignificantlyfromthe
+Tool-Integrated Reasoning. Tool-Integrated Reasoning
+structuredfeedback,indicatingstronggeneralizationacross
+(TIR) aims to enable models to invoke external tools
+architecturesandmodelscales.
+(e.g., search engines [14, 37, 50], calculators [15, 52])
+to overcome knowledge limitations and execute complex
+4.5.CaseStudy
+tasks[13,17,42,69,82,83]. Subsequentworksignificantly
+To illustrate how Agent0-VL performs self-evolving rea- enhancedLLMcapabilitiesinmulti-toolcoordination,plan-
+soning, we present a representative visual reasoning case ning,andexecutionthroughinstruction-tuningandagentic
+inFigure4(fullversioninAppendix4.5). Unlikeconven- frameworks[22,26,39,41]. Recentresearchbegantoex-
+Table4. PerformanceoftheAgent0-VLasaPRM.“+Ours”denotesmodelsintegratedwiththeAgent0-VLforrewardscoring. Across
+diversemultimodalreasoningbenchmarks,ourmethodconsistentlyenhancesaccuracy,validatingitseffectivenessasageneralizable,
+tool-groundedrewardmodel.
+Model MathVerse MathVision MathVista WeMath HallBench ChartQA Overall
+Qwen2.5-VL-3B[3] 34.8 21.9 58.4 51.7 59.8 73.1 50.0
++Ours 38.9 26.1 65.8 54.2 61.2 75.2 53.6
+Qwen2.5-VL-7B[3] 46.3 25.1 67.8 62.1 65.0 83.5 58.3
++Ours 51.2 33.6 72.3 66.9 68.1 84.6 62.8
+InternVL2.5-8B[6] 39.5 19.7 64.4 53.5 61.7 79.1 53.0
++Ours 43.2 26.2 67.3 59.8 63.6 83.0 57.2
+InternVL2.5-8B[6] 39.8 29.3 71.6 58.1 64.3 85.9 58.2
++Ours 45.4 33.0 74.6 62.5 67.2 88.3 61.8
+Qwen2.5-VL-32B[3] 48.5 38.4 74.7 69.1 71.8 84.0 64.4
++Ours 53.0 44.3 78.6 75.2 74.7 88.5 69.1
+Phase 1: Initial Reasoning Phase 2: Evaluation
+< d $ .. 2 t u O h 7 e n i 0 n e ^ k E p \ > c a o T i s s r h c t s e $ ib , g ( l p e o e o a n in s l d t i i i t e s n iv r g t p e o r a e c t t x a a d - l t a c u io x u e n i l s a N ) i t s e o t … r c h t o a T h u h t ( n e … p t d o e e s r- i s c t c i l v o r e i c p k t y i w - o a n is x i e " s f ) r " o b m is y c i { { s " " r s i s Q t t t i e c 4 e p a p ( _ $ l _ i l i x n o n d > g d e i e 0 c x x , " e " y : : r 2 1 < r , o , * 0 r " * . $ s } T c ) . h o ", e r e " d t " o e :- o f 1 i l n . _ 0 i c t , i h o " e c n c o o k n f " f : ' i f b d a l e i l n s n e d c } e s " p : o 1. t 0 ' i , s " w cr r i o ti n q g u … e" T : E " h R r e r e r o a e r s fo o F r n o e i , n u t g n h c d e o t n ru ta e i n b s li n a d spot
+3.I need to (a) Check if segment A-B enters Q2. * (b)
+Check if segment B-C enters Q2. * (c) Sum the results.
+(a) Segment A-B: …. (b) Segment B-C: From $B(7, -1)$ Phase 3: Self-Repair
+[Q4] to $C(-4, -3)$ [Q3]. Both points have $y < 0$. EE Key Feedback:…<think> 1. Diagnosis:*EE has assigned a score ... 2. Root Cause: RA's
+Therefore, the entire segment is in the $y < 0$ region definition of the "blind spot" was incorrect. 3. EE Correction: …4. Repair Strategy: I must issue
+and **cannot enter Q2**. Length in blind spot is $0$. a `PATCH` to correct the core logical premise…</think>
+(c) Total length = $0 + 0 = 0$. </think> { "action": "PATCH", "target_step": 1, "patch_type": "text",justification": "Original logic
+<answer>0.00 </answer> Failed Attempt incorrectly…}
+Question:As shown in the figure, a coast guard
+watchtower is located at the coordinate origin Phase 4: Corrected Reasoning
+O(0, 0).Three key reef locations, A, B, and C, <think> Goal: Restart reasoning based on the `PATCH`. 2. Corrected Premise: Blind Spot = Quadrant 4 (Q4, $x > 0, y < 0$). 3. New Plan…</think>
+are marked on the nautical grid...Calculate {"tool_name":"calc_intersection_and_distance", "tool_input":..} à [Tool Output]
+how much of the ship's total journey (segments <think> **Integrate (a):** Tool returns length of A-B in Q4 as **$1.01015$**. 6. **Execute (b) -…* I will call the tool.
+A-B and B-C) is sailed within the watchtower's </think>{"tool_name":"calc_intersection_and_distance", "tool_input":..} à [Tool Output]
+blind spot. < < t a h n i s n w k> e r * > * 8 In .1 te 3 g < r / a a te n s (b w ) e :* r * > Tool returns length of B-C in Q4 as **$7.11601…</think> Correct
+Figure4.SimplifiedillustrationofAgent0-VL’sself-evolvingreasoningprocessonageometricreasoningtaskduringtrainingphase.The
+modelfirstproducesanincorrectanswer(Phase1),afterwhichtheVerifieridentifiesthelogicalerror(Phase2),triggersSelf-Repairto
+generateacorrection(Phase3),andfinallyre-executesreasoningviatheSolvertoreachthecorrectsolution(Phase4). Thecomplete
+multi-phasecaseisprovidedinAppendix4.5(Figure8).
+tendTIRtoVLMs,enablingmodelstonotonlyprocesstext thatguidemoreeffectiveself-improvement.
+butalsodynamicallyinteractwithvisualinformation. One
+lineofworkpositionstheVLMasanorchestratorthatcalls 6.Conclusion
+uponexternalvisionexperttools[19,67]orskillreposito-
+WepresentedAgent0-VL,aself-evolvingvision–language
+ries [29]. Another line of work explores how VLMs can
+agent that unifies reasoning, verification, and self-repair
+performdynamicreasoningatthe“visionlevel,”treatingim-
+withinasinglemodel. Throughitsdualroles,theSolverand
+ageexplorationitselfasatool,likezooming[45]andvisual
+the Verifier, Agent0-VL operates under the Self-Evolving
+querying[61]. Recently, manyeffortshaveadoptedRein-
+ReasoningCycle,wherethemodelcontinuallyrefinesitsrea-
+forcementLearning(RL)fortraining[46–48]. GRIT[10]
+soningthroughtool-groundedverification,confidence-gated
+andDeepEyes[79]leverageRLtoincentivizethemodelto
+repair, and reinforcement learning. Empirically, Agent0-
+activelyciteimageregions(e.g.,boundingboxes)withinits
+VLoutperformsexistingopen-sourcemodelsacrossawide
+reasoningchains. Alsosomeworks(e.g.,WebWatcher[13])
+rangeofvisualreasoningbenchmarks,achievingstronger
+utilizeRLtoenhancethegeneralizationoftooluseformul-
+factualconsistencyandmulti-turnstability.
+timodal agents in deep research tasks [34, 60]. Building
+on this line of work, our method further integrates tool-
+Acknowledgement
+augmentedreasoningintothemodel’sself-evaluationpro-
+cess,enablingthegenerationofprocess-levelrewardsignals ThisworkispartiallysupportedbytheAIforMathFund
+fromRenaissancePhilanthropy,AmazonResearchAward,
+and Cisco Faculty Research Award. The Authors also ac- [14] Google. Trydeepresearchandournewexperimentalmodel
+knowledgetheNationalArtificialIntelligenceResearchRe- ingemini,youraiassistant,2024.
+source(NAIRR)Pilot,PurdueAnvilAIforcontributingto [15] ZhibinGou,ZhihongShao,YeyunGong,YelongShen,Yujiu
+thisresearchresult. Yang, MinlieHuang, NanDuan, andWeizhuChen. Tora:
+Atool-integratedreasoningagentformathematicalproblem
+References solving. arXivpreprintarXiv:2309.17452,2023.
+[16] TianruiGuan,FuxiaoLiu,XiyangWu,RuiqiXian,Zongxia
+[1] JoshAchiam,StevenAdler,SandhiniAgarwal,LamaAhmad, Li,XiaoyuLiu,XijunWang,LichangChen,FurongHuang,
+IlgeAkkaya,FlorenciaLeoniAleman,DiogoAlmeida,Janko YaserYacoob,etal. Hallusionbench:anadvanceddiagnostic
+Altenschmidt,SamAltman,ShyamalAnadkat,etal. Gpt-4 suiteforentangledlanguagehallucinationandvisualillusion
+technicalreport,2024. inlargevision-languagemodels. pages14375–14385,2024.
+[2] Anthropic. Claude3.7Sonnet,anthropic.com. https://
+[17] ZhichengGuo,SijieCheng,HaoWang,ShihaoLiang,Yujia
+www.anthropic.com/claude/sonnet,2025. 2025-
+Qin, Peng Li, Zhiyuan Liu, Maosong Sun, and Yang Liu.
+02-24.
+Stabletoolbench: Towardsstablelarge-scalebenchmarking
+[3] ShuaiBai,KeqinChen,XuejingLiu,JialinWang,Wenbin ontoollearningoflargelanguagemodels. arXivpreprint
+Ge,SiboSong,KaiDang,PengWang,ShijieWang,JunTang, arXiv:2403.07714,2024.
+etal. Qwen2.5-vltechnicalreport,2025.
+[18] YichengHe,ChengsongHuang,ZongxiaLi,JiaxinHuang,
+[4] HardyChen,HaoqinTu,FaliWang,HuiLiu,XianfengTang,
+andYonghuiYang. Visplay:Self-evolvingvision-language
+Xinya Du, Yuyin Zhou, and Cihang Xie. Sft or rl? an
+modelsfromimages. arXivpreprintarXiv:2511.15661,2025.
+earlyinvestigationintotrainingr1-likereasoninglargevision-
+[19] YushiHu,WeijiaShi,XingyuFu,DanRoth,MariOstendorf,
+languagemodels,2025.
+LukeZettlemoyer,NoahASmith,andRanjayKrishna.Visual
+[5] Jiaqi Chen, Jianheng Tang, Jinghui Qin, Xiaodan Liang,
+sketchpad: Sketchingasavisualchainofthoughtformul-
+Lingbo Liu, Eric P. Xing, and Liang Lin. Geoqa: A geo-
+timodallanguagemodels. AdvancesinNeuralInformation
+metricquestionansweringbenchmarktowardsmultimodal
+ProcessingSystems,37:139348–139379,2024.
+numericalreasoning,2022.
+[20] Wenxuan Huang, Bohan Jia, Zijie Zhai, Shaosheng Cao,
+[6] ZheChen,WeiyunWang,YueCao,YangzhouLiu,Zhang-
+Zheyu Ye, Fei Zhao, Zhe Xu, Yao Hu, and Shaohui Lin.
+weiGao, ErfeiCui, JinguoZhu, ShenglongYe, HaoTian,
+Vision-r1:Incentivizingreasoningcapabilityinmultimodal
+Zhaoyang Liu, et al. Expanding performance boundaries
+largelanguagemodels,2025.
+of open-source multimodal models with model, data, and
+[21] Physical Intelligence, Kevin Black, Noah Brown, James
+test-timescaling,2025.
+Darpinian, Karan Dhabalia, Danny Driess, Adnan Esmail,
+[7] Google Deepmind. Gemini 2.5: Our most intelligent
+MichaelEqui,ChelseaFinn,NiccoloFusai,etal. π0.5: a
+AI model — blog.google. https://blog.google/
+vision-language-actionmodelwithopen-worldgeneralization,
+technology/google-deepmind/gemini-model-
+2025. URLhttps://arxiv.org/abs/2504.16054,1(2):3.
+thinking-updates-march-2025/#gemini-2-5-
+thinking,2025. Accessed:2025-03-25. [22] BowenJin,HansiZeng,ZhenruiYue,JinsungYoon,Sercan
+Arik,DongWang,HamedZamani,andJiaweiHan. Search-
+[8] Yihe Deng, Hritik Bansal, Fan Yin, Nanyun Peng, Wei
+r1:Trainingllmstoreasonandleveragesearchengineswith
+Wang, and Kai-Wei Chang. Openvlthinker: An early ex-
+reinforcement learning. arXiv preprint arXiv:2503.09516,
+plorationtocomplexvision-languagereasoningviaiterative
+2025.
+self-improvement,2025.
+[23] BoLi,YuanhanZhang,DongGuo,RenruiZhang,FengLi,
+[9] YiDingandRuqiZhang.Sherlock:Self-correctingreasoning
+invision-languagemodels. arXivpreprintarXiv:2505.22651, HaoZhang,KaichenZhang,PeiyuanZhang,YanweiLi,Zi-
+wei Liu, et al. Llava-onevision: Easy visual task transfer.
+2025.
+arXivpreprintarXiv:2408.03326,2024.
+[10] YueFan,XuehaiHe,DijiYang,KaizhiZheng,Ching-Chen
+Kuo, Yuting Zheng, Sravana Jyothi Narayanaraju, Xinze [24] LeiLi,YuqiWang,RunxinXu,PeiyiWang,XiachongFeng,
+Guan, andXinEricWang. Grit: Teachingmllmstothink LingpengKong,andQiLiu. Multimodalarxiv:Adatasetfor
+withimages. arXivpreprintarXiv:2505.15879,2025. improvingscientificcomprehensionoflargevision-language
+[11] JiazhanFeng,ShijueHuang,XingweiQu,GeZhang,Yujia models. arXivpreprintarXiv:2403.00231,2024.
+Qin,BaoquanZhong,ChengquanJiang,JinxinChi,andWan- [25] Pengyi Li, Matvey Skripkin, Alexander Zubrey, Andrey
+junZhong. Retool:Reinforcementlearningforstrategictool Kuznetsov,andIvanOseledets. Confidenceisallyouneed:
+useinllms. arXivpreprintarXiv:2504.11536,2025. Few-shotrlfine-tuningoflanguagemodels. arXivpreprint
+[12] Yichao Fu, Xuewei Wang, Yuandong Tian, and Jiawei arXiv:2506.06395,2025.
+Zhao. Deep think with confidence. arXiv preprint [26] XuefengLi,HaoyangZou,andPengfeiLiu. Torl: Scaling
+arXiv:2508.15260,2025. tool-integratedrl. arXivpreprintarXiv:2503.23383,2025.
+[13] Xinyu Geng, Peng Xia, Zhen Zhang, Xinyu Wang, Qi- [27] ZongxiaLi,WenhaoYu,ChengsongHuang,RuiLiu,Zhen-
+uchenWang,RuixueDing,ChenxiWang,JialongWu,Yida wen Liang, Fuxiao Liu, Jingxi Che, Dian Yu, Jordan
+Zhao, Kuan Li, et al. Webwatcher: Breaking new fron- Boyd-Graber, Haitao Mi, et al. Self-rewarding vision-
+tierofvision-languagedeepresearchagent. arXivpreprint languagemodelviareasoningdecomposition. arXivpreprint
+arXiv:2508.05748,2025. arXiv:2508.19652,2025.
+[28] Jiaqi Liu, Songning Lai, Pengze Li, Di Yu, Wenjie Zhou, [42] Timo Schick, Jane Dwivedi-Yu, Roberto Dess`ı, Roberta
+Yiyang Zhou, Peng Xia, Zijun Wang, Xi Chen, Shixiang Raileanu, Maria Lomeli, Eric Hambro, Luke Zettlemoyer,
+Tang,etal. Mimickingthephysicist’seye: Avlm-centric NicolaCancedda,andThomasScialom. Toolformer: Lan-
+approach for physics formula discovery. arXiv preprint guagemodelscanteachthemselvestousetools. Advances
+arXiv:2508.17380,2025. inNeuralInformationProcessingSystems,36:68539–68551,
+[29] Shilong Liu, Hao Cheng, Haotian Liu, Hao Zhang, Feng 2023.
+Li,TianheRen,XueyanZou,JianweiYang,HangSu,Jun [43] SheikhShafayat,FahimTajwar,RuslanSalakhutdinov,Jeff
+Zhu, et al. Llava-plus: Learning to use tools for creating Schneider,andAndreaZanette. Canlargereasoningmodels
+multimodal agents. In European conference on computer self-train? arXivpreprintarXiv:2505.21444,2025.
+vision,pages126–142.Springer,2024. [44] ZhihongShao,PeiyiWang,QihaoZhu,RunxinXu,Junxiao
+[30] PanLu,RanGong,ShibiaoJiang,LiangQiu,SiyuanHuang, Song,XiaoBi,HaoweiZhang,MingchuanZhang,YKLi,Y
+XiaodanLiang,andSong-ChunZhu. Inter-gps:Interpretable Wu,etal. Deepseekmath:Pushingthelimitsofmathematical
+geometryproblemsolvingwithformallanguageandsymbolic reasoninginopenlanguagemodels,2024.
+reasoning,2021. [45] Haozhan Shen, Kangjia Zhao, Tiancheng Zhao, Ruochen
+[31] PanLu,HritikBansal,TonyXia,JiachengLiu,ChunyuanLi, Xu,ZilunZhang,MingweiZhu,andJianweiYin. Zoomeye:
+HannanehHajishirzi,HaoCheng,Kai-WeiChang,Michel Enhancingmultimodalllmswithhuman-likezoomingcapa-
+Galley,andJianfengGao. Mathvista:Evaluatingmathemat- bilitiesthroughtree-basedimageexploration. InProceedings
+icalreasoningoffoundationmodelsinvisualcontexts. In of the 2025 Conference on Empirical Methods in Natural
+The 3rd Workshop on Mathematical Reasoning and AI at LanguageProcessing,pages6613–6629,2025.
+NeurIPS’23,2023. [46] AlexSu,HaozheWang,WeimingRen,FangzhenLin,and
+WenhuChen. Pixelreasoner:Incentivizingpixel-spacerea-
+[32] Ahmed Masry, Xuan Long Do, Jia Qing Tan, Shafiq Joty,
+soningwithcuriosity-drivenreinforcementlearning. arXiv
+and Enamul Hoque. Chartqa: A benchmark for question
+preprintarXiv:2505.15966,2025.
+answering about charts with visual and logical reasoning.
+pages2263–2279,2022. [47] Zhaochen Su, Linjie Li, Mingyang Song, Yunzhuo Hao,
+ZhengyuanYang,JunZhang,GuanjieChen,JiaweiGu,Jun-
+[33] FanqingMeng,LingxiaoDu,ZongkaiLiu,ZhixiangZhou,
+taoLi,XiaoyeQu,etal. Openthinkimg: Learningtothink
+Quanfeng Lu, Daocheng Fu, Tiancheng Han, Botian Shi,
+withimagesviavisualtoolreinforcementlearning. arXiv
+WenhaiWang,JunjunHe,etal. Mm-eureka:Exploringthe
+preprintarXiv:2505.08617,2025.
+frontiersofmultimodalreasoningwithrule-basedreinforce-
+[48] ZhaochenSu,PengXia,HangyuGuo,ZhenhuaLiu,YanMa,
+mentlearning,2025.
+XiaoyeQu,JiaqiLiu,YanshuLi,KaideZeng,Zhengyuan
+[34] KartikNarayan,YangXu,TianCao,KavyaNerella,VishalM
+Yang,etal. Thinkingwithimagesformultimodalreasoning:
+Patel,NavidShiee,PeterGrasch,ChaoJia,YinfeiYang,and
+Foundations,methods,andfuturefrontiers. arXivpreprint
+ZheGan. Deepmmsearch-r1:Empoweringmultimodalllms
+arXiv:2506.23918,2025.
+inmultimodalwebsearch. arXivpreprintarXiv:2510.12801,
+[49] Qwen-VL Team. Qwen3-vl: Sharper vision, deeper
+2025.
+thought,broaderaction. https://qwen.ai/blog?id=
+[35] OpenAI. OpenAIo1SystemCard—openai.com. https:
+99f0335c4ad9ff6153e517418d48535ab6d8afef&
+//cdn.openai.com/o1-system-card.pdf, 2024.
+from=research.latest-advancements-list,
+Accessed:2024-09-12.
+2025. 2025-09-22.
+[36] OpenAI. Introducing gpt-5. https://openai.com/
+[50] TongyiDeepResearchTeam,BaixuanLi,BoZhang,Dingchu
+index/introducing-gpt-5/,2025.
+Zhang,FeiHuang,GuangyuLi,GuoxinChen,HuifengYin,
+[37] OpenAI. Openaideepresearchsystemcard,2025.
+JialongWu,JingrenZhou,etal. Tongyideepresearchtechni-
+[38] Jing-ChengPang,PengyuanWang,KaiyuanLi,Xiong-Hui calreport. arXivpreprintarXiv:2510.24701,2025.
+Chen,JiachengXu,ZongzhangZhang,andYangYu. Lan- [51] Omkar Thawakar, Shravan Venkatraman, Ritesh Thawkar,
+guage model self-improvement by reinforcement learning AbdelrahmanMShaker,HishamCholakkal1RaoMuham-
+contemplation. InInternationalConferenceonLearningRep- madAnwer,SalmanKhan,andFahadKhan. Evolmm:Self-
+resentations,pages1–11,2024. evolvinglargemultimodalmodelswithcontinuousrewards.
+[39] Shishir G Patil, Tianjun Zhang, Xin Wang, and Joseph E arXivpreprintarXiv:2511.16672,2025.
+Gonzalez. Gorilla: Largelanguagemodelconnectedwith [52] KeWang,HouxingRen,AojunZhou,ZimuLu,SichunLuo,
+massiveapis. arXivpreprintarXiv:2305.15334,2023. WeikangShi,RenruiZhang,LinqiSong,MingjieZhan,and
+[40] RunqiQiao,QiunaTan,GuantingDong,MinhuiWu,Chong Hongsheng Li. Mathcoder: Seamless code integration in
+Sun,XiaoshuaiSong,ZhuomaGongQue,ShanglinLei,Zhe llmsforenhancedmathematicalreasoning. arXivpreprint
+Wei,MiaoxuanZhang,etal. We-math:Doesyourlargemul- arXiv:2310.03731,2023.
+timodalmodelachievehuman-likemathematicalreasoning?, [53] KeWang,JuntingPan,WeikangShi,ZimuLu,HouxingRen,
+2024. AojunZhou,MingjieZhan,andHongshengLi. Measuring
+[41] YujiaQin,ShihaoLiang,YiningYe,KunlunZhu,LanYan, multimodalmathematicalreasoningwithmath-visiondataset.
+YaxiLu,YankaiLin,XinCong,XiangruTang,BillQian,etal. pages95095–95169,2024.
+Toolllm:Facilitatinglargelanguagemodelstomaster16000+ [54] KangruiWang,PingyueZhang,ZihanWang,YaningGao,
+real-worldapis. arXivpreprintarXiv:2307.16789,2023. Linjie Li, Qineng Wang, Hanyang Chen, Chi Wan, Yip-
+ingLu,ZhengyuanYang,etal. Vagen: Reinforcingworld Feng,LiShen,etal. Mulberry:Empoweringmllmwitho1-
+modelreasoningformulti-turnvlmagents. arXivpreprint likereasoningandreflectionviacollectivemontecarlotree
+arXiv:2510.16907,2025. search,2024.
+[55] Qinsi Wang, Bo Liu, Tianyi Zhou, Jing Shi, Yueqian Lin, [69] ShunyuYao,JeffreyZhao,DianYu,NanDu,IzhakShafran,
+Yiran Chen, Hai Helen Li, Kun Wan, and Wentian Zhao. Karthik Narasimhan, and Yuan Cao. React: Synergizing
+Vision-zero: Scalable vlm self-improvement via strategic reasoningandactinginlanguagemodels. InInternational
+gamifiedself-play. arXivpreprintarXiv:2509.25541,2025. ConferenceonLearningRepresentations(ICLR),2023.
+[56] XuezhiWang,JasonWei,DaleSchuurmans,QuocLe,Ed [70] XiangYue,YuanshengNi,KaiZhang,TianyuZheng,Ruoqi
+Chi,SharanNarang,AakankshaChowdhery,andDennyZhou. Liu,GeZhang,SamuelStevens,DongfuJiang,WeimingRen,
+Self-consistencyimproveschainofthoughtreasoninginlan- YuxuanSun,etal. Mmmu:Amassivemulti-disciplinemulti-
+guagemodels. arXivpreprintarXiv:2203.11171,2022. modalunderstandingandreasoningbenchmarkforexpertagi.
+InProceedingsoftheIEEE/CVFConferenceonComputer
+[57] XiyaoWang, ChunyuanLi, JianweiYang, KaiZhang, Bo
+VisionandPatternRecognition,pages9556–9567,2024.
+Liu,TianyiXiong,andFurongHuang. Llava-critic-r1:Your
+criticmodelissecretlyastrongpolicymodel. arXivpreprint [71] Jingyi Zhang, Jiaxing Huang, Huanjin Yao, Shunyu Liu,
+arXiv:2509.00676,2025. XikunZhang,ShijianLu,andDachengTao. R1-vl: Learn-
+ing to reason with multimodal large language models via
+[58] XiyaoWang,ZhengyuanYang,ChaoFeng,HongjinLu,Lin-
+step-wisegrouprelativepolicyoptimization,2025.
+jie Li, Chung-Ching Lin, Kevin Lin, Furong Huang, and
+LijuanWang. Sotawithless:Mcts-guidedsampleselection [72] JuntianZhang,SongJin,ChuanqiCheng,YuhanLiu,Yankai
+fordata-efficientvisualreasoningself-improvement,2025. Lin,XunZhang,YufeiZhang,FeiJiang,GuojunYin,Wei
+Lin,etal. Viper: Empoweringtheself-evolutionofvisual
+[59] LaiWei,YutingLi,ChenWang,YueWang,LingheKong,
+perceptionabilitiesinvision-languagemodel. arXivpreprint
+WeiranHuang,andLichaoSun. Unsupervisedpost-training
+arXiv:2510.24285,2025.
+formulti-modalLLMreasoningviaGRPO. arXivpreprint
+[73] QingyangZhang,HaitaoWu,ChangqingZhang,PeilinZhao,
+arXiv:2505.22453,2025.
+andYataoBian. Rightquestionisalreadyhalftheanswer:
+[60] JinmingWu,ZihaoDeng,WeiLi,YidingLiu,BoYou,BoLi,
+Fully unsupervised llm reasoning incentivization. arXiv
+ZejunMa,andZiweiLiu. Mmsearch-r1:Incentivizinglmms
+preprintarXiv:2504.05812,2025.
+tosearch. arXivpreprintarXiv:2506.20670,2025.
+[74] RenruiZhang,DongzhiJiang,YichiZhang,HaokunLin,Ziyu
+[61] Qiong Wu, Xiangcong Yang, Yiyi Zhou, Chenxin Fang,
+Guo,PengshuoQiu,AojunZhou,PanLu,Kai-WeiChang,
+BaiyangSong,XiaoshuaiSun,andRongrongJi. Grounded
+YuQiao,etal. Mathverse:Doesyourmulti-modalllmtruly
+chain-of-thought for multimodal large language models,
+seethediagramsinvisualmathproblems? pages169–186.
+2025.
+Springer,2024.
+[62] PengXia,KaideZeng,JiaqiLiu,CanQin,FangWu,Yiyang
+[75] Yi-Fan Zhang, Qingsong Wen, Chaoyou Fu, Xue Wang,
+Zhou,CaimingXiong,andHuaxiuYao. Agent0: Unleash-
+Zhang Zhang, Liang Wang, and Rong Jin. Beyond llava-
+ingself-evolvingagentsfromzerodataviatool-integrated
+hd: Diving into high-resolution large multimodal models.
+reasoning. arXivpreprintarXiv:2511.16043,2025.
+arXivpreprintarXiv:2406.08487,2024.
+[63] WeiXiong,HanningZhang,ChenluYe,LichangChen,Nan
+[76] Yi-FanZhang,XingyuLu,ShukangYin,ChaoyouFu,Wei
+Jiang,andTongZhang. Self-rewardingcorrectionformathe-
+Chen,XiaoHu,BinWen,KaiyuJiang,ChangyiLiu,Tianke
+maticalreasoning. arXivpreprintarXiv:2502.19613,2025.
+Zhang,etal. Thyme:Thinkbeyondimages. arXivpreprint
+[64] Ran Xu, Jingjing Chen, Jiayu Ye, Yu Wu, Jun Yan, Carl arXiv:2508.11630,2025.
+Yang,andHongkunYu. Incentivizingagenticreasoningin [77] Yi-FanZhang,TaoYu,HaochenTian,ChaoyouFu,PeiyanLi,
+llmjudgesviatool-integratedreinforcementlearning. arXiv JianshuZeng,WulinXie,YangShi,HuanyuZhang,Junkang
+preprintarXiv:2510.23038,2025.
+Wu,etal. Mm-rlhf:Thenextstepforwardinmultimodalllm
+[65] ZhenghaiXue,LongtaoZheng,QianLiu,YingruLi,Xiaosen alignment. arXivpreprintarXiv:2502.10391,2025.
+Zheng,ZejunMa,andBoAn. Simpletir: End-to-endrein- [78] XuandongZhao,ZheweiKang,AosongFeng,SergeyLevine,
+forcementlearningformulti-turntool-integratedreasoning. andDawnSong.Learningtoreasonwithoutexternalrewards.
+arXivpreprintarXiv:2509.02479,2025. arXivpreprintarXiv:2505.19590,2025.
+[66] YiYang,XiaoxuanHe,HongkunPan,XiyanJiang,YanDeng, [79] Ziwei Zheng, Michael Yang, Jack Hong, Chenxiao Zhao,
+XingtaoYang,HaoyuLu,DachengYin,FengyunRao,Min- GuohaiXu,LeYang,ChaoShen,andXingYu. Deepeyes:
+fengZhu,etal. R1-onevision:Advancinggeneralizedmulti- Incentivizing”thinkingwithimages”viareinforcementlearn-
+modalreasoningthroughcross-modalformalization,2025. ing. arXivpreprintarXiv:2505.14362,2025.
+[67] Zhengyuan Yang, Linjie Li, Jianfeng Wang, Kevin Lin, [80] YiyangZhou,ChenhangCui,RafaelRafailov,ChelseaFinn,
+Ehsan Azarnasab, Faisal Ahmed, Zicheng Liu, Ce Liu, and Huaxiu Yao. Aligning modalities in vision large lan-
+Michael Zeng, and Lijuan Wang. Mm-react: Prompting guage models via preference fine-tuning. arXiv preprint
+chatgptformultimodalreasoningandaction. arXivpreprint arXiv:2402.11411,2024.
+arXiv:2303.11381,2023. [81] Yiyang Zhou, Zhiyuan Fan, Dongjie Cheng, Sihan Yang,
+[68] HuanjinYao,JiaxingHuang,WenhaoWu,JingyiZhang,Yibo ZhaorunChen,ChenhangCui,XiyaoWang,YunLi,Linjun
+Wang,ShunyuLiu,YingjieWang,YuxinSong,Haocheng Zhang,andHuaxiuYao. Calibratedself-rewardingvisionlan-
+guagemodels.InAdvancesinNeuralInformationProcessing
+Systems(NeurIPS),2024.
+[82] YiyangZhou,YangfanHe,YaofengSu,SiweiHan,JoelJang,
+GedasBertasius,MohitBansal,andHuaxiuYao. Reagent-v:
+Areward-drivenmulti-agentframeworkforvideounderstand-
+ing. arXivpreprintarXiv:2506.01300,2025.
+[83] YiyangZhou,ZhaoyangWang,TianleWang,ShangyuXing,
+Peng Xia, Bo Li, Kaiyuan Zheng, Zijian Zhang, Zhaorun
+Chen,WenhaoZheng,etal. Anyprefer:Anautomaticframe-
+workforpreferencedatasynthesis. InInternationalConfer-
+enceonLearningRepresentations(ICLR),2025.
+[84] JinguoZhu,WeiyunWang,ZheChen,ZhaoyangLiu,Shen-
+glong Ye, Lixin Gu, Yuchen Duan, Hao Tian, Weijie Su,
+JieShao,etal. Internvl3: Exploringadvancedtrainingand
+test-timerecipesforopen-sourcemultimodalmodels,2025.
+[85] YuxinZuo,KaiyanZhang,LiSheng,ShangQu,GanquCui,
+XuekaiZhu,HaozhanLi,YuchenZhang,XinweiLong,Ermo
+Hua,BiqingQi,YoubangSun,ZhiyuanMa,LifanYuan,Ning
+Ding, and Bowen Zhou. TTRL: Test-time reinforcement
+learning. arXivpreprintarXiv:2504.16084,2025.
+Agent0-VL: Exploring Self-Evolving Agent for
+Tool-Integrated Vision-Language Reasoning
+Supplementary Material
+A.Notation SystemPrompt(Solver)
+B.ImplementationDetails
+You are the Reasoner in a unified
+Base Model. Agent0-VL is implemented upon Qwen2.5- tool-integrated VLM agent. You must
+solve tasks through multi-turn
+VL-7B-Instruct and Qwen3-VL-8B. Both the Solver and
+reasoning and selective tool use.
+Verifiershareparametersθ.
+Training Details. Our training pipeline consists of two Rules:
+sequentialstages: supervisedfine-tuning(SFT)andRL.In
+theSFTstage,Agent0-VLisfirsttrainedontool-usageand
+- Wrap internal reasoning in
+imagemanipulationdata,followedbygradualannealingon
+<think>...</think>.
+mathematicalcodereasoningdata. Thelearningrateisset - Call tools only when necessary using:
+to1×10−5,whileotherhyperparametersremainconsistent. {"tool_name":"<Tool>","tool_input":{...}}
+- Wait for tool_output before continuing.
+Weadoptabatchsizeof128,trainfor3epochs,andapplya
+- Be concise and deterministic; no
+linearwarmupratioof0.05. Toensuretrainingstabilityand hallucinated values.
+preventearly-stagecollapseorentropydegenerationinthe
+RLprocess,weperformashortexternal-rewardpretraining Process:
+phasebeforeself-evolutionbegins. Specifically,themodelis
+trainedfor2epochsusingconventionalRLwithexternally
+<think>
+definedcorrectnesssignalstoinitializestableexplorationand 1. Restate goal & plan next step.
+tool-usagebehaviors. Thispretrainingservesasawarm-up 2. Decide if a tool is needed; specify
+input.
+thatactivatesstructuredexploration,afterwhichthemodel
+3. Integrate tool_output; update
+transitionstotheself-evolvingRLphasedrivenpurelyby reasoning.
+internalprocessrewards. Intheself-evolvingRLstage,the </think>
+learningrateissetto5×10−7,andtrainingisperformed Emit one tool call or continue reasoning.
+When finished:
+for 1 epoch with a batch size of 256. The reinforcement
+learningfollowstheGRPO[44]paradigmwithagroupsize
+N =8forrelativenormalization. WesettheKLdivergence (1) Output CONFIDENCE: <0-1>
+coefficientβ = 0.001toregularizepolicydrift, collect (2)Output FINAL_ANSWER: <answer>.
+KL
+4 rollouts per task, and apply a repetition penalty of 1.05
+todiscourageredundantreasoning. Theentropycoefficient
+isβ = 0.01,theselectiverepairthresholdτ = 0.7,and
+ent c Figure5.SystempromptfortheSolver.
+therepairpenaltyη =0.05. Allexperimentsareconducted
+withmixed-precisiontraining(bfloat16)on8NVIDIAH200
+GPUs.
+D.1.Overview
+C.PromptingandTemplates To ensure diversity and robustness, the training data are
+constructed through a progressive curriculum, covering a
+Weprovidesystempromptsforourframework,asshownin
+wide range of multimodal reasoning tasks. The resulting
+Figure5-7,respectively.
+corpusisdividedintothreefunctionaltiers:
+• Directreasoningdata: single-turntextualorvisualques-
+D.TrainingDataConstructionPipeline
+tionssolvablewithouttoolcalls,groundinglinguisticrea-
+This section describes the multi-stage data construction soningandvisualperception.
+pipelineusedtotrainAgent0-VL.Theobjectiveistobuild • Tool-augmenteddata: problemsthatrequirecodeexecu-
+alarge-scalecorpusofhigh-quality,tool-integratedreason- tion,OCR,orvisualanalysis,providingfactualgrounding
+ing trajectories that equip the model with both reasoning andverifiableevidence.
+andverificationcapabilitiesbeforeenteringtheself-evolving • Multi-turn reasoning data: complex vi-
+reinforcementstage. sual–mathematical tasks involving iterative tool
+Symbol Meaning
+x Taskinstance(image+text)
+s ,a ,o State/context,action(reasoning/toolcall),observation(tooloutput)atstept
+t t t
+τ Trajectory{(s ,a ,o )}T
+t t t t=1
+π UnifiedpolicywithroletokensforRA/EE
+θ
+r(t) Process-levelrewardatstept
+proc
+g(τ) Compositetrajectoryreward(Eq.5)
+τ Confidencethresholdfortriggeringlocalrepair
+c
+Table5.Keynotationsusedthroughoutthepaper.
+SystemPrompt Formathematicalandchart-basedreasoning,wefurtherin-
+cludeMathVerse[74], MathVista[31], WeMath[40], and
+ChartQA[32].
+You are the Verifier in a unified
+tool-integrated VLM agent. Your role
+is to verify a given reasoning D.2.Multi-StageSFTDataConstruction
+trajectory step-by-step, optionally
+calling tools to check facts. The SFT stage aims to teach Agent0-VL to perform end-
+to-end,tool-integratedreasoningandself-verificationunder
+minimal human supervision. We employ a three-step au-
+tomatic pipeline inspired by recent multimodal reasoning
+Inputs: trajectory prefix $\tau_{1:t} =
+{(s_k, a_k, o_k)}_{k=1..t}$. works[33,77].
+Rules: (1) Task Sampling and Prompt Construction. We ran-
+(1)Wrap internal thought in domlysamplemultimodalproblems(Q,I)fromthedatasets
+<think>...</think>. above. For each problem, a structured prompt is applied
+(2)Use the same tool schema for factual
+that requests: (i) a detailed reasoning trace (wrapped in
+checks.
+(3) Output exactly one JSON line per step: <think>...</think>)and(ii)explicittool-useplans
+inJSONformat. Teachermodels(GPT-5[36]andQwen2.5-
+VL-72B[3])areusedtobootstrapthegenerationofcomplete
+{"step_index":t,
+trajectories.
+"score":<-1-1>,
+"confidence":<0-1>,
+(2) Tool Execution and Verification. All tool calls are
+"critique":"<<=2 sentences>",
+executed in a sandbox environment to obtain real results.
+"tool_check":true|false
+} Foreachreasoningstepa t ,thecorrespondingobservation
+o islogged,formingcompletemultimodaltrajectoriesτ =
+t
+Principles: {(a ,o )}T . Anauxiliaryverifiermodelthenchecksthe
+t t t=1
+consistencybetweentextualreasoning,tooloutputs,andthe
+(1) Ground verification on objective tool finalanswer. Inconsistentorunexecutabletrajectoriesare
+evidence. automaticallyfiltered.
+(2) Penalize unsupported or inconsistent
+reasoning. (3)Tool-GroundedSelf-VerificationandRepairExam-
+(3) High confidence requires agreement ples. To initialize the model’s self-evaluation ability, we
+between tool and text.
+furtherincludeexampleswheretheverifiergeneratesstruc-
+tured feedback V = (score ,conf ,critique ) and cor-
+t t t t
+rection signals for low-confidence steps. These “reason-
+Figure6.SystempromptfortheVerifier. ing–verification–repair”triplesserveasbridgesamplesfor
+transitioningfromsupervisedlearningtoself-evolvingrein-
+forcementlearning.
+use,correction,andreflection. After filtering and deduplication, we obtain approxi-
+Allpromptsarederivedoradaptedfromexistingmulti- mately200khigh-qualitymultimodaltrajectories. Thisuni-
+modalbenchmarks,includingGeometry3K[30],GeoQA[5], fiedSFTdatasetinitializesthedual-rolereasoningandveri-
+Mulberry [68], LLaVA-OV-Image [23], MM-RLHF [77], ficationbehaviorsofAgent0-VL,layingthefoundationfor
+SMR[75],MM-Eureka[33],Retool[11],andarXivQA[24]. self-evolvingoptimization.
+SystemPrompt D.3.DatasetForReinforcementLearning
+We start from math and perception problems from Math-
+You are the Self-Repair module of a Verse [74], MathVista [31], WeMath [40], arXivQA [24],
+unified tool-integrated VLM. andChartQA[32],andThinkLiteVL[58]. Themodelrolls
+You receive: (i) the original trajectory
+outreasoningtrajectoriesunderitscurrentpolicy,whilethe
+prefix \tau_{1:t}, (ii) the EE
+verification triple for step t internalVerifiergeneratesstep-levelrewardsandcritiquesto
+(score_t, confidence_t, critique_t), guideoptimization.
+and (iii) the minimal repair target
+D.4.QualityControl
+(segment uˆ(t)). To ensure factual reliability and semantic alignment, we
+apply:
+GOAL
+• Executionvalidation: alltoolinvocationsarere-runina
+- If confidence_t < \tau_c, propose a
+sandboxtoremoveinvalidtraces.
+minimal, local patch to uˆ(t) that
+fixes the specific error WITHOUT • Semantic consistency check: textual reasoning must
+rewriting validated context. alignwithtoolresultsandvisualobservations.
+- Use tools to recompute only what is
+• Redundancy filtering: near-duplicate reasoning traces
+necessary to validate the patch.
+areprunedviaembeddingsimilarity.
+• Manual spot-check: about 10k samples are manually
+reviewedformultimodalandreasoningcorrectness.
+REASONING FORMAT
+ThissystematicconstructionensuresthatAgent0-VLlearns
+- Put your full planning and diagnostics
+not only to reason and act across modalities, but also to
+inside <think>...</think>.
+- After <think>, either (A) emit a PATCH verify,repair,andself-evolvethroughgrounded,tool-based
+JSON (and optionally a tool call), or evidence.
+(B) emit a NO_CHANGE JSON if repair
+In total, Agent0-VL is trained on approximately 240k
+is not warranted.
+curatedmultimodalreasoningtrajectories: ∼200kSFTtra-
+jectoriesforcold-startreasoning,and∼40kdataforRL.
+PATCH JSON (single line): E.CaseStudies
+{
+"action": "PATCH",
+To provide an intuitive understanding of how Agent0-VL
+"target_step": t,
+performsreasoning,verification,andtoolinteractioninprac-
+"patch_type":
+"<text|code|tool_call|parameter>", tice,wevisualizeseveralrepresentativecasescoveringboth
+"new_content": "<the minimal single-stepandmulti-stepreasoningscenarios. Theseexam-
+replacement content>",
+plesillustratehowthemodeldynamicallyinvokesexternal
+tools,integratestooloutputsintoitsinternalreasoningpro-
+"justification": "<<= 2 sentences cess,andleveragestheVerifierforprocess-levelverification
+referencing critique/evidence>" andcorrection. Together,thesecaseshighlightthemodel’s
+}
+abilitytogroundreasoninginvisualevidence,maintainfac-
+tualconsistency, andperformself-reflectiveimprovement
+NO_CHANGE JSON (single line):
+{ acrossdiversevisualreasoningtasks.
+"action": "NO_CHANGE",
+"target_step": t,
+"reason": "<why repair is not warranted
+or evidence is insufficient>"
+}
+Figure7.SystempromptforSelf-RepairMode.
+As shown in the figure, a coast guard Phase 1: Initial Reasoning System Prompt for Solver
+watchtower is located at the coordinate <think>
+origin O(0, 0).Three key reef locations, A, B, 1. Thegoal is to calculate **
+and C, are marked on the nautical grid.A 2. *The description "from due East (positive x-axis) counter-clockwise by $270^\circ$, ending
+ship departs from point A, planning to sail in at due North (positive y-axis)" is **self-contradictory**. * (a) A $270^\circ$ counter-
+sequence to point B, and then to point C. Its clockwise rotation from East ($0^\circ$) should end at South ($270^\circ$). * (b) Reaching
+route consists of two straight-line North ($90^\circ$) from East ($0^\circ$) is only a $90^\circ$ rotation.
+segments: A-B and B-C**. The • One possible interpretation is that the beam covers the $270^\circ$ **major arc** from East
+watchtower‘s searchlight beam is limited. It to North, i.e., $0^\circ \rightarrow -90^\circ(\text{or } 270^\circ) \rightarrow 180^\circ
+can only rotate counter-clockwise from due \rightarrow 90^\circ$.
+East (positive x-axis) by **$270^\circ$**, • * Under this interpretation, the covered areas are Q1, Q4, and Q3.
+ending at due North (positive y-axis). • * Therefore, the **Blind Spot = Quadrant 2 ($x < 0, y > 0$)**.
+Calculate how much of the ship's total 3.I need to (a) Check if segment A-B enters Q2. * (b) Check if segment B-C enters Q2. * (c) Sum
+journey (segments A-B and B-C) is sailed the results.
+within the watchtower's blind spot. 4.**Execute Plan:**
+• * (a) Segment A-B: From $A(8, 6)$ [Q1] to $B(7, -1)$ [Q4]. Both points have $x > 0$. Therefore,
+the entire segment is in the $x > 0$ region and **cannot enter Q2**. Length in blind spot is
+$0$.
+• * (b) Segment B-C: From $B(7, -1)$ [Q4] to $C(-4, -3)$ [Q3]. Both points have $y < 0$.
+Phase 3: Self-Repair Self-Repair System Prompt Therefore, the entire segment is in the $y < 0$ region and **cannot enter Q2**. Length in
+blind spot is $0$.
+**EE Key Feedback:** $\text{score}_1 = -1.0$, $\text{conf}_1 = 1.0$, • * (c) Total length = $0 + 0 = 0$.
+$\text{critique}_1$ = "The true blind spot is Q4 ($x > 0, y < 0$)". </think>
+**Trigger Condition:** $\text{conf}_t \ge \tau_c$ and $\text{score}_t < 0$ (high- <answer>0.00 </answer> Failed Attempt
+confidence error), activating repair gate $g_t$.
+<think> 1. **Diagnosis:** EE has assigned a score of $-1.0$ with $1.0$ confidence at
+` 3. s * te * p E _ E i n C d o e r x re :1 c ` ti . o 2 n . : * * * * R T o h o e t ` C c a ri u ti s q e u :* e * ` R e A xp 's l i d c e it f l i y n s it t i a o t n e o s f t t h h e e c " o b r l r i e n c d t s b p l o in t d " w sp a o s t i n is c orrect. Phase 2: Evaluation System Prompt for Verifier
+**Quadrant 4 (Q4)**. 4. **Repair Strategy:** I must issue a `PATCH` to correct the {"step_index":1, "score":-1.0, "confidence":1.0, "critique":"Reasoning contains a critical logic
+core logical premise in `step_index:1` of the reasoning. This patch will change the error. The definition of 'blind spot' is wrong. The instruction 'from due East (0°) counter-
+computational basis for all subsequent steps. clockwise by 270°' is explicit and covers the angular range [0°, 270°], which is Q1, Q2, and Q3.
+</think> The 'ending at due North' text contradicts the 270° rotation and should be treated as
+{ "action": "PATCH", "target_step": 1, "patch_type": "text", "new_content": "Corrected interference or a typo. Therefore, the true blind spot is Q4 ($x > 0, y < 0$).", "tool_check":false}
+Premise: Based on EE verification, the blind spot is identified as Quadrant 4 (Q4, $x > {"step_index":2, "score":-1.0, "confidence":1.0, "critique":"The subsequent calculations (steps
+0, y < 0$).", "justification": "Original logic incorrectly identified Q2 as the blind spot 4a, 4b), while correct based on the faulty premise (Q2), are invalid because the premise is
+due to contradictory input text. EE has clarified the correct definition is Q4." } wrong. The actual route segments A-B and B-C do transit the true blind spot, Q4.",
+"tool_check":false}
+Error Found
+Phase 4: Corrected Reasoning Solver System Prompt, with `PATCH` injected from SR
+<think>
+1. **Goal:** Restart reasoning based on the `PATCH`. 2. **Corrected Premise:** Blind Spot = Quadrant 4 (Q4, $x > 0, y < 0$). 3. **New Plan:** * (a) Calculate the length of segment A-B within
+Q4. * (b) Calculate the length of segment B-C within Q4. * (c) Sum the lengths and round. 4. **Execute (a) - A-B:** * Segment starts at $A(8, 6)$ [Q1] and ends at $B(7, -1)$ [Q4]. * It crosses
+the x-axis ($y=0$) into the blind spot Q4. * I need to find the intersection $P$ of the line A-B with $y=0$, and then calculate the distance between $P$ and $B$. * I will call a tool for this
+geometric calculation. </think>
+{"tool_name":"calc_intersection_and_distance", "tool_input":{"p1":[8, 6], "p2":[7, -1], "axis_to_cross":"y=0", "target_quadrant":4}}
+**[Tool Output]**
+`{"intersection_point":[7.142857, 0.0], "distance_in_quadrant":1.01015}`
+<think>
+5. **Integrate (a):** Tool returns length of A-B in Q4 as **$1.01015$**. 6. **Execute (b) - B-C:** * Segment starts at $B(7, -1)$ [Q4] and ends at $C(-4, -3)$ [Q3]. * It starts *in* the blind spot Q4
+and leaves by crossing the y-axis ($x=0$). * I need to find the intersection $Q$ of the line B-C with $x=0$, and then calculate the distance between $B$ and $Q$. * I will call the tool.
+</think>
+{"tool_name":"calc_intersection_and_distance", "tool_input":{"p1":[7, -1], "p2":[-4, -3], "axis_to_cross":"x=0", "target_quadrant":4}}
+**[Tool Output]** `{"intersection_point":[0.0, -2.272727], "distance_in_quadrant":7.11601}`
+<think>
+7. **Integrate (b):** Tool returns length of B-C in Q4 as **$7.11601$**. 8. **Execute (c) - Summation:** * Total Distance = (Length of A-B in Q4) + (Length of B-C in Q4) * Total = $1.01015 +
+7.11601 = 8.12616$. * Rounding to two decimal places, the result is $8.13$.
+</think>
+<answer> 8.13 </answer> Correct
+Figure8.Afullreasoning–evaluation–repaircycleofAgent0-VLonageometricreasoningtask.TheSolverfirstgeneratesanincorrect
+solution(Phase1),whichtheVerifieridentifiesandcritiquesthroughtool-groundedverification(Phase2). Basedonthisfeedback,the
+modelperformsSelf-Repairtopatchthefaultypremise(Phase3)andre-executesreasoningwiththecorrectedlogic(Phase4),producing
+theverifiedfinalanswer.
+Question: What street is indicated by the sign on the Tool Calling
+pole near the center bottom of the image?
+Options: A. MACHIGAN B. MACHLGUN C. MICHIGUN
+D. MICHIGAN import os
+Please select the correct answer from the options import random
+above. from PIL import Image
+# Define paths
+image_path = "hr_bench_4k/179.jpg"
+output_dir = "/mnt/data/temp_processed_images"
+# Ensure the output directory exists
+Model Response os.makedirs(output_dir, exist_ok=True)
+# Load the image
+<Think>
+The task is to identify the street name displayed on the sign located image = Image.open(image_path)
+# Define cropping region (x1, y1, x2, y2)
+near the bottom center of the image. The sign is relatively small and
+crop_coords = (1550, 2650, 1850, 2750)
+distant, making the text difficult to read without magnification. To
+improve readability, the image should be cropped and zoomed in # Crop and zoom
+cropped = image.crop(crop_coords)
+around this specific region, enhancing the visibility of the sign’s text
+for accurate recognition. The sign lies slightly to the right of the zoom_factor = 2
+zoomed = cropped.resize( (cropped.width * zoom_factor, cropped.height * zoom_factor))
+image’s central lower area, so cropping this portion will allow for
+# Generate output filename
+focused inspection. The cropping coordinates can be estimated
+based on the sign’s relative position within the image. suffix = random.randint(1000, 9999)
+output_path = os.path.join(output_dir, f"179_{suffix}.jpg")
+Tool Calling # Save and print path
+zoomed.save(output_path)
+Tool execution print(output_path)
+After examining the cropped and enlarged section, the sign clearly
+reads “N MICHIGAN AV 100 E”, confirming that the indicated street
+is Michigan Avenue.
+</think> Tool execution
+<answer>
+D. MICHIGAN <sandbox\_output> <subimage\_sign> </sandbox\_output>
+</answer>
+Figure9. Single-steptool-integratedreasoning. TheexampledemonstrateshowAgent0-VLidentifiesastreetnamefromanimage
+byreasoningaboutthetask,decidingtocropandzoominonaspecificregionoftheimage,andinvokingtheimage-croppingtoolto
+enhancevisibility.Theresultingoutputconfirmsthestreetname,showinghowthemodeleffectivelygroundsitsreasoningprocessinvisual
+manipulation.
+Model Response Tool Calling
+<Think>
+We need the cone’s **vertical height (h)**, but the question <tool>
+provides the **slant height (l)**. import math
+From the Pythagorean theorem for the right triangle formed by r = 2
+height, radius, and slant height:\[h = \sqrt{l^2 - r^2}\] l = 8
+Once we find \(h\), we can compute the cone’s volume using:\[V h = math.sqrt(l**2 - r**2)
+= \frac{1}{3}\pi r^2 h\] V = (1/3) * math.pi * (r**2) * h
+round(V, 2)
+</tool>
+Tool Calling
+Tool execution
+Question: Find the
+volume of the cone Tool execution <sandbox\_output> 32.45
+shown.
+</sandbox\_output>
+Round your answer to
+**two decimal places**.
+We get the result from python code. The result is 32.45.
+<answer>
+Therefore, when rounded to two decimal
+32.54 cm³
+places:\[\boxed{V = 32.54 \, \text{cm}^3}\]
+</answer>
+</think>
+Figure10. Mathematicalreasoningwithcodeexecution. Thiscaseillustrateshowthemodeldecomposesageometryprobleminto
+structuredreasoningsteps,formulatesthenecessaryequationsusingthePythagoreantheorem,andcallsthePythoncomputationtoolto
+verifyandcomputethecone’svolume.Thetool-groundedreasoningensuresboththenumericalcorrectnessandinterpretabilityofthefinal
+solution.
+Reasoning Model Solution Reward Model Evaluation
+Question S T $ ro h f t ( o e e x t p ) s p = 1 r o : o x f I ^ b d e 2 l a e e + c n m h t x i f a f - y u s 6 t n k h $ c s e a t u i G n o s d n o t a $ a o l g n d ( d x e ) t t $ h e , e r w m n h c in i o c e m h t i h p s e a r r e n e p u t r m h e e s b m e e n r . t e o d f c b o y m a m gr o a n p h ro . o T t o s d b o e t t h w is e , e w n e t w m o u f s u t n fi c n t d io t n h s e , Step 1 Correct { { { a ✓ ✓ ✓ n } } } d C C A g l o p e r m a p a p r r p o h p l p e i r c r o t i a e a b l t l s a e e c n m s o a t p l r s y a e t s t a : e i t s g R e y m e : c F e o i n n g t n d : i i C z n e o g d r r r o e n o c e t t e s ly d s i e d t p e o a n h r t a i a f t i n e e d d ly l e t t h h e b e o n g t o c h a o l a m lg p e a b r r in a g ic < im to p o o l r > t T s o y o m l p C y a a l s li s n p g
+Step 2: Find the Roots of $f(x)$ {✓}Explicit methodology: Stated the approach clearly # Define the function
+T w f a T T a h h h n e c e i e d s t s o r s - g e o 2 r e i i t o v . t n $ e t t o g s $ h s . f ( e o W u x r o f s e + e o a q t 3 t w l f u s o ) u ( a o o f n x o t k d c i - r o t i f 2 $ s i n o o ) t f r ( i n = t n x t o w ) a c 0 $ r t z $ o e e i r $ s o n r t o $ h o u : \ e t m $ { s - $ v b 3 f a x o , e ^ l r 2 u r 2 s $ \ e } f t s + $ ( h x . o a x )$ f t - : $ m $ x 6 $ $ u x = l f _ t o i 1 0 p r $ = l w y $ - h t 3 W o i c \ - e q h 6 u t c a h a a n e d n d f \ u s t a e o n d x l c d v t t { e i a t o o n t n h d + 's i } 1 s \ v . q q a T u u l h u a a e e d d s i e r x s a _ n z t 2 i u e c = m r o e 2 b . q $ F e u $ o r a s r t $ a io f r n ( e x ) + b $ 3 y , Step 2 Correct { { 6 { { { ✓ ✓ ✓ ✓ ✓ $ } } } } } a C V A C C n a c o o le d l c r r i a r r d u s e e r r u c c f a p a m t t t r c e e e r o t t s q f o o o a e u r t $ c n i a z e + t t t a o a x i 1 t o r t t $ i i i r n o z o a n a n s c t e : t m i i o W t o u n e n e p t : : h l : $ l $ o $ - ( x o x d x r = ^ + : g 2 I - a 3 d 3 n + ) e , ( i x x n z 2 e t - $ - i d 2 f 6 i ) e a = = d l g 0 0 f e $ a $ b c r t a o ic rs s t t h e a p t s multiply to $- x f # r p < o = t r = S o o i n x o s o t * t s l p l ( v * > " . = e 2 R s s y o f + o m p o x r . t s b t - s o h o 6 o l e l v s f e r ( f o ' ( ( x x f o ' , ) ) t : x s " ) , roots)
+Step 3: Find the Roots of $g(x)$ from the Graph Step 3 Incorrect {✓} Correct method: Identifying x-intercepts for roots
+The roots of a function shown on a graph are its x-intercepts, which are the points where {✓} Appropriate visual approach: Using graph inspection
+t g h (x e ) $ c , u w rv e e c c a r n o i s d s e e n s t i t f h y e th h e o s r e iz p o o n i t n a t l s . x-axis. By visually inspecting the provided graph of $y = { { ❌ ❌ } } C N R o I v T e IC rif A ic L a E t R io R n O : F R a : i I l n e c d o t r o re c c h t e r c o k o t r e id a e d n in ti g f i a c g a a ti i o n n st graph properties
+The parabola intersects the x-axis at:$$x_1 = -1 \quad \text{and} \quad x_2 = 2$$ {❌}Symmetry violation: Claimed roots violate parabola symmetry
+The set of roots for $g(x)$ is $\{-1, 2\}$.
+{✓} Clear presentation: Well-organized comparison
+Step 4: Compare the Roots of $f(x)$ and $g(x)$ Step 4 Correct {✓} Correct logical structure: Proper set intersection approach
+Now, we compare the sets of roots we found for both functions:Roots of $f(x)$: $\{-3, 2\}$; {✓} Accurate computation: Given the inputs, correctly identified
+Roots of $g(x)$: $\{-1, 2\}$. The common root is the value that appears in both common root
+sets.$$\text{Common Root(s): } \{2\}$$ {❌}Propagated error: Used incorrect $g(x)$ roots from Step 3
+Each function also has a root that is not shared: $x = -3$ for $f(x)$ and $x = -1$ for $g(x)$. {!}Fortuitous result: Error did not affect final answer
+S B t a e s p e d 5 : o F n in t a h l e C c o o n m c p lu a s r i i o so n n, the functions $f(x)$ and $g(x)$ share exactly one root ($x=2$), Step 5 Correct { { ✓ ✓ } } C Ac o c rr u e r c a t t e c o m n a c p lu p s in io g n : : C O o n rr e e c c o tl m y l m in o k n e d ro t o o t c i h d o e i n c t e if i B ed
+and each function has another root that is unique to it. This corresponds to choice B. {✓} Complete reasoning: Acknowledged unique roots for each function
+{!} Lucky correctness: Final answer correct despite intermediate error
+Final Answer: B Answer Correct
+Figure11.Evaluator-basedprocessverification.ThisexampleshowcasestheVerifierroleofAgent0-VL,wherethemodelcritically
+inspects each reasoning step produced by the Solver in a function-root comparison task. The model performs step-level judgments
+(Correct/Incorrect),identifiespropagationerrors,andrecognizeswhenthefinalconclusionremainsvaliddespiteintermediatemistakes.This
+demonstratesthemodel’scapacityforfine-grainedself-evaluationandprocess-levelreasoninganalysis.
+Model Response
+<Think>
+Question:Below is the graph of Looking at this problem, I need to find the midline equation of a trigonometric function. I'm
+a trigonometric function. It has given two critical points: a minimum at (-π/2, 2.4) and a maximum at (3π/2, 13). Let me think
+a minimum point at $\left(- through this systematically and use code to verify my reasoning. Tool Calling
+\frac{1}{2} \pi, 2.4\right)$ and
+a maximum point at The midline of any trigonometric function is the horizontal line exactly halfway between its <tool>
+$\left(\frac{3}{2} \pi, maximum and minimum y-values. This is because trigonometric functions oscillate min_y = 2.4
+1 e 3 q \ ua ri t g io h n t )$ of . W th h e a t f i u s n c t t h i e o n m ? id G li i n ve e symmetrically around their midline max_y = 13
+an exact expression. Step 1 I have: Minimum point: (-π/2, 2.4); Maximum point: (3π/2, 13) # m C id a li l n c e u l = a t ( e m m in i _ d y l i + n e max_y) / 2
+Goal: Find exact midline equation print(f"Midline = ({min_y} +
+The x-coordinates don't matter for the midline calculation - only the y-values do. {max_y}) / 2 =
+{midline}")</tool>
+Step 2 For the midline: Midline = (Maximum y-value + Minimum y-value) / 2
+Let me calculate this:
+Tool Calling
+This gives me: Midline = (2.4 + 13) / 2 = 7.7
+Tool execution Tool execution
+Through systematic reasoning and computational verification, I've determined that the <sandbox\_output> 32.45
+midline equation is: y = 7.7 </sandbox\_output>
+</think>
+<answer>
+7.7
+</answer>
+Figure12.Analyticalreasoningwithvisualgrounding.Inthistrigonometricmidlineproblem,Agent0-VLinterpretsgraphicalinput,
+reasonsstep-by-stepthroughsymboliccomputation,andvalidatesitsreasoningusingcodeexecution.Bycombiningperceptualunderstanding
+andanalyticalcomputation,themodelachievesconsistentreasoninggroundedinbothmathematicalandvisualevidence.

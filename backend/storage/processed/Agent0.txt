@@ -1,0 +1,1100 @@
+Agent0: Unleashing Self-Evolving Agents from Zero Data
+via Tool-Integrated Reasoning
+PengXia1 KaideZeng1 JiaqiLiu1 CanQin2 FangWu3 YiyangZhou1 CaimingXiong2 HuaxiuYao1
+Abstract extensive interaction with an environment, such as deep
+research(OpenAI,2025;Google,2024;Teametal.,2025)
+Large Language Model (LLM) Agents, often
+andagenticcoding(Jimenezetal.,2023;Anthropic,2025;
+trained with Reinforcement Learning (RL), are
+Wang et al., 2024a). To optimize these complex, multi-
+constrainedbyadependencyonhuman-curated
+stepinteractionsandmovebeyondhard-codedworkflows,
+data, limiting scalability and tethering AI to
+ReinforcementLearning(RL)hasemergedasaprincipal
+human knowledge. Existing self-evolution trainingparadigm(Ouyangetal.,2022;Shaoetal.,2024;
+frameworksofferanalternativebutaretypically
+Tu et al., 2025), achieving significant progress on com-
+restrictedbythemodel’sinherentcapabilitiesand
+plexreasoningtasks. However,theefficacyofthesemeth-
+single-round interactions, hindering the devel-
+ods,whetherReinforcementLearningfromHumanFeed-
+opmentofcomplexcurriculainvolvingtooluse
+back(RLHF)orReinforcementLearningfromVerifiable
+or dynamic reasoning. We introduce Agent0,
+Rewards(RLVR),reliesheavilyonmassive,high-quality,
+a fully autonomous framework that evolves
+human-curateddatasets(Zhangetal.,2025c). Thisdepen-
+high-performing agents without external data
+dencynotonlycreatesaseverescalabilitybottleneck(Yue
+through multi-step co-evolution and seamless
+etal.,2025),whichistime-consuming,labor-intensive,and
+toolintegration. Agent0establishesasymbiotic
+costly,butalsofundamentallytethersthepotentialofAIto
+competitionbetweentwoagentsinitializedfrom
+thelimitsofhumanknowledgeandannotationspeed.
+thesamebaseLLM:acurriculumagentthatpro-
+posesincreasinglychallengingfrontiertasks,and To break free from this reliance on human data, self-
+anexecutoragentthatlearnstosolvethem. We evolutionframeworkshaveemergedasapromisingalterna-
+integrateexternaltoolstoenhancetheexecutor’s tive(Zhaoetal.,2025;Liuetal.,2025a;Huangetal.,2025;
+problem-solvingcapacity;thisimprovement,in Wang et al., 2025d), offering a scalable pathway by en-
+turn,pressuresthecurriculumagenttoconstruct ablingmodelstoautonomouslygeneratetheirowntraining
+more complex, tool-aware tasks. Through data. Yet,despitetheirpotential,existingself-playorself-
+this iterative process, Agent0 establishes a challengingapproachesfacesevereconstraints. First,their
+self-reinforcingcyclethatcontinuouslyproduces capabilitiesarecappedbythemodel’sinherentknowledge
+high-quality curricula. Empirically, Agent0 andreasoningabilities(Fangetal.,2025;Chengetal.,2024;
+substantially boosts reasoning capabilities, Zhou et al., 2025a), causing the generated tasks to rarely
+improving the Qwen3-8B-Base model by 18% surpassthemodel’scurrentcomplexity(Zhouetal.,2025b),
+onmathematicalreasoningand24%ongeneral leadingtolearningstagnation. Second,theseframeworks
+reasoning benchmarks. Code is available at typicallyoperateonlyinsingle-roundinteractions(Lietal.,
+https://github.com/aiming-lab/Agent0. 2025c),failingtocapturethedynamic,context-dependent
+natureofreal-worldproblems. Thisduallimitationnotonly
+restrictsthecomplexityoftheself-generatedcurriculumbut,
+1.Introduction
+morecritically,hindersthemodelfrommasteringessential
+skillsthatrequirecomplextooluseormulti-stepreasoning.
+Large Language Model (LLM) Agents have shown re-
+markable capabilities in tackling complex, long-horizon To address these challenges, as demostrated in Figure 1,
+problems (Qiu et al., 2025b;a; Jin et al., 2025; Yu et al., weintroduceAgent0,afullyautonomousframeworkde-
+2025a; Tang et al., 2025; Zhai et al., 2025) that require signedtoguidetheevolutionofagentsentirelyfromscratch.
+Agent0completelyeliminatesthedependenceonanyex-
+1UNC-ChapelHill2SalesforceResearch3StanfordUniversity.
+ternaldataorhumanannotations,pioneeringlycombining
+Correspondenceto:PengXia<pxia@cs.unc.edu>,HuaxiuYao
+<huaxiu@cs.unc.edu>. toolintegrationwithmulti-roundco-evolution. Theframe-
+work’simplementationbeginswithabaseLLMfromwhich
+Preliminarywork.
+1
+5202
+voN
+02
+]GL.sc[
+1v34061.1152:viXra
+Agent0:UnleashingSelf-EvolvingAgentsfromZeroDataviaTool-IntegratedReasoning
+q
+…
+Curriculum Executor
+Agent Question Agent
+Reasoning Process
+Tool
+Environment
+Model Tool Tool
+Response Calling Response
+a
+̂
+Curriculum Executor
+Reward Predicted Reward
+Answer
+r r
+C E
+(a) (b)
+Figure1.TheAgent0autonomousco-evolutionframework.TheCurriculumAgent(left)usesRLtogeneratefrontiertasks,rewarded
+bytheExecutorAgent’suncertaintyandtool-usefrequency. TheExecutorAgent(right)learntosolvethembyRL.Thissharedtool
+integrationdrivesavirtuouscycle,spiralinguptaskcomplexityandagentcapabilityentirelyfromscratch.
+we initialize two functionally distinct agents: an execu- cycleoftheexecutor’scapabilityimprovement.
+toragentandacurriculumagent. Theseagentsco-evolve
+throughasymbioticcompetition: thecurriculumagentis
+2.Preliminaries
+trained using RL (Shao et al., 2024) to propose frontier
+tasksthatpreciselychallengetheexecutor’scurrentcapabil- LLM as a Policy Agent. We formulate the LLM as an
+ities,usingtheexecutor’suncertainty(i.e.,self-consistency agent,representedbyapolicyπ withparametersθ. Given
+θ
+across multiple answers) and its frequency of tool use as apromptx,theagentautoregressivelygeneratesaresponse
+rewardsignals. Concurrently,theexecutoragentistrained y ∼ π (·|x). The general objective of reinforcement
+θ
+via RL to successfully solve these tasks, optimizing on a learningistooptimizeθtomaximizetheexpectedreward
+filteredsetofchallengingproblemsgeneratedbythefrozen J(θ)=E [R(y|x)].
+x∼D,y∼πθ(·|x)
+curriculumagentandusingpseudo-labelsderivedfromits
+Group Relative Policy Optimization (GRPO).
+own majority voting. Equipping the executor with a tool
+GRPO (Shao et al., 2024) is a reinforcement learn-
+enhancesitsproblem-solvingabilities,whichinturncom-
+ingmethodthatavoidstrainingacriticbyusingintra-group
+pelsthetool-equippedcurriculumagenttogeneratemore
+relativerewards. Foreachpromptx,themodelsamplesG
+complex,tool-basedcurricula. Thisestablishesavirtuous
+responses {y ,...,y }, which are scored to get rewards
+cycle,drivingasynchronousspiralofimprovementinboth 1 G
+{r ,...,r }. GRPOcomputesnormalizedadvantagesAˆ
+agentcapabilityandcurriculumcomplexity. Furthermore, 1 G i
+weextendthisparadigmtosupportmulti-turninteractions, using a z-score: Aˆ i = s r td i ( − { m rj ea } n G j ( = {r 1 j )+ }G j ϵ = no 1 rm ), where ϵ norm is a
+enablingthegenerationofcontext-rich,conversationaltasks small constant for numerical stability. The policy isthen
+thatbetterreflectreal-worldproblem-solving. updated by minimizing the following PPO-style clipped
+lossfunction(Schulmanetal.,2017):
+TheprimarycontributionofthispaperisAgent0,anovel
+framework that autonomously evolves LLM agents from G (cid:32)
+scratchthroughtool-augmentedreasoningwithoutrelying L GRPO (θ)=− G 1 (cid:88) min π π θ ( ( x x i ) ) Aˆ i ,
+on any external data. Across ten benchmarks spanning i=1
+θold i
+(1)
+(cid:33)
+mathematicalandgeneralreasoning,empiricalresultsshow (cid:16) π (x ) (cid:17)
+thatAgent0achievessubstantialmodelagnosticcapabil- clip π θ (x i ) ,1−ϵ,1+ϵ Aˆ i +βKL(π θ ∥π θold ),
+itygains,improvingmathematicalreasoningperformance
+θold i
+by 18% and general reasoning performance by 24%. In where πθ(xi) is the importance sampling ratio between
+addition, our analysis confirms this gain is driven by our
+πθold (xi)
+thecurrentpolicyπ andthereferencepolicyπ fromthe
+co-evolutionaryloop,wherethecurriculumagentlearnsto
+θ θold
+previousiteration. Aˆ isthenormalizedadvantage, andϵ
+generateprogressivelycomplextasks,creatingavirtuous i
+andβ arehyperparameters. TheKL-divergencetermacts
+2
+Agent0:UnleashingSelf-EvolvingAgentsfromZeroDataviaTool-IntegratedReasoning
+Policy Update by GRPO
+x {y 1,1 ,⋯,y 1,m} ŷ
+Curriculum … 1 Executor … Majority … 1
+Agent x i Agent {y i,1 ,⋯,y i,m} Voting y i ̂
+Model Tool
+Environment Response Calling
+Tool Final
+Response Answer
+Self-Consistency Executor … … {y i,1 ,⋯,y i,m} Majority y … 1 ̂
+Data p(x̂) Filtered Data Agent {y 1,1 ,⋯,y 1,m} Voting y i ̂
+Ambiguity Signal Policy Update by ADPO
+Figure2.TheAgent0co-evolutionaryloop.(1)CurriculumEvolution:TheCurriculumAgentπ istrainedviaRLtogeneratetasks,
+θ
+maximizingarewardR basedonexecutorUncertaintyR ,ToolUseR andRepetitionPenaltyR .(2)ExecutorEvolution:Tasks
+C unc tool rep
+arefilteredbyself-consistencyscorepˆtocreateachallengingdatasetD(t).TheExecutorAgentπ isthentrainedonD(t)viaADPO,an
+ϕ
+ambiguity-awareRLmethodusingmajority-votepseudo-labelsy˜.
+asaregularizationpenaltytostabilizetraining. multi-turninteractions,enablingtheCurriculumAgentto
+generatecontext-rich,conversationaltasksthatbetterreflect
+3.TheAgent0Framework real-worldproblem-solving.
+3.1.FrameworkOverview 3.2.CurriculumAgentTraining
+Agent0 is a fully autonomous, iterative co-evolutionary ThegoaloftheCurriculumAgentπ ,istogenerateaprompt
+θ
+framework designed to enhance the capabilities of LLM xthatmaximizesacompositerewardsignalR . Thisre-
+C
+agents without relying on any human-annotated data. At wardsignalisdesignedtoquantifythechallengeoftaskx
+the core of this framework are two functionally distinct forthecurrentExecutorAgentπ . Weoptimizeπ using
+ϕ θ
+agentsinitializedfromthesamebaseLLM,π base : (1)Cur- theGRPOalgorithmdescribedintheSection2.
+riculumAgent(π )aimstogeneratefrontiertasksthatare
+θ
+Foreachtaskx generatedbyπ ,wecomputeitsrewardby
+appropriatelychallengingforthecurrentExecutorAgent; i θ
+samplingkresponses{y }k fromthecurrentExecutorπ .
+(2) Executor Agent (π ) aims to solve the increasingly j j=1 ϕ
+ϕ
+ThecompositerewardR consistsoftwokeycomponents:
+complextasksproposedbytheCurriculumAgent. C
+Uncertainty Reward. This reward incentivizes the Cur-
+These two agents co-evolve iteratively through a process
+riculum Agent to generate tasks that the Executor finds
+ofsymbioticcompetition,asillustratedinFigure2. Each
+confusingoruncertain(Shietal.,2025;Baeetal.,2025).
+iterationtofthisprocessisdividedintotwostages:
+WeusetheExecutor’sself-consistencypˆ(x;π )asaproxy
+ϕ
+CurriculumEvolution. WetraintheCurriculumAgentπ θ foruncertainty. pˆisdefinedastheproportionofthek re-
+usingRLtospecializeingeneratingtasksthatchallengethe sponsesthatvoteforthemajorityanswer(y˜). Thereward
+currentExecutorAgentπ(t−1). functionisdesignedtobemaximizedwhenpˆ=0.5,where
+ϕ
+theExecutor’suncertaintyishighest:
+ExecutorEvolution. WeusethefrozenCurriculumAgent
+π(t) to generate a pool of tasks, from which we filter a R (x;π )=1−2|pˆ(x;π )−0.5| (2)
+θ unc ϕ ϕ
+challengingdatasetD(t). WethentraintheExecutorAgent
+π onthisdatasetusingRL,evolvingitintoπ(t).
+Thisfunctionpenalizestasksthatareeithertooeasy(pˆ→1)
+ϕ ϕ ortoohard(pˆ→0).
+Theintegrationofacodeinterpretertoolestablishesavirtu-
+ToolUseReward. Todrivethevirtuouscycle,wemustex-
+ouscycle: theExecutorAgent’sproblem-solvingcapabil-
+plicitlyrewardtasksthatprompttheExecutortouseitstool.
+itiesareenhancedbythetool, whichinturncompelsthe
+We define R based on the number of tool invocations,
+tool-equippedCurriculumAgenttogeneratemorecomplex, tool
+identifiedbythetoolresponsemarker, i.e., ‘‘‘output,
+tool-basedcurricula. Furthermore,theframeworksupports
+withinacompleteprediction y = π (x). LetN (y)be
+ϕ tool
+3
+Agent0:UnleashingSelf-EvolvingAgentsfromZeroDataviaTool-IntegratedReasoning
+Algorithm1Self-EvolutionaryFrameworkAgent0 whereλ ,λ ,andλ arehyperparameters. Weusethis
+unc tool rep
+Require: BaseLLMπ base ;IterationsT;Samplesk. R C astherewardr i intheGRPOloss.
+1: Initializeπ(0) ←π andπ(0) ←π .
+θ base ϕ base
+2: foreachiterationt=1,...,T do 3.3.ExecutorAgentTraining
+3: ▷CurriculumEvolution(Trainπ )
+θ
+4: Initializeπ θ ←π θ (t−1) TheExecutorAgentπ ϕ ’sobjectiveistomaximizeitssuc-
+5: GenerateabatchoftasksX ={x i }∼π θ cessrateinsolvingtasksgeneratedbytheCurriculumAgent
+6: fortaskx i ∈Xdo π . ThisstageoftrainingisalsobasedonGRPO.
+7: Samplekresponses{y }k ∼π(t−1)(x ) θ
+j j=1 ϕ i
+8: ComputeR (x )usingEq.5
+C i 3.3.1.DATASETCURATIONANDTRAJECTORY
+9: endfor
+10: Updateπ usingL with(X,R )→π(t) GENERATION
+θ GRPO C θ
+11: ▷ExecutorEvolution(Trainπ )
+ϕ ChallengingDatasetConstruction. AftertheCurriculum
+12: Generate X ∼ π(t) and filter to D(t) = {(x,pˆ,y˜)}
+pool θ Agent π(t) is trained, we freeze it. We use it to generate
+where|pˆ(x)−0.5|≤δ θ
+13: Initializeπ ←π(t−1) a large pool of candidate tasks X pool . For each task x in
+14: forbatchB ϕ D ={ ϕ (x,pˆ(x),y˜)}∼D(t)do this pool, we have the current Executor π ϕ (t−1) sample k
+15: InitializeT ,A˜ ,P responsesandcalculateitsself-consistencypˆ(x). Itiscal-
+batch batch batch
+16: for(x,pˆ(x),y˜)∈B do culated as the proportion of responses that voted for this
+D
+17: Samplektrajectories{τ
+i
+}k
+i=1
+∼π
+ϕ
+(x) majorityanswery˜:
+18: ComputerewardsR =I(o =y˜)
+i i
+19: ComputescaledadvantagesA˜ i ←A i ·f(pˆ(x)) 1(cid:88) k (cid:88) k
+20: Add{τ i }toT batch ,{A˜ i }toA˜ batch ,pˆ(x)toP batch pˆ(x)= k I(o i =y˜), y˜=argm y ax I(o i =y), (6)
+21: endfor i=1 i=1
+22: Updateπ ϕ usingL ADPO (Eq.8)oncollectedbatch where I is the indicator function. To build an efficient
+23: endfor
+24: π(t) ←π training curriculum, we filter for tasks that lie at the ca-
+ϕ ϕ
+25: endfor pabilityfrontier. Soweretainonlythosetaskswhoseself-
+consistencyscoresfallwithinaninformativeband:
+(cid:110) (cid:12) (cid:12) (cid:111)
+the total count of these markers in y. The reward is then D(t) = x∈X |(cid:12)pˆ(x;π(t−1))−0.5(cid:12)≤δ , (7)
+pool (cid:12) ϕ (cid:12)
+calculatedasaweighted,cappedvalue:
+whereδisathresholdcontrollingthecurriculumdifficulty.
+R tool (x;π ϕ )=γ·min(N tool (y),C) (3) Thisfilteringstepensuresthatπ ϕ trainsonlyontasksthat
+areneithertooeasynortoohardforit.
+whereγisascalinghyperparameterforrewardscoreandC
+isacaponthenumberofrewardedcallstopreventreward- Multi-TurnRollout. Wereplacethestandardsingle-turn
+ingexcessiveorspurioustooluse. generation with a multi-step, tool-integrated rollout pro-
+cess. During this process, each of the k trajectories is
+RepetitionPenalty. Toencouragediversitywithinatrain-
+generated by having the policy π(t−1) first produce text
+ing batch X, following (Huang et al., 2025), we intro- ϕ
+reasoningt . Whenthepolicyemitsatool-calltrigger(i.e.,
+duce a repetition penalty R . We first compute pair- 1
+rep ‘‘‘python...‘‘‘tags),generationispaused.Thecode
+wise distances between generated tasks using a similar-
+c isthenexecutedinasandbox,whichreturnsanexecu-
+ity metric, such as BLEU score (Papineni et al., 2002): 1
+tionresultorerrorf . Thisfeedbackf ,prependedwitha
+d =1−BLEU(x ,x ). Tasksarethengroupedintoclus- 1 1
+ij i j simpleprefixlike‘‘‘output...‘‘‘,isfedbacktothe
+ters C = {C ,...,C } where d < τ . The penalty
+1 K ij BLEU policy. Thepolicythencontinuesgenerating,conditioning
+forataskx belongingtoclusterC isproportionaltoits
+i k on the history and the new feedback [t ⊕c ⊕f ⊕...].
+relativeclustersize: 1 1 1
+This iterative process repeats until the policy generates a
+|C | final answer o (i.e., in {boxed...} tags), resulting in a
+Rrep(x
+i
+)=λrep
+B
+k , (4)
+complete,hybridreasoningtrajectory. Thisdynamic,inter-
+leavedfeedbackmechanismallowstheagenttoiteratively
+whereBisthebatchsizeandλ isascalingfactor.
+rep refineitsreasoningandcorrecterrors,mimickingthe“aha
+CompositeReward. Thefinalrewardcombinesthesesig- moment”ofself-correction.
+nals, subtracting the repetition penalty, and is gated by a
+Pseudo-LabelAdvantage. Aftergeneratingk fulltrajec-
+formatcheckR .
+format toriesandidentifyingtheirkfinalanswers{o }k ,weuse
+i i=1
+R (x )=R (x )·max(0,(λ R thepreviouslydeterminedmajorityanswery˜asthepseudo-
+C i format i unc unc
++λ tool R tool )−R rep (x i )) (5) label. WethenassignaterminalrewardR i =I(o i =y˜)to
+4
+Agent0:UnleashingSelf-EvolvingAgentsfromZeroDataviaTool-IntegratedReasoning
+eachtrajectorybasedonwhetheritsanswero matchesthis confidentsamplestopreservestability.
+i
+pseudo-label. ThisoutcomerewardR isusedtocompute
+i TheExecutorAgentisupdatedbyminimizingtheADPO
+theadvantageA fortheentiremulti-steptrajectoryi.
+i objective:
+3.3.2.AMBIGUITY-DYNAMICPOLICYOPTIMIZATION (cid:34) G (cid:32)
+L (θ)=E − 1 (cid:88) min r (θ)A˜ (x),
+StandardGRPOtreatsalltrainingsamplesequally(Schul- ADPO x∼D(t) G i i
+manetal.,2017;Shaoetal.,2024). However,inourself- i=1
+(cid:33)(cid:35)
+evolutionarysetting,werelyonmajorityvotingtoderive clip (cid:16) r (θ),1−ϵ ,1+ϵ (x) (cid:17) A˜ (x) ,
+pseudo-labels,whichintroducestwocriticalissues: label i low high i
+noise and restricted exploration on ambiguous tasks. To (8)
+addressthese,weproposeAmbiguity-DynamicPolicyOp- wherer (θ)istheimportancesamplingratio,A˜ (x)isthe
+i i
+timization(ADPO),whichincorporatestwokeymodifica- ambiguity-scaled advantage, and ϵ (x) is the dynamic
+high
+tionsmotivatedbythedata’sambiguitysignalpˆ(x). upperboundinverselyrelatedtopˆ(x).
+Ambiguity-Aware Advantage Scaling. The first issue
+is that for high-ambiguity tasks (low pˆ(x)), the majority 4.Experiments
+answer is prone to errors. Directly optimizing on these
+In this section, we evaluate the performance of Agent0,
+noisylabelsusingstandardGRPOrisksreinforcingincor-
+aiming to answer the following questions: (1) How does
+rectreasoning. Topreventoverfittingtopotentiallyinaccu-
+ratepseudo-labels,wescalethenormalizedadvantageAˆ . theperformanceofAgent0compareagainststate-of-the-art
+i
+self-evolvingbaselines? (2)Istheproposedco-evolutionary
+Wedefineascalingfactors(x) = f(pˆ(x)),wheref isan
+loopeffectiveatprogressivelyimprovingtheagents’perfor-
+increasingfunctionofself-consistency. Theadvantageis
+modifiedasA˜ (x)=Aˆ ·s(x). Thisproportionallydown- manceovermultipleiterations? (3)Howeffectiveiseach
+i i
+keycomponentofourframework? (4)Canthemathemat-
+weightsthetrainingsignalfromunreliable,low-consistency
+icalreasoningabilitiescultivatedbyAgent0generalizeto
+samples.
+improveperformanceongeneral-domainreasoningtasks?
+Ambiguity-
+Modulated Trust
+4.1.ExperimentalSetup
+Regions. The sec-
+ond issue pertains Implementation Details. Our framework Agent0, is
+to the rigid con- implemented based on the VeRL (Sheng et al., 2025).
+straints imposed by We evaluate Agent0 on two base models: Qwen3-4B-
+standard proximal BaseandQwen3-8B-Base(Yangetal.,2025a). Boththe
+algorithms(Yuetal., two Agent are initialized from these base models. Dur-
+2025b). Whilestatic ing the co-evolutionary loop, for each task x i , we sam-
+clipping (e.g., ϵ) is Figure3.Up-clippedtokenprobabil- ple k = 10 responses from the Executor to compute un-
+designed to ensure ities. Most up-clipped tokens have certainty and generate pseudo-labels. The task filtering
+stability,itcreatesan lowprobabilities,implyingstandard threshold is set to δ = 0.25, retaining tasks with a self-
+asymmetric barrier clippinglimitsexploration. consistency pˆ(x) between 0.3 and 0.8. For the Curricu-
+tolearning. AsillustratedinFigure3, empiricalanalysis lum Agent, we set the tool reward scaling λ tool = 0.6
+reveals that the upper clipping bound is predominantly and cap C = 4. For the Executor Agent, we integrate a
+triggeredbytokenswithlowprobabilities. Thisindicates sandboxedcodeinterpreter(Chengetal.,2025)basedon
+that the standard mechanism disproportionately “clamps” VeRL-Tool(Jiangetal.,2025),allowingittoexecutecode
+the growth of unlikely tokens, effectively stifling the snippetsenclosedin‘‘‘python...‘‘‘tagsandreceive
+emergence of new reasoning paths. This restriction is the‘‘‘output...‘‘‘.
+particularly detrimental for high-ambiguity tasks (low
+BaselineMethods. WecompareAgent0againstseveral
+pˆ(x)),wherethecorrectreasoningoftenresidesinthetail
+state-of-the-artself-improvementmethods. 1)BaseModel:
+of the current policy distribution and requires significant
+Thepre-trainedbasemodelwithoutanyfine-tuning.2)Base
+updates to surface. To address this bottleneck, ADPO
+Model w/ tool: The base model evaluated in a zero-shot
+dynamically modulates the trust region. We define the
+setting, but given access to the code interpreter. 3) Self-
+upperclippingboundϵ (x)asadecreasingfunctionof
+high EvolvingMethods: R-Zero(Huangetal.,2025),Absolute
+pˆ(x). Thiseffectivelyrelaxestheconstraintforambiguous
+Zero(Zhaoetal.,2025), SPIRAL(Liuetal.,2025a)and
+inputs, permitting larger gradient steps to uplift potential
+Socratic-Zero(Wangetal.,2025d).
+low-probabilitysolutions,whileretainingtightboundson
+EvaluationDatasetsandMetrics. Agent0requiresno
+5
+Agent0:UnleashingSelf-EvolvingAgentsfromZeroDataviaTool-IntegratedReasoning
+Table1.Comprehensiveresultsonmathematicalreasoningbenchmarks.Thepeakperformanceachievedduringeachmodel’straining
+processishighlightedinbold.
+ModelName AVG AMC Minerva MATH GSM8K Olympiad AIME25 AIME24
+Qwen3-4B-Base
+BaseModel ✗ ✗ 42.6 45.7 38.2 68.2 87.8 41.0 6.15 10.9
+BaseModelw/tool ✓ ✗ 44.2 46.3 39.6 71.0 88.6 43.7 7.71 12.3
++AbsoluteZero ✓ ✗ 46.4 50.0 41.9 76.2 89.3 41.5 13.4 12.2
++SPIRAL ✗ ✗ 47.0 57.5 42.4 76.4 91.0 38.4 10.0 13.3
++R-Zero ✗ ✗ 49.1 57.3 52.9 79.6 92.1 44.6 4.27 12.7
++Agent0 ✓ ✗ 52.5 60.6 55.6 80.5 92.6 46.7 14.1 17.4
+Qwen3-8B-Base
+BaseModel ✗ ✗ 49.2 52.0 50.0 78.0 89.1 44.7 16.7 13.9
+BaseModelw/tool ✓ ✗ 53.2 60.3 54.9 79.2 90.7 47.9 18.7 20.9
++AbsoluteZero ✓ ✗ 52.6 62.5 52.9 76.6 92.0 47.8 18.2 18.4
++R-Zero ✗ ✗ 54.7 61.7 60.7 82.0 94.1 48.9 19.2 16.4
++Socratic-Zero ✗ ✓ 56.1 63.7 52.4 81.2 87.3 55.1 24.5 28.4
++Agent0 ✓ ✗ 58.2 62.4 61.3 82.4 94.5 54.0 24.8 28.0
+Table2. Resultsongeneral-domainreasoningbenchmarks.
+ModelName OverallAVG MATHAVG SuperGPQA MMLU-Pro BBEH
+Qwen3-4B-Base
+BaseModel ✗ ✗ 27.1 42.6 20.9 37.4 7.57
+BaseModelw/tool ✓ ✗ 30.3 44.2 25.8 42.9 8.32
++AbsoluteZero ✓ ✗ 33.6 46.4 27.1 52.6 8.3
++SPIRAL ✗ ✗ 34.2 47.0 27.1 53.2 9.57
++R-Zero ✗ ✗ 34.6 49.1 27.6 51.5 10.4
++Agent0 ✓ ✗ 37.6 52.5 29.9 55.9 12.0
+Qwen3-8B-Base
+BaseModel ✗ ✗ 34.5 49.2 28.3 51.8 8.6
+BaseModelw/tool ✓ ✗ 36.7 53.2 29.5 54.8 9.37
++AbsoluteZero ✓ ✗ 39.9 52.6 33.5 62.5 10.8
++R-Zero ✗ ✗ 38.7 54.7 31.4 58.2 10.6
++Socratic-Zero ✗ ✓ 39.2 56.1 30.1 60.9 9.5
++Agent0 ✓ ✗ 42.1 58.2 33.0 63.4 13.7
+human-annotateddatafortraining. Weevaluateallmethods utilizesacodeexecutor,by10.6%. ItevenexceedsSocratic-
+on two suites of benchmarks: 1) Mathematical Reason- Zeroby3.7%,whichreliesonexternalOpenAIAPIs. This
+ing: We use a comprehensive set including AMC, Min- demonstratesthesuperiorityofAgent0’sself-evolutionap-
+erva(Lewkowyczetal.,2022), MATH(Hendrycksetal., proach. By using tools to interact with the environment,
+2021),GSM8K(Cobbeetal.,2021),Olympiad-Bench(He theagenteffectivelyenhancesthequalityanddiversityof
+etal.,2024),AIME25,andAIME24. 2)General-Domain questions generated by the curriculum agent. Similarly,
+Reasoning: To measure generalization, we use SuperG- fortheexecutionagent,thismoreeffectivelyimprovesits
+PQA(Duetal.,2025),MMLU-Pro(Wangetal.,2024b), problem-solvingcapabilities.
+andBBEH(Kazemietal.,2025). Wereporttheaccuracy
+GeneralizationtoGeneral-DomainTasks. Furthermore,
+(pass@1)basedongreedydecodingacrossallbenchmarks,
+Table2showsstrongevidenceofgeneralization.OnQwen3-
+exceptAMCandAIMEbenchmarks(mean@32).
+8B, Agent0 achieves the highest overall average score
+among all approaches, significantly outperforming other
+4.2.MainResults
+data-freemethods. Thisindicatesthatthecomplex,multi-
+Wepresentthemainresultsformathematicalreasoningin stepreasoningabilitieswecultivatedintheexecutionagent
+Table1andforgeneral-domainreasoninginTable2. byusingthecurriculumagentwithtools,canbeeffectively
+transferredtogeneral-domaintasks.
+ComparisonwithBaselines. Itsignificantlyoutperforms
+all compared baseline methods in both mathematics and
+4.3.Analysis
+general-domain reasoning. On Qwen3-8B-Base, Agent0
+surpassesthepowerfuldata-freemethodR-Zeroby6.4% Inthissection,weprovideadetailedanalysisofeachmod-
+andoutperformstheself-playmethodAbsoluteZero,which ule’sperformance,alongwithaseriesofanalyticalexperi-
+6
+Agent0:UnleashingSelf-EvolvingAgentsfromZeroDataviaTool-IntegratedReasoning
+Table5.Evolution of Task Difficulty and Tool Use. We report
+thepassrateofthefixedExecutionAgent(fromIteration1)on
+datasetsgeneratedbytheCurriculumAgentatdifferentstages.
+Dataset PassRate(Executor ) Avg.ToolCalls
+Iter1
+D 64.0 1.65
+Iter1
+D 58.5 2.10
+Iter2
+D 51.0 2.60
+Iter3
+Figure4.Performance on mathematical and general reasoning
+co-evolutionaryloop.Withtheinvolvementoftools,thecur-
+benchmarks,showingconsistentimprovementforbothQwen3-4B
+riculumagentprogressivelygeneratesmoredifficulttasks,
+andQwen3-8Bacrossthreeco-evolutionaryiterations.
+ments,tobetterunderstandtheperformancegains. whiletheexecutionagentlearnstosolvethesetasksmore
+efficiently. Thisalsoconfirmsthatagentself-evolutionisa
+Table3. AblationstudyofAgent0.
+reasonableandpromisingdirection(Huangetal.,2025).
+Method GeneralAVG MathAVG
+Agent0 36.7 58.2 Strategic Tool Inte- Table4.Comparison on non-tool
+CurriculumAgent grationMatters. Our andothertool-integratedbaselines.
+w/oTraining 29.5 46.8 advantageliesnotjust
+Model MATH General
+w/oToolReward 31.8 48.7
+in having a tool, but
+w/oRepetitionPenalty 31.3 47.9 Qwen3-4B 42.6 22.0
+inlearninghowtouse
+ExecutionAgent w/oTool
+w/oADPO 34.9 56.2 it. As shown in Ta- +SPIRAL 47.0 30.0
+w/oMulti-turn 35.3 55.9 ble 4, merely provid- +R-Zero 49.1 29.8
+w/Tool
+ing a tool (i.e., Base
+Ablation Study. As shown in Table 3, we conducted a +TIR 44.2 25.7
+Modelw/Tool)yields +AbsoluteZero 46.4 29.3
+seriesofablationexperimentstoevaluatetheimpactofeach +Agent0 52.5 32.6
+a slight performance
+component in our method. Specifically, we evaluate the
+boost. Agent0signifi-
+impactof: (1)thecurriculumagent’straining,(2)thetool
+cantlyoutperformsothertool-usingbaselines,suchasAb-
+reward, (3) the repetition penalty, (4) our ambiguity scal-
+soluteZero. Agent0alsosignificantlysurpassesnon-tool
+ingmechanism,and(5)themulti-turnreasoningcapability.
+methodslikeR-ZeroandSPIRAL.Thisindicatesthatour
+Forthecurriculumagent,withouttraining,theperformance
+curriculum agent, by using the R reward to explicitly
+significantlydropsby9.3%. Thisreflectsthevalueofthe tool
+incentivizethegenerationofcomplextasksrequiringtool
+learnedcurriculum. Next,whenthetoolrewardisnotin-
+use,isfarmoreeffectivethanmethodsthatonlyusetools
+cluded,themodel’sperformancedropsby7.2%. Thistests
+forvalidation(e.g.,AbsoluteZero)ordonotusetoolsatall
+ourcorehypothesisthatexplicitlyrewardingtool-usetasks
+(e.g.,R-Zero). Furthermore,theexecutionagentutilizesthe
+is necessary. It shows a severe performance degradation
+toolinconjunctionwithmulti-stepreasoning,whichalso
+whenweremovethediversitycomponent,indicatingthat
+leadstoperformancegains,resultinginco-evolution.
+R ishighlyeffectiveforcurriculumdiversity,particularly
+rep
+forgeneraltasks. Asfortheexecutionagent,trainingitus- EvolutionofTaskDifficultyandToolUse.Weanalyzethe
+ingtheoriginalGRPOwithstandardadvantageandclipping tasksgeneratedbythecurriculumagentduringthetraining
+resulted in a performance drop of 1.9%. This is because iterations. We sample 200 questions from each iteration
+theoriginalalgorithmdoesnotaccountforthereliabilityof forthisanalysis. AsshowninTable5,thepassrateofthe
+pseudo-labels,demonstratingtheeffectivenessofourpro- executionagent(fromIteration1)progressivelydecreases
+posedambiguityscalingmechanism. Theintroductionof when evaluated on task sets generated by the curriculum
+multi-turnreasoningplayedasignificantroleinboosting agentsfromIterations1,2,and3. Thisindicatesthatthe
+Agent0’sperformance,especiallyforcomplexmathematical taskdifficultyisgraduallyincreasing,confirmingthatthe
+reasoningthatrequiresmulti-turnreasoning. curriculumadaptstotheimprovementintheexecutor’scapa-
+bilities. Moreimportantly,theaveragenumberoftoolcalls
+Consistent Improvement through Co-Evolution. As
+pergeneratedtasksteadilyincreasesacrossiterations. This
+shown in Figure 4, our method demonstrates stable and
+directlyprovesthatourR rewardsuccessfullyguidesthe
+progressiveimprovementduringtheiterativeprocess. On tool
+curriculumagenttogeneratemorecomplexandtool-reliant
+Qwen3-8B-Base, the average math score improved from
+problems,therebydrivingavirtuouscycle.
+55.1 (Iter 1) to 56.5 (Iter 2), peaking at 58.2 (Iter 3). In
+additiontomathematics,Agent0showedthesimilartrend QualitativeAnalysis. Figure5illustratestheco-evolution
+onothergeneral-domainreasoningtasks,withanaverage of task complexity and solving proficiency. The Curricu-
+improvementof2%periterationcomparedtotheprevious lumAgenteffectivelygeneratesincreasinglydifficultprob-
+one. This iterative gain validates the effectiveness of our lems,progressingfrombasicgeometry(Iter1)tocomplex
+7
+Agent0:UnleashingSelf-EvolvingAgentsfromZeroDataviaTool-IntegratedReasoning
+Generated Questions from Curriculum Agent Test Question (MATH)
+Compute: 1−2+3−4+5−…+99−100
+Iter 1 Let ABC be a triangle with ∠A=90∘. Points D and E
+lie on sides AB and AC, respectively, such that Model Output by Agent0
+AD+EC=BC and AD⋅EC=BD⋅AE. Find the To solve the problem 1−2+3−4+5−…+99−100, we can observe
+measure of ∠B. the pattern in the series. The series alternates between adding and
+subtracting consecutive integers.
+A rectangle R has sides of length 10 and 5. Point P lies We can group the terms in pairs to simplify the calculation:
+Iter 2 inside R such that the distances from P to the four (1−2)+(3−4)+(5−6)+…+(99−100)
+s p i o d s e i s ti v o e f r R e a a l r e n u x m , y b ,1 e 0 rs − . F x i , n a d n t d h e 5 m − a y x , i w m h u e m re p x o a s n s d ib l y e a re t E o a t c a h l, t p h a e ir r e ( 2 a k re − 5 1 0 ) − pa 2 ir k s s . i T m h p e l r i e fi f e o s r e to , t − he 1 . s S u i m nc o e f t t h h e e r e s e a r r i e e s 1 i 0 s 0 : terms in
+value ofx2+y2. 50×(−1)=−50
+Let's confirm this with Python code.
+In a particular city, each neighborhood is assigned a
+Iter 3 distinct integer address from 1 to N. To ensure the ```python
+safety of the city, the city council decides to organize # Calculate the sum of the series 1 - 2 + 3 - 4 + 5 - ... + 99 - 100
+a unique parade route where no two adjacent
+result = sum(i if i % 2 != 0 else -i for i in range(1, 101))
+neighborhoods should share a common digit in their
+address. For example, if the parade starts at address print(result)
+15, the next possible stop cannot be any address ```
+containing the digits 1 or 5. What is the maximum ```output
+value of N such that the parade can visit all -50
+neighborhoods without breaking this rule? Express ```
+your answer as a three-digit integer. The sum of the series 1−2+3−4+5−…+99−100 is \boxed{-50}.
+Figure5.QualitativeCaseAnalysis.Left:ExamplesofgeneratedquestionsshowingaclearincreaseincomplexityanddiversityfromIter
+1toIter3.Right:AdemonstrationofAgent0’ssolvingprocess,utilizingahybridapproachofmathematicalreasoningandPythoncode
+executiontosolveastandardMATHproblem.
+constraint satisfaction tasks (Iter 3). Simultaneously, the Tool-Integrated Reasoning (TIR). Applying Reinforce-
+ExecutorAgent0demonstratesreliableproblem-solvingca- mentLearning(RL)(Jaechetal.,2024;Wangetal.,2025c;b;
+pabilities. In the provided example, the agent effectively Zhouetal.,2025c;Wuetal.,2025a;Yangetal.) toenhance
+combines natural language reasoning to identify patterns LLMtool-useisagrowingfield. Manyapproachesrelyon
+withthePythoncodeinterpretertoverifycalculations,vali- domain-specific data or supervised fine-tuning (Jin et al.,
+datingthemodel’sabilitytohandlehybridreasoningtasks. 2025;Fengetal.,2025;Lietal.,2025b;Gengetal.,2025;
+Hanetal.,2025b;Suetal.,2025). ThemoregeneralZero
+RLsetting,however,isnotoriouslyunstableinmulti-turn
+5.RelatedWork
+scenarios. RecentadvancesinTIRaddressthesechallenges
+Self-Evolving from Zero Data. The paradigm of self- throughthreekeydimensions: stability,generalization,and
+evolution, where LLMs generate their own training data, complexity. Tostabilizelearningdynamics,methodslike
+hasgainedsignificanttraction(Liuetal.,2024;Dongetal., ASPO(Lin&Xu,2025)andSimpleTIR(Xueetal.,2025)
+2024; Fang et al., 2025; Yang et al., 2025b; Kuba et al., introducetheoreticalguaranteesandgradientfilteringfor
+2025).Thisapproachrangesfromdual-agent“Coder-Tester” voidturns.Beyondstability,(Chenetal.,2025)demonstrate
+setupsinverifiabledomains(Linetal.,2025;Wangetal., thecross-domaintransferabilityoftool-useskills.Finally,to
+2025e)tofullyautonomousframeworks(Zhaoetal.,2025; handlecomplexmulti-turnscenarios,advancedtechniques
+Huangetal.,2025;Wangetal.,2025d;Liuetal.,2025b;Tao optimizeforlong-horizonplanning(Gaoetal.,2025;Erdo-
+etal.,2024;Zhangetal.,2025a;Wuetal.,2025b;Luetal., ganetal.,2025),memorymanagement(Yanetal.,2025),
+2025)thatlearntogeneratenovelproblemsfromscratch. andinteractionefficiency(Wangetal.,2025a).
+Toguidethislearning, manymethodsuselabel-freerein-
+forcementlearning,relyingonheuristicrewardsignalssuch 6.Conclusion
+asoutputconfidence(Lietal.,2025a)orconsistency(Zhang
+etal.,2025b;Prabhudesaietal.,2025;Zuoetal.,2025;Yu We introduce Agent0, a fully autonomous framework
+etal.,2025c). However,thesesystemsarecriticallylimited whereacurriculumagentandanexecutoragentco-evolve
+bythemodel’sinherentknowledge(Hanetal.,2025a;Xia withoutanyhuman-curateddata. Weintegratedacodein-
+etal.,2025),causingcurriculumstagnationastasksrarely terpreterintotheloop,whichcreatesavirtuouscycle: the
+surpass the model’s current complexity. Agent0 breaks tool-equippedexecutor’simprovingcapabilitiesdrivethe
+thiscapbyintegratinganexternaltool,providingexternal curriculumagenttogenerateprogressivelyhardertasks.Our
+problem-solvingpower. However, withoutexternaltools, experimentsshowthatAgent0significantlyenhancesthe
+suchclosed-loopsystemsriskmodecollapseandcurriculum reasoningabilitiesofbaseLLMs. Itdemonstratesascalable
+stagnation,astheyremainboundedbythemodel’sinherent andeffectivepathwayforevolvinghighlycapableagents,
+knowledge. Agent0breaksthisceilingbyintegratingan breakingthedependencyonhuman-annotateddatasets.
+externaltooltointroduceobjectiveproblem-solvingpower.
+8
+Agent0:UnleashingSelf-EvolvingAgentsfromZeroDataviaTool-IntegratedReasoning
+Acknowledgement llm evaluation across 285 graduate disciplines. arXiv
+preprintarXiv:2502.14739,2025.
+WethankChengsongHuangforhelpfuldiscussions. This
+workispartiallysupportedbytheAIforMathFundfromRe- Erdogan, L. E., Lee, N., Kim, S., Moon, S., Furuta, H.,
+naissancePhilanthropy. TheAuthorsalsoacknowledgethe Anumanchipalli,G.,Keutzer,K.,andGholami,A. Plan-
+NationalArtificialIntelligenceResearchResource(NAIRR) and-act: Improvingplanningofagentsforlong-horizon
+Pilot,PurdueAnvilAIforcontributingtothisresearchre- tasks. arXivpreprintarXiv:2503.09572,2025.
+sult.
+Fang,W.,Liu,S.,Zhou,Y.,Zhang,K.,Zheng,T.,Chen,K.,
+Song,M.,andTao,D.Serl:Self-playreinforcementlearn-
+References
+ingforlargelanguagemodelswithlimiteddata. arXiv
+Achiam,J.,Adler,S.,Agarwal,S.,Ahmad,L.,Akkaya,I., preprintarXiv:2505.20347,2025.
+Aleman,F.L.,Almeida,D.,Altenschmidt,J.,Altman,S.,
+Feng,J.,Huang,S.,Qu,X.,Zhang,G.,Qin,Y.,Zhong,B.,
+Anadkat,S.,etal. Gpt-4technicalreport. arXivpreprint
+Jiang,C.,Chi,J.,andZhong,W. Retool: Reinforcement
+arXiv:2303.08774,2023.
+learning for strategic tool use in llms. arXiv preprint
+Anthropic. Claude code, 2025. URL https://www. arXiv:2504.11536,2025.
+claude.com/product/claude-code.
+Gao,J.,Fu,W.,Xie,M.,Xu,S.,He,C.,Mei,Z.,Zhu,B.,
+Bae,S.,Hong,J.,Lee,M.Y.,Kim,H.,Nam,J.,andKwak, andWu,Y. Beyondtenturns: Unlockinglong-horizon
+D. Onlinedifficultyfilteringforreasoningorientedre- agenticsearchwithlarge-scaleasynchronousrl. arXiv
+inforcementlearning. arXivpreprintarXiv:2504.03380, preprintarXiv:2508.07976,2025.
+2025.
+Geng,X.,Xia,P.,Zhang,Z.,Wang,X.,Wang,Q.,Ding,R.,
+Chen, Z., Yang, J., Xiao, T., Zhou, R., Zhang, L., Xi, X., Wang, C., Wu, J., Zhao, Y., Li, K., etal. Webwatcher:
+Shi,X.,Wang,W.,andWang,J. Cantool-integratedre- Breakingnewfrontierofvision-languagedeepresearch
+inforcementlearninggeneralizeacrossdiversedomains? agent. arXivpreprintarXiv:2508.05748,2025.
+arXivpreprintarXiv:2510.11184,2025.
+Google. Try deep research and our new ex-
+Cheng,P.,Dai,Y.,Hu,T.,Xu,H.,Zhang,Z.,Han,L.,Du, perimental model in gemini, your ai assistant,
+N.,andLi,X. Self-playingadversariallanguagegame 2024. URL https://blog.google/products/
+enhancesllmreasoning. AdvancesinNeuralInformation gemini/google-gemini-deep-research/.
+ProcessingSystems,37:126515–126543,2024.
+Han,S.,Liu,J.,Su,Y.,Duan,W.,Liu,X.,Xie,C.,Bansal,
+Cheng,Y.,Chen,J.,Chen,J.,Chen,L.,Chen,L.,Chen,W., M.,Ding,M.,Zhang,L.,andYao,H. Alignmenttipping
+Chen,Z.,Geng,S.,Li,A.,Li,B.,Li,B.,Li,L.,Liu,B., process: How self-evolution pushes llm agents off the
+Liu,J.,Liu,K.,Liu,Q.,Liu,S.,Liu,S.,Liu,T.,Liu,T., rails. arXivpreprintarXiv:2510.04860,2025a.
+Liu,Y.,Long,R.,Mai,J.,Ning,G.,Peng,Z.Y.,Shen,
+K., Su, J., Su, J., Sun, T., Sun, Y., Tao, Y., Wang, G., Han, S., Xia, P., Zhang, R., Sun, T., Li, Y., Zhu, H.,
+Wang,S.,Wang,X.,Wang,Y.,Wang,Z.,Xia,J.,Xiang, and Yao, H. Mdocagent: A multi-modal multi-agent
+L., Xiao, X., Xiao, Y., Xi, C., Xin, S., Xu, J., Xu, S., frameworkfordocumentunderstanding. arXivpreprint
+Yang,H.,Yang,J.,Yang,Y.,Yuan,J.,Zhang,J.,Zhang, arXiv:2503.13964,2025b.
+Y.,Zhang,Y.,Zheng,S.,Zhu,H.,andZhu,M. Fullstack
+He,C.,Luo,R.,Bai,Y.,Hu,S.,Thai,Z.L.,Shen,J.,Hu,J.,
+bench: Evaluatingllmsasfullstackcoders,2025. URL
+Han,X.,Huang,Y.,Zhang,Y.,etal. Olympiadbench: A
+https://arxiv.org/abs/2412.00535.
+challengingbenchmarkforpromotingagiwitholympiad-
+Cobbe,K.,Kosaraju,V.,Bavarian,M.,Chen,M.,Jun,H., level bilingual multimodal scientific problems. arXiv
+Kaiser,L.,Plappert,M.,Tworek,J.,Hilton,J.,Nakano, preprintarXiv:2402.14008,2024.
+R.,etal. Trainingverifierstosolvemathwordproblems.
+Hendrycks, D., Burns, C., Basart, S., Zou, A., Mazeika,
+arXivpreprintarXiv:2110.14168,2021.
+M., Song, D., and Steinhardt, J. Measuring mas-
+Dong, G., Lu, K., Li, C., Xia, T., Yu, B., Zhou, C., and sive multitask language understanding. arXiv preprint
+Zhou, J. Self-play with execution feedback: Improv- arXiv:2009.03300,2020.
+inginstruction-followingcapabilitiesoflargelanguage
+Hendrycks,D.,Burns,C.,Kadavath,S.,Arora,A.,Basart,
+models. arXivpreprintarXiv:2406.13542,2024.
+S.,Tang,E.,Song,D.,andSteinhardt,J.Measuringmath-
+Du,X.,Yao,Y.,Ma,K.,Wang,B.,Zheng,T.,Zhu,K.,Liu, ematicalproblemsolvingwiththemathdataset. arXiv
+M.,Liang,Y.,Jin,X.,Wei,Z.,etal. Supergpqa: Scaling preprintarXiv:2103.03874,2021.
+9
+Agent0:UnleashingSelf-EvolvingAgentsfromZeroDataviaTool-IntegratedReasoning
+Huang, C., Yu, W., Wang, X., Zhang, H., Li, Z., Li, R., Lin,H.andXu,Z. Understandingtool-integratedreasoning.
+Huang, J., Mi, H., and Yu, D. R-zero: Self-evolving arXivpreprintarXiv:2508.19201,2025.
+reasoningllmfromzerodata. 2025. URLhttps://
+Lin,Z.,Shen,S.,Shang,J.,Weston,J.,andNie,Y.Learning
+arxiv.org/abs/2508.05004.
+tosolveandverify: Aself-playframeworkforcodeand
+Jaech,A.,Kalai,A.,Lerer,A.,Richardson,A.,El-Kishky, testgeneration. arXivpreprintarXiv:2502.14948,2025.
+A., Low, A., Helyar, A., Madry, A., Beutel, A., Car-
+ney, A., et al. Openai o1 system card. arXiv preprint Liu, B., Guertler, L., Yu, S., Liu, Z., Qi, P., Balcells, D.,
+arXiv:2412.16720,2024. Liu,M.,Tan,C.,Shi,W.,Lin,M.,Lee,W.S.,andJaques,
+N. Spiral: Self-playonzero-sumgamesincentivizesrea-
+Jiang,D.,Lu,Y.,Li,Z.,Lyu,Z.,Nie,P.,Wang,H.,Su,A., soningviamulti-agentmulti-turnreinforcementlearning.
+Chen,H.,Zou,K.,Du,C.,etal. Verltool: Towardsholis- arXivpreprintarXiv:2506.24119,2025a.
+ticagenticreinforcementlearningwithtooluse. arXiv
+preprintarXiv:2509.01055,2025. Liu,B.,Jin,C.,Kim,S.,Yuan,W.,Zhao,W.,Kulikov,I.,Li,
+X.,Sukhbaatar,S.,Lanchantin,J.,andWeston,J. Spice:
+Jimenez,C.E.,Yang,J.,Wettig,A.,Yao,S.,Pei,K.,Press,
+Self-play in corpus environments improves reasoning.
+O.,andNarasimhan,K. Swe-bench: Canlanguagemod-
+arXivpreprintarXiv:2510.24684,2025b.
+els resolve real-world github issues? arXiv preprint
+arXiv:2310.06770,2023. Liu,Y.,Sun,P.,andLi,H. Largelanguagemodelsasagents
+intwo-playergames. arXivpreprintarXiv:2402.08078,
+Jin, B., Zeng, H., Yue, Z., Yoon, J., Arik, S., Wang, D.,
+2024.
+Zamani, H., and Han, J. Search-r1: Training llms to
+reasonandleveragesearchengineswithreinforcement Lu, H., Wen, Y., Cheng, P., Ding, R., Xu, H., Guo, J.,
+learning. arXivpreprintarXiv:2503.09516,2025. Wang, C., Chen, H., Jiang, X., and Jiang, G. Search
+self-play:Pushingthefrontierofagentcapabilitywithout
+Kazemi, M., Fatemi, B., Bansal, H., Palowitch, J., Anas-
+supervision. arXivpreprintarXiv:2510.18821,2025.
+tasiou,C.,Mehta,S.V.,Jain,L.K.,Aglietti,V.,Jindal,
+D.,Chen,P.,etal. Big-benchextrahard. arXivpreprint OpenAI. Openai deep research system card,
+arXiv:2502.19187,2025. 2025. URL https://openai.com/index/
+introducing-deep-research/.
+Kuba,J.G.,Gu,M.,Ma,Q.,Tian,Y.,andMohan,V. Lan-
+guage self-play for data-free training. arXiv preprint Ouyang,L.,Wu,J.,Jiang,X.,Almeida,D.,Wainwright,C.,
+arXiv:2509.07414,2025. Mishkin,P.,Zhang,C.,Agarwal,S.,Slama,K.,Ray,A.,
+et al. Training language models to follow instructions
+Kwon, W., Li, Z., Zhuang, S., Sheng, Y., Zheng, L., Yu,
+withhumanfeedback. Advancesinneuralinformation
+C.H.,Gonzalez,J.E.,Zhang,H.,andStoica,I. Efficient
+processingsystems,35:27730–27744,2022.
+memorymanagementforlargelanguagemodelserving
+withpagedattention. InProceedingsoftheACMSIGOPS
+Papineni, K., Roukos, S., Ward, T., andZhu, W.-J. Bleu:
+29thSymposiumonOperatingSystemsPrinciples,2023.
+a method for automatic evaluation of machine transla-
+tion. InProceedingsofthe40thannualmeetingofthe
+Lewkowycz, A., Andreassen, A., Dohan, D., Dyer, E.,
+AssociationforComputationalLinguistics,pp.311–318,
+Michalewski, H., Ramasesh, V., Slone, A., Anil, C.,
+2002.
+Schlag,I.,Gutman-Solo,T.,etal. Solvingquantitative
+reasoningproblemswithlanguagemodels. Advancesin
+Prabhudesai, M., Chen, L., Ippoliti, A., Fragkiadaki, K.,
+neural information processing systems, 35:3843–3857,
+Liu, H., and Pathak, D. Maximizing confidence alone
+2022.
+improvesreasoning. arXivpreprintarXiv:2505.22660,
+Li, P., Skripkin, M., Zubrey, A., Kuznetsov, A., and 2025.
+Oseledets, I. Confidence is all you need: Few-shot
+Qiu, J., Qi, X., Wang, H., Juan, X., Wang, Y., Zhao, Z.,
+rl fine-tuning of language models. arXiv preprint
+Geng, J., Guo, J., Li, P., Shi, J., et al. Alita-g: Self-
+arXiv:2506.06395,2025a.
+evolving generative agent for agent generation. arXiv
+Li,X.,Zou,H.,andLiu,P. Torl: Scalingtool-integratedrl. preprintarXiv:2510.23601,2025a.
+arXivpreprintarXiv:2503.23383,2025b.
+Qiu,J.,Qi,X.,Zhang,T.,Juan,X.,Guo,J.,Lu,Y.,Wang,
+Li, Y., Shen, X., Yao, X., Ding, X., Miao, Y., Krishnan, Y., Yao, Z., Ren, Q., Jiang, X., etal. Alita: Generalist
+R., and Padman, R. Beyond single-turn: A survey on agentenablingscalableagenticreasoningwithminimal
+multi-turninteractionswithlargelanguagemodels. arXiv predefinitionandmaximalself-evolution. arXivpreprint
+preprintarXiv:2504.04717,2025c. arXiv:2505.20286,2025b.
+10
+Agent0:UnleashingSelf-EvolvingAgentsfromZeroDataviaTool-IntegratedReasoning
+Rein,D.,Hou,B.L.,Stickland,A.C.,Petty,J.,Pang,R.Y., Wang,H.,Qian,C.,Zhong,W.,Chen,X.,Qiu,J.,Huang,S.,
+Dirani, J., Michael, J., and Bowman, S. R. Gpqa: A Jin,B.,Wang,M.,Wong,K.-F.,andJi,H. Otc: Optimal
+graduate-level google-proof q&a benchmark. In First toolcallsviareinforcementlearning. arXive-prints,pp.
+ConferenceonLanguageModeling,2024. arXiv–2504,2025a.
+Schulman, J., Wolski, F., Dhariwal, P., Radford, A., and Wang, H., Que, H., Xu, Q., Liu, M., Zhou, W., Feng, J.,
+Klimov, O. Proximal policy optimization algorithms. Zhong,W.,Ye,W.,Yang,T.,Huang,W.,etal. Reverse-
+ArXiv preprint, abs/1707.06347, 2017. URL https: engineeredreasoningforopen-endedgeneration. arXiv
+//arxiv.org/abs/1707.06347. preprintarXiv:2509.06160,2025b.
+Shao,Z.,Wang,P.,Zhu,Q.,Xu,R.,Song,J.,Bi,X.,Zhang, Wang, H., Xu, Q., Liu, C., Wu, J., Lin, F., and Chen, W.
+H.,Zhang,M.,Li,Y.,Wu,Y.,etal. Deepseekmath: Push- Emergent hierarchical reasoning in llms through rein-
+ingthelimitsofmathematicalreasoninginopenlanguage forcement learning. arXiv preprint arXiv:2509.03646,
+models. arXivpreprintarXiv:2402.03300,2024. 2025c.
+Sheng,G.,Zhang,C.,Ye,Z.,Wu,X.,Zhang,W.,Zhang,R., Wang, S., Jiao, Z., Zhang, Z., Peng, Y., Ze, X., Yang,
+Peng,Y.,Lin,H.,andWu,C. Hybridflow: Aflexibleand B., Wang, W., Wei, H., and Zhang, L. Socratic-zero:
+efficientrlhfframework. InProceedingsoftheTwentieth Bootstrappingreasoningviadata-freeagentco-evolution.
+EuropeanConferenceonComputerSystems,pp.1279– arXivpreprintarXiv:2509.24726,2025d.
+1297,2025.
+Wang,X.,Li,B.,Song,Y.,Xu,F.F.,Tang,X.,Zhuge,M.,
+Pan,J.,Song,Y.,Li,B.,Singh,J.,etal. Openhands: An
+Shi,T.,Wu,Y.,Song,L.,Zhou,T.,andZhao,J. Efficient
+open platform for ai software developers as generalist
+reinforcementfinetuningviaadaptivecurriculumlearning.
+arXivpreprintarXiv:2504.05520,2025. agents. arXivpreprintarXiv:2407.16741,2024a.
+Wang,Y.,Ma,X.,Zhang,G.,Ni,Y.,Chandra,A.,Guo,S.,
+Srivastava,A.,Rastogi,A.,Rao,A.,Shoeb,A.A.M.,Abid,
+Ren,W.,Arulraj,A.,He,X.,Jiang,Z.,etal. Mmlu-pro:
+A., Fisch, A., Brown, A. R., Santoro, A., Gupta, A.,
+Amorerobustandchallengingmulti-tasklanguageun-
+Garriga-Alonso, A., et al. Beyond the imitation game:
+derstandingbenchmark. AdvancesinNeuralInformation
+Quantifyingandextrapolatingthecapabilitiesoflanguage
+ProcessingSystems,37:95266–95290,2024b.
+models. Transactions on machine learning research,
+2023.
+Wang,Y.,Yang,L.,Tian,Y.,Shen,K.,andWang,M. Co-
+evolvingllmcoderandunittesterviareinforcementlearn-
+Su,Z.,Xia,P.,Guo,H.,Liu,Z.,Ma,Y.,Qu,X.,Liu,J.,Li,
+ing. arXivpreprintarXiv:2506.03136,2025e.
+Y.,Zeng,K.,Yang,Z.,etal. Thinkingwithimagesfor
+multimodalreasoning: Foundations,methods,andfuture
+Wu, F., Huang, X., Xuan, W., Zhang, Z., Xiao, Y., Wan,
+frontiers. arXivpreprintarXiv:2506.23918,2025.
+G., Li, X., Hu, B., Xia, P., Leskovec, J., et al. Mul-
+tiplayer nash preference optimization. arXiv preprint
+Tang,X.,Qin,T.,Peng,T.,Zhou,Z.,Shao,D.,Du,T.,Wei,
+arXiv:2509.23102,2025a.
+X.,Xia,P.,Wu,F.,Zhu,H.,etal. Agentkb: Leveraging
+cross-domain experience for agentic problem solving. Wu,R.,Wang,X.,Mei,J.,Cai,P.,Fu,D.,Yang,C.,Wen,L.,
+arXivpreprintarXiv:2507.06229,2025. Yang,X.,Shen,Y.,Wang,Y.,etal.Evolver:Self-evolving
+llmagentsthroughanexperience-drivenlifecycle. arXiv
+Tao, Z., Lin, T.-E., Chen, X., Li, H., Wu, Y., Li, Y., Jin,
+preprintarXiv:2510.16079,2025b.
+Z., Huang, F., Tao, D., and Zhou, J. A survey on
+self-evolutionoflargelanguagemodels. arXivpreprint Xia,P.,Wang,J.,Peng,Y.,Zeng,K.,Wu,X.,Tang,X.,Zhu,
+arXiv:2404.14387,2024. H., Li, Y., Liu, S., Lu, Y., et al. Mmedagent-rl: Opti-
+mizingmulti-agentcollaborationformultimodalmedical
+Team,T.D.,Li,B.,Zhang,B.,Zhang,D.,Huang,F.,Li,G.,
+reasoning. arXivpreprintarXiv:2506.00555,2025.
+Chen,G.,Yin,H.,Wu,J.,Zhou,J.,etal. Tongyideepre-
+searchtechnicalreport. arXivpreprintarXiv:2510.24701, Xue,Z.,Zheng,L.,Liu,Q.,Li,Y.,Zheng,X.,Ma,Z.,and
+2025. An, B. Simpletir: End-to-end reinforcement learning
+formulti-turntool-integratedreasoning. arXivpreprint
+Tu,A.,Xuan,W.,Qi,H.,Huang,X.,Zeng,Q.,Talaei,S.,
+arXiv:2509.02479,2025.
+Xiao, Y., Xia, P., Tang, X., Zhuang, Y., etal. Position:
+The hidden costs and measurement gaps of reinforce- Yan,S.,Yang,X.,Huang,Z.,Nie,E.,Ding,Z.,Li,Z.,Ma,
+ment learning with verifiable rewards. arXiv preprint X.,Kersting,K.,Pan,J.Z.,Schu¨tze,H.,etal. Memory-
+arXiv:2509.21882,2025. r1: Enhancinglargelanguagemodelagentstomanage
+11
+Agent0:UnleashingSelf-EvolvingAgentsfromZeroDataviaTool-IntegratedReasoning
+andutilizememoriesviareinforcementlearning. arXiv Zhao,A.,Wu,Y.,Yue,Y.,Wu,T.,Xu,Q.,Yue,Y.,Lin,M.,
+preprintarXiv:2508.19828,2025. Wang,S.,Wu,Q.,Zheng,Z.,andHuang,G. Absolute
+zero:Reinforcedself-playreasoningwithzerodata,2025.
+Yang,A.,Li,A.,Yang,B.,Zhang,B.,Hui,B.,Zheng,B., URLhttps://arxiv.org/abs/2505.03335.
+Yu,B.,Gao,C.,Huang,C.,Lv,C.,etal. Qwen3technical
+report. arXivpreprintarXiv:2505.09388,2025a. Zhou,Y.,Levine,S.,Weston,J.,Li,X.,andSukhbaatar,S.
+Self-challenginglanguagemodelagents. arXivpreprint
+Yang,X.,Han,J.,Bommasani,R.,Luo,J.,Qu,W.,Zhou, arXiv:2506.01716,2025a.
+W.,Bibi,A.,Wang,X.,Yoon,J.,Stengel-Eskin,E.,etal.
+Reliable and responsible foundation models. Transac- Zhou,Y.,Liang,Z.,Liu,H.,Yu,W.,Panaganti,K.,Song,L.,
+tionsonMachineLearningResearch. Yu,D.,Zhang,X.,Mi,H.,andYu,D. Evolvinglanguage
+modelswithoutlabels: Majoritydrivesselection,novelty
+Yang,Z.,Shen,W.,Chen,R.,Li,C.,Wan,F.,Yan,M.,Quan, promotes variation. arXiv preprint arXiv:2509.15194,
+X.,andHuang,F. Spell: Self-playreinforcementlearn- 2025b.
+ing for evolving long-context language models. arXiv
+Zhou, Y., Wang, Z., Wang, T., Xing, S., Xia, P., Li, B.,
+preprintarXiv:2509.23863,2025b.
+Zheng,K.,Zhang,Z.,Chen,Z.,Zheng,W.,etal. Anypre-
+Yu,H.,Chen,T.,Feng,J.,Chen,J.,Dai,W.,Yu,Q.,Zhang, fer: Anagenticframeworkforpreferencedatasynthesis.
+Y.-Q.,Ma,W.-Y.,Liu,J.,Wang,M.,etal. Memagent:Re- arXivpreprintarXiv:2504.19276,2025c.
+shapinglong-contextllmwithmulti-convrl-basedmem-
+Zuo,Y.,Zhang,K.,Sheng,L.,Qu,S.,Cui,G.,Zhu,X.,Li,
+oryagent. arXivpreprintarXiv:2507.02259,2025a.
+H.,Zhang,Y.,Long,X.,Hua,E.,etal. Ttrl: Test-time
+Yu,Q.,Zhang,Z.,Zhu,R.,Yuan,Y.,Zuo,X.,Yue,Y.,Dai, reinforcementlearning.arXivpreprintarXiv:2504.16084,
+W.,Fan,T.,Liu,G.,Liu,L.,etal. Dapo: Anopen-source 2025.
+llmreinforcementlearningsystematscale.arXivpreprint
+arXiv:2503.14476,2025b.
+Yu, Z., Su, W., Tao, L., Wang, H., Singh, A., Yu, H.,
+Wang,J.,Gao,H.,Yuan,W.,Weston,J.,etal. Restrain:
+Fromspuriousvotestosignals–self-drivenrlwithself-
+penalization. arXivpreprintarXiv:2510.02172,2025c.
+Yue,Y.,Chen,Z.,Lu,R.,Zhao,A.,Wang,Z.,Song,S.,and
+Huang,G. Doesreinforcementlearningreallyincentivize
+reasoningcapacityinllmsbeyondthebasemodel? arXiv
+preprintarXiv:2504.13837,2025.
+Zhai,Y.,Tao,S.,Chen,C.,Zou,A.,Chen,Z.,Fu,Q.,Mai,
+S., Yu, L., Deng, J., Cao, Z., et al. Agentevolver: To-
+wardsefficientself-evolvingagentsystem. arXivpreprint
+arXiv:2511.10395,2025.
+Zhang,D.-C.,Zhao,Y.,Wu,J.,Zhang,L.,Li,B.,Yin,W.,
+Jiang,Y.,Li,Y.-F.,Tu,K.,Xie,P.,etal. Evolvesearch:
+Aniterativeself-evolvingsearchagent. InProceedings
+ofthe2025ConferenceonEmpiricalMethodsinNatural
+LanguageProcessing,pp.13134–13147,2025a.
+Zhang, K., Yao, Q., Liu, S., Wang, Y., Lai, B., Ye, J.,
+Song, M., and Tao, D. Consistent paths lead to truth:
+Self-rewardingreinforcementlearningforllmreasoning.
+arXivpreprintarXiv:2506.08745,2025b.
+Zhang, K., Zuo, Y., He, B., Sun, Y., Liu, R., Jiang, C.,
+Fan, Y., Tian, K., Jia, G., Li, P., et al. A survey of
+reinforcementlearningforlargereasoningmodels. arXiv
+preprintarXiv:2509.08827,2025c.
+12
+Agent0:UnleashingSelf-EvolvingAgentsfromZeroDataviaTool-IntegratedReasoning
+Appendix
+A.ExperimentalDetails
+A.1.HyperparameterSettings
+ExecutorAgentTraining
+• GlobalBatchSize: 128
+• LearningRate: 1×10−6
+• WeightDecay: 1×10−2
+• KLPenaltyCoefficient(λ ): 1×10−2
+KL
+• MaxSteps: 40
+• NumberofRollouts: 16
+• RolloutTemperature: 1.0
+• RolloutTop-p: 0.99
+CurriculumAgentTraining
+• GlobalBatchSize: 128
+• LearningRate: 1×10−6
+• WeightDecay: 1×10−2
+• KLPenaltyCoefficient(λ ): 1×10−2
+KL
+• MaxSteps: 5
+• NumberofRollouts: 4
+• RolloutTemperature: 1.0
+• RolloutTop-p: 0.99
+A.2.Prompt
+Thissectionpresentstheprompttemplatesusedfortheexecutorandcurriculumagent,andjudgepromptinTable6,Table7
+andTable8.
+Table6. Prompttemplateusedforexecutoragent.
+SystemPrompt:
+AconversationbetweenUserandAssistant. Theuserasksaquestion,andtheAssistantsolvesit. Theassistantfirst
+thinksaboutthereasoningprocessinthemindandthenprovidestheuserwiththeanswer. User: Pleaseintegrate
+naturallanguagereasoningwithprogramstosolvetheproblemabove.Ifyouwanttorunanypythoncode,writecode
+inthepythonmarkdowncodeblockandtheexecutionwillbeappendedinanoutputcodeblocklike‘‘‘python
+you code here‘‘‘‘‘‘output result here‘‘‘. Pleaseputyourfinalanswerwithinboxed{}.
+UserPrompt:
+{problem}
+13
+Agent0:UnleashingSelf-EvolvingAgentsfromZeroDataviaTool-IntegratedReasoning
+Table7. Prompttemplateusedforcurriculumagent.
+SystemPrompt:
+Youareanexpertcompetition-mathproblemsetter. FIRST,inyourprivatescratch-pad,thinkstep-by-steptodesign
+abrand-new,non-trivialproblem. Theproblemcouldcomefromanyfieldofmathematics,includingbutnotlimited
+toalgebra, geometry, numbertheory, combinatorics, prealgebra, probability, statistics, andcalculus. Aimfora
+difficultysuchthatfewerthan30%ofadvancedhigh-schoolstudentscouldsolveit. Avoidre-usingtextbookcliches
+orfamouscontestproblems. THEN,withoutrevealinganyofyourprivatethoughts,outputexactlythefollowing
+twoblocks:
+<question>
+Thefullproblemstatementononeormorelines
+</question>
+boxed{final answer}
+DoNOToutputanythingelse—noexplanations,noextramarkup.
+UserPrompt:
+Generateonenew,challengingreasoningquestionnow. Remembertoformattheoutputexactlyasinstructed.
+Table8.Prompttemplateusedforjudging.WeusetheGPT-4o(Achiametal.,2023)asthejudgemodel(temperature:0.1).
+SystemPrompt:
+Youareamathanswerchecker.
+UserPrompt:
+Hi,thereisananswer: {answer},andthegroundtruthansweris: {response},pleasecheckwhethertheanswer
+iscorrectornot,andreturnthe**only**YesorNo.
+A.3.SandboxConfiguration
+WeintegratedaPython-basedcodeexecutionsandbox(Chengetal.,2025)toenableverificationandalgorithmicreasoning.
+Thesystemcomprisestwocorecomponents: aMulti-TurnInteractionProtocolandaDistributedExecutionOrchestrator,
+supportedbyarobustinfrastructure.
+Multi-TurnInteractionProtocol. Weemploya“stop-and-go”strategytofacilitatemulti-stepreasoning: Themodelis
+instructedtogeneratereasoningfollowedbyexecutablePythoncodewithinmarkdowndelimiters. Upondetectingacode
+blockviaregex,generationhalts. Thecodeisextractedandruninanisolatedsandbox,capturingstdoutorstderr. Execution
+resultsareappendedtotheconversationhistory. Themodeltheninterpretstheseresultstoderiveafinalanswerformattedin
+LaTeXboxednotation(boxed{···}).
+Distributed Execution Orchestrator. To manage parallel candidate generation (e.g., N = 10), we implemented a
+load-balancing mechanism: Execution is decoupled into isolated worker nodes to prevent interference with the main
+inferenceserver. Athread-safeRound-Robinschedulerdistributesrequestsacrossnodes. AThreadPoolExecutormanages
+asynchronouscalls,preventingmainloopblocking. Thesystemrobustlyhandlesnetworktimeoutsandfailures,feeding
+errormessagesbacktothemodelforpotentialself-correction.
+Infrastructure. BuiltonFlaskandvLLM(Kwonetal.,2023),thesystemensureshighthroughput. Tomaintainstability,a
+backgroundthreadperformslow-prioritytensoroperationsduringidleperiods,preventingGPUdeepsleepandensuring
+consistentlatency.
+B.OverviewoftheBaselines
+• BaseModel: Thepre-trainedbasemodelwithoutanyfine-tuning.
+14
+Agent0:UnleashingSelf-EvolvingAgentsfromZeroDataviaTool-IntegratedReasoning
+• BaseModelw/tool: Thebasemodelevaluatedinazero-shotsetting,butgivenaccesstothecodeinterpreter.
+• R-Zero(Huangetal.,2025): Aself-evolvingframeworkthatoperatesfromzerodata,butdoesnotutilizeexternaltools.
+• AbsoluteZero(Zhaoetal.,2025): Aself-playmethodthatdoesuseacodeexecutorforverification,representingastrong
+tool-awarebaseline.
+• SPIRAL(Liuetal.,2025a): Aself-playmethodbasedonzero-sumgamesandmulti-turninteractions.
+• Socratic-Zero(Wangetal.,2025d): Astrongbaselinerepresentingmethodsthatleverageexternalproprietarymodelsfor
+reasoningassistance.
+C.EvaluationBenchmarks
+• AMC: A collection of problems from standard American middle and high school math competitions, serving as a
+foundationalbenchmarkforpre-collegiatemathematicalreasoning.
+• Minerva(Lewkowyczetal.,2022): Thedatasetevaluatesthemodel’sabilitytohandleformalscientificnotationandsolve
+complexSTEM-relatedquestions.
+• MATH(Hendrycksetal.,2021):Acomprehensivedatasetofchallenginghighschoolcompetitionproblemsacrossvarious
+subfields(e.g.,algebra,geometry),requiringcomplexheuristicsearchandmulti-stepderivation.
+• GSM8K(Cobbeetal.,2021): Aclassicbenchmarkconsistingofhigh-qualitygradeschoolmathwordproblemsthattest
+themodel’sabilitytoperformmulti-steplogicusingbasicarithmeticoperations.
+• Olympiad-Bench(Heetal.,2024): AnadvancedbenchmarkaggregatingextremelydifficultproblemsfromChineseand
+InternationalMathematicalOlympiads,designedtoprobetheupperlimitsofLLMreasoningcapabilities.
+• AIME24&AIME25: Thesedatasetscompriseproblemsfromthe2024and2025AmericanInvitationalMathematics
+Examinations,servingasarigoroustestofadvancedproblem-solvingonrecent,likelyuncontaminateddata.
+• SuperGPQA(Duetal.,2025): AnevolutionoftheGPQAdataset(Reinetal.,2024),thisbenchmarkfeaturesdifficult
+graduate-levelquestionsacrossscientificdomainsthatarechallengingevenforexperts,specificallydesignedtominimize
+datacontaminationandretrievalshortcuts.
+• MMLU-Pro(Wangetal.,2024b): AnenhancedversionoftheMMLUbenchmark(Hendrycksetal.,2020)thatintroduces
+harderquestions,increasedoptions,andmorecomplexreasoningrequirementstobetterdifferentiatebetweentop-tier
+languagemodels.
+• BBEH(Kazemietal.,2025): AselectedsubsetofchallengingtasksfromtheBig-Benchsuite(Srivastavaetal.,2023),
+focusingonareaswherelanguagemodelstraditionallystruggle,suchassymbolicmanipulation,logicaldeduction,and
+algorithmictracking.
+D.AdditionalResultsandAnalysis
+D.1.TheImpactoftheNumberofTurnsonPerformance
+Weinvestigatetheimpactoftheconversationlengthonmodelperformancebyincreasingtheinteractionturnsfrom1to4
+duringthecurriculumgenerationphase. AsshowninTable9,extendingthenumberofturnsyieldssignificantbenefits.
+Comparedtothesingle-turnbaseline,the4-turnsettingimprovestheexecutor’soverallperformanceby3.4%,withspecific
+gainsof3%onmathematicalbenchmarksand2.6%ongeneraldomaintasks. Thisperformanceboostcanbeattributedto
+theincreasedcomplexityofthecurriculum. Multi-turninteractionsencouragethecurriculumagenttogeneratetaskswith
+longercontextdependenciesandprogressivedifficulty. Consequently,theexecutorisforcedtoenhanceitscapabilityto
+maintainlogicalconsistencyandreasoningoverextendedhorizons,ratherthanrelyingonsimplepatternmatching.
+D.2.DetailedResults
+Foramoredetailedanalysis,wereportthecompleteresultsofthe3-iterationexperimentsinTable10andTable11. These
+tablesprovideacomprehensivebreakdownoftheagent’sperformanceacrossallindividualbenchmarks,furthervalidating
+theeffectivenessandrobustnessofAgent0.
+15
+Agent0:UnleashingSelf-EvolvingAgentsfromZeroDataviaTool-IntegratedReasoning
+Table9.Ablationstudyonthenumberofinteractionturns.Increasingturnsfrom1to4leadstoconsistentperformancegainsacrossall
+domains.
+NumberofTurns OverallAVG MathAVG GeneralAVG
+1 35.5 50.4 30.8
+2 35.8 50.7 31.1
+3 36.1 51.2 31.3
+4 36.7 51.9 31.6
+Table10.Comprehensiveresultsonmathematicalreasoningbenchmarks.Thepeakperformanceachievedduringeachmodel’straining
+processishighlightedinbold.
+ModelName AVG AMC Minerva MATH GSM8K Olympiad AIME25 AIME24
+Qwen3-4B-Base
+BaseModel ✗ ✗ 42.6 45.7 38.2 68.2 87.8 41.0 6.15 10.9
++Agent0(Iter1) ✓ ✗ 51.9 59.8 55.0 79.9 92.6 46.1 13.0 16.8
++Agent0(Iter2) ✓ ✗ 52.2 60.0 55.1 80.2 92.5 46.5 13.8 17.1
++Agent0(Iter3) ✓ ✗ 52.5 60.6 55.6 80.5 92.6 46.7 14.1 17.4
+Qwen3-8B-Base
+BaseModel ✗ ✗ 49.2 52.0 50.0 78.0 89.1 44.7 16.7 13.9
++Agent0(Iter1) ✓ ✗ 55.1 57.3 59.0 81.6 93.9 48.4 20.9 24.9
++Agent0(Iter2) ✓ ✗ 56.5 59.2 60.1 81.9 94.0 51.2 22.9 26.1
++Agent0(Iter3) ✓ ✗ 58.2 62.4 61.3 82.4 94.5 54.0 24.8 28.0
+E.CaseAnalysis
+Toprovidequalitativeevidenceofthemodel’sevolution,Table12,Table13,Table14,Table15,Table16,Table17,Table18,
+Table19,andTable20through9presentthreerepresentativequestionsgeneratedateachstagefromIteration1toIteration
+3. Weobserveaclearprogressionindifficulty: whiletheinitialiterationfeaturesrelativelystraightforwardqueries,the
+tasksinIteration3evolveintohighlycomplex,multi-stepproblemsrequiringdeepreasoning. Thisescalationisdrivenby
+theco-evolutionarydynamic,wheretheCurriculumAgent,incentivizedtomaximizetheExecutor’slearningsignal,must
+continuouslypushthedifficultyfrontiertochallengetheExecutor’sexpandingproficiency,therebyeffectivelypreventing
+learningstagnation.
+16
+Agent0:UnleashingSelf-EvolvingAgentsfromZeroDataviaTool-IntegratedReasoning
+Table11. Resultsongeneral-domainreasoningbenchmarks.
+ModelName OverallAVG MATHAVG SuperGPQA MMLU-Pro BBEH
+Qwen3-4B-Base
+BaseModel ✗ ✗ 27.1 42.6 20.9 37.4 7.57
++Agent0(Iter1) ✓ ✗ 36.7 51.9 28.9 55.1 10.7
++Agent0(Iter2) ✓ ✗ 36.9 52.2 29.3 55.3 11.0
++Agent0(Iter3) ✓ ✗ 37.6 52.5 29.9 55.9 12.0
+Qwen3-8B-Base
+BaseModel ✗ ✗ 34.5 49.2 28.3 51.8 8.6
++Agent0(Iter1) ✓ ✗ 40.7 55.1 32.5 62.2 13.0
++Agent0(Iter2) ✓ ✗ 41.3 56.5 32.5 62.4 13.6
++Agent0(Iter3) ✓ ✗ 42.1 58.2 33.0 63.4 13.7
+Table12. SampledquestionsgeneratedbyCurriculumAgent(Iter1).
+QuestionsfromCurriculumAgent
+LetS bethesetofallpositiveintegersnforwhichthepolynomial
+P(x)=x3−2023x2+nx−1
+hasthreedistinctpositiveintegerroots. FindthesumofallelementsinS.
+Table13. SampledquestionsgeneratedbyCurriculumAgent(Iter1).
+QuestionsfromCurriculumAgent
+InatriangleABC withsidelengthsa,b,andc(wherea=BC,b=CA,andc=AB),lettheareabeK. Ifthe
+incircleofthetriangletouchesBC,CA,andAB atD,E,andF respectively,andthelengthsofBD,CE,and
+AF arex,y,andzrespectively,provethatx2+y2+z2 ≥ 3K.
+2
+Table14. SampledquestionsgeneratedbyCurriculumAgent(Iter1).
+QuestionsfromCurriculumAgent
+Whatistheminimumnumberofpointsinsideasquarewithsidelength1thatareneededtoensurethatatleasttwo
+ofthepointsareatmost0.25unitsapartfromeachother?
+Table15. SampledquestionsgeneratedbyCurriculumAgent(Iter2).
+QuestionsfromCurriculumAgent
+Ona9×9chessboard,initiallyonecellisblack. Ineachmove,youcanchooseawhitecellthathasatleastone
+blackcellinthesameroworcolumnandinvertthecolorofthatchosencellfromwhitetoblack. Determinethe
+minimumnumberofmovesrequiredtoturntheentirechessboardintoablackboard.
+Table16. SampledquestionsgeneratedbyCurriculumAgent(Iter2).
+QuestionsfromCurriculumAgent
+LetS ={1,2,3,...,100}. AsubsetAofSiscalled*good*ifforanyx,y ∈A(withx̸=y),thesumx+yisnot
+aperfectsquare. Findthemaximumpossiblesizeofa*good*subsetofS.
+17
+Agent0:UnleashingSelf-EvolvingAgentsfromZeroDataviaTool-IntegratedReasoning
+Table17. SampledquestionsgeneratedbyCurriculumAgent(Iter2).
+QuestionsfromCurriculumAgent
+InthelandofPolytopia,eachcityisrepresentedbyauniquepointonalargesphericalmap. Thekingdecidesto
+createanewcityataspecialpointonthissphere. Todeterminethelocation,heusesasequenceofoperationsonthe
+coordinatesofexistingcities.
+Themapisrepresentedbyaspherewheretheequationx2+y2+z2 =1holdsforanypoint(x,y,z)representing
+acity. Thekingchoosestwoexistingcities,AandB,withcoordinates(a ,a ,a )and(b ,b ,b ),respectively. He
+1 2 3 1 2 3
+definesanewcityCwithcoordinatescalculatedbytheformula:
+a2+b2+a b ·(1+a b +a b +a b )
+c = i i i i 1 1 2 2 3 3
+i 1+a2+a2+a2+b2+b2+b2+(a b +a b +a b )2
+1 2 3 1 2 3 1 1 2 2 3 3
+fori=1,2,3.
+(cid:16) √ (cid:17) (cid:16) √ (cid:17)
+Given that the coordinates of city A are 1,1, 2 and the coordinates of city B are −1,1, 2 , find the
+2 2 2 2 2 2
+coordinatesofthenewcityC.
+Table18. SampledquestionsgeneratedbyCurriculumAgent(Iter3).
+QuestionsfromCurriculumAgent
+A sequence of positive integers a ,a ,a ,...,a is defined such that for each n ≥ 1, the number a is
+1 2√3 2024 n+1
+determinedbytherulea = a +⌊ a ⌋,startingwitha = 1. Findtheremainderwhena isdividedby
+n+1 n n 1 2024
+1000.
+Table19. SampledquestionsgeneratedbyCurriculumAgent(Iter3).
+QuestionsfromCurriculumAgent
+Inaknockouttournamentwith2n players,wherenisapositiveinteger,eachmatcheliminatesoneplayer. The
+tournament is structured such that each round halves the number of players. What is the minimum number of
+matches that must be played to determine the champion if, for each round, the number of matches played is a
+Fibonaccinumber?
+Table20. SampledquestionsgeneratedbyCurriculumAgent(Iter3).
+QuestionsfromCurriculumAgent
+Acircleisdividedinto2023congruentarcs. Theendpointsofonearcarecoloredredandblue. Iftwopointsthat
+arediametricallyoppositearebothcoloredred,whatistheprobabilitythatthetwoendpointsofthearcdirectly
+adjacenttotheredendpointsarebothblue? Expressyouranswerasacommonfraction.
+18

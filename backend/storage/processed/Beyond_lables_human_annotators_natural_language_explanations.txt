@@ -1,0 +1,1004 @@
+Beyond Labels: Empowering Human Annotators with Natural Language
+Explanations through a Novel Active-Learning Architecture
+BingshengYao IshanJindal LucianPopa
+RensselaerPolytechnicInstitute IBMResearch IBMResearch
+YannisKatsis SayanGhosh LihongHe
+IBMResearch UNCChapelHill IBMResearch
+YuxuanLu ShashankSrivastava YunyaoLi†
+NortheasternUniversity UNCChapelHill Apple
+JamesHendler DakuoWang∗
+RensselaerPolytechnicInstitute NortheasternUniversity
+Abstract
+Real-world domain experts (e.g., doctors)
+rarely annotate only a decision label in their
+day-to-dayworkflowwithoutprovidingexpla-
+nations. Yet, existing low-resource learning
+techniques,suchasActiveLearning(AL),that
+aimtosupporthumanannotatorsmostlyfocus
+onthelabelwhileneglectingthenaturallan-
+guageexplanationofadatapoint. Thiswork
+proposes a novel AL architecture to support
+experts’ real-world need for label and expla-
+nation annotations in low-resource scenarios.
+OurALarchitectureleveragesanexplanation-
+generation model to produce explanations
+guided by human explanations, a prediction
+modelthatutilizesgeneratedexplanationsto-
+ward prediction faithfully, and a novel data
+diversity-based AL sampling strategy that
+benefitsfromtheexplanationannotations. Au-
+tomated and human evaluations demonstrate
+theeffectivenessofincorporatingexplanations
+Figure 1: Our dual-model AL system architecture at
+intoALsamplingandtheimprovedhumanan-
+notationefficiencyandtrustworthinesswithour everyiteration: 1)theALdataselectorchoosesafew
+unlabeled examples; 2) human annotators provide an
+ALarchitecture. Additionalablationstudiesil-
+explanationandlabelforeachdatainstance;3)theanno-
+lustrate the potential of our AL architecture
+tatedexplanationsareusedtofinetunetheexplanation-
+for transfer learning, generalizability, and in-
+generationmodel;4)theannotatedlabelsandgenerated
+tegrationwithlargelanguagemodels(LLMs).
+explanationsareusedtofinetunethepredictionmodel.
+WhileLLMsexhibitexceptionalexplanation-
+Then,humanscanreviewthepredictedlabelsandgen-
+generation capabilities for relatively simple
+tasks,theireffectivenessincomplexreal-world eratedexplanationsforunlabeleddataandstartthenext
+iteration. Greenarrowsindicatethetrainingtarget.
+taskswarrantsfurtherin-depthstudy.
+1 Introduction 2021)demonstrateastonishingperformanceonvar-
+ious NLP tasks, including Question Answering
+State-of-the-art(SoTA)languagemodels(Devlin (QA) and Question Generation (QG) (Rajpurkar
+et al., 2019; Radford et al., 2019; Winata et al., et al., 2016; Duan et al., 2017; Kocˇiský et al.,
+2018; Yao et al., 2022), Natural Language Infer-
+∗†d.wang@northeastern.edu Corresponding Author.
+WorkdonewhileYunyaowasatIBMResearch. ence (NLI) (Bowman et al., 2015; Wang et al.,
+3202
+tcO
+32
+]LC.sc[
+2v01721.5032:viXra
+2018), etc. Despite the superior generative capa- 2)Apredictionmodelthatacceptsthedatacon-
+bilities, the lack of faithful explainability within tentandthegeneratedexplanationsforprediction.
+these“blackboxes”mayleadtomistrustoftheir We integrate AL to reduce human annotation
+predictions(Lipton,2018),wherehumans,onthe effortsandestablishhumantrustworthinessbyac-
+otherhand,candevelopintermediaterationalesto tivelyengaginghumansinthetrainingprocess. We
+facilitatethedecision-makingprocess. design a novel data diversity-based AL sampling
+strategytoselectthemostrepresentativeexamples
+Thelackofexplainabilityanduntrustworthiness
+by exploiting the explanation annotations, which
+ofmodelsismagnifiedintherealworld(Drozdal
+is analogous to the prevalent core-set (Sener and
+etal.,2020),wheredomainexpertsrarelyonlyan-
+Savarese,2017)strategy. OurALarchitectureaims
+notateadecisionlabelintheirdailyworkflowwith-
+tosupportlow-resourcemodelpredictionsandAI
+outprovidingexplanations(i.e.,clinicaldiagnoses
+trustworthinessbyexplicitlygeneratingnaturallan-
+by clinicians) (Zhang et al., 2023), and humans
+guageexplanations. Specifically,werequestlabel
+need explanations to understand and trust model
+and free-form explanation annotations for a very
+predictions(Zhangetal.,2021). Therefore,afew
+limitednumberofexamples(e.g.,3or10)selected
+approacheswereproposedtoretrospectivelyana-
+byourALsamplingstrategyateveryALiteration.
+lyzetheprobabilitydistributionwithinthemodel
+Subsequently,thegeneratedexplanationsserveas
+oraskmodelstogenerateexplanationsalongwith
+inputforthefinalprediction,demonstratingthepo-
+predictions (Ribeiro et al., 2016; Lundberg and
+tentialfortheseexplanationstosupportthemodel’s
+Lee,2017;Yuetal.,2019;Rajagopaletal.,2021;
+predictionsfaithfully.
+Chenetal.,2021),despite,theformerisstillvery
+difficultforlaymentounderstandwhilethelatter
+WeconducttwoALsimulationswithdifferent
+amounts of samplings and iterations on a large-
+explanationsarenotfaithfultowardpredictions.
+scale NLI dataset with human-annotated expla-
+As researchers looked into the quality (Car-
+nations to justify incorporating explanations in
+ton et al., 2020; Yao et al., 2023) of human-
+ALdataselectioncanconsistentlyoutperformran-
+annotatednaturallanguageexplanations(Camburu
+dom, traditional data diversity-based, and model
+et al., 2018; Rajani et al., 2019; Aggarwal et al.,
+probability-based sampling strategies. We make
+2021), they discovered numerous issues in exist-
+thecodepublicallyavailable1.
+ingdatasets(Gevaetal.,2019;Chmielewskiand
+A human evaluation of perceived validity, ex-
+Kucker,2020;Narangetal.,2020;Sunetal.,2022),
+plainability,andpreferenceofthegeneratedexpla-
+such that the human annotations are of low qual-
+nations among our system, a SoTA explanation-
+ityandsignificantinconsistency. Furthermore,the
+generationsystem,andhuman-annotatedexplana-
+ever-increasing costs in terms of labor, finances,
+tionsshowsthat,despitehumanexplanationsbeing
+andtimeforlarge-scale,high-qualitydataannota-
+rankedhighest,explanationsgeneratedbyoursys-
+tionsremainapersistentchallengefortheresearch
+temarepreferredovertheSOTAsystem. Addition-
+community. This challenge has given rise to var-
+ally,weconductthreeablationstudiestoexplore
+ious methodologies to reduce reliance on human
+thecapabilityandpotentialofourproposedALar-
+annotations,suchasActiveLearning(AL)(Settles,
+chitectureintransferlearning,generalizability,and
+2009). ALisahuman-in-the-loopframeworkthat
+incorporating large language models (LLMs) for
+utilizesALsamplingstrategiestoiterativelyselect
+explanationgenerationtofurtherreducehumanef-
+asmallnumberofrepresentativeexamples,request
+forts. LLMsdemonstrateexceptionalexplanation-
+oracleannotations,andsubsequentlyfine-tunethe
+generation capabilities on relatively simple tasks.
+modelusingtheannotateddata. However,priorAL
+However,theireffectivenessinhandlingcomplex
+workspredominantlyfocusonlabelsandoverlook
+real-worldtaskswarrantsin-depthstudy.
+thefactthatreal-worldscenariosoftenneedboth
+labelsandnaturallanguageexplanations. 2 RelatedWork
+In this work, we propose a dual-model AL ar-
+2.1 DatasetswithNaturalLanguage
+chitectureforhumanannotationoflabelsandex-
+Explanations
+planations, drawing inspiration from the human
+decision-makingprocess. Oursystemconsistsof:
+WiegreffeandMarasovic(2021)conductedacom-
+1)Anexplanation-generationmodelguidedby
+1https://github.com/neuhai/
+human-providedexplanations explanation-enriched-active-learning
+prehensive review of 65 datasets with explana- Fuetal.,2013;SchröderandNiekler,2020;Ren
+tionsandprovideda3-classtaxonomy: highlights, et al., 2021) of sampling strategies provide two
+free-text, and structured. Among the large-scale high-level selection concepts: data diversity and
+datasetswithfree-textexplanations,e-SNLI(Cam- model probability. We propose a novel data
+buru et al., 2018) is a prominent one, which ex- diversity-based strategy that leverages human-
+tended the Stanford Natural Language Inference annotatedexplanationstoselectdata. Ourdatase-
+(SNLI) corpus (Bowman et al., 2015), a classifi- lectorsharesasimilarconceptwiththeestablished
+cationtasktodeterminetheinferencerelationbe- data-based clustering strategies (Xu et al., 2003;
+tweentwotextualcontexts(premiseandhypothe- NguyenandSmeulders,2004)andcore-set(Sener
+sis): entailment, contradiction, or neutral. The e- andSavarese,2017)thataimtoselectthemostrep-
+SNLIdataset(examplesareshowninAppendixA) resentativedatawhilemaximizingdiversity. Com-
+containshuman-annotatedfree-formexplanations paredwithmodelprobability-basedstrategies,data
+for549,367examplesintrain,9,842invalidation, diversity-basedonesaremodel-agnosticandneed
+and9,824intestsplit. much less computing resources, whereas the for-
+Another popular group of datasets extended mer requires inference on unlabeled examples to
+the Commonsense QA (CQA v1.0 and v1.11 calculateprobability.
+versions) datasets (Talmor et al., 2019), includ- In addition to AL, Marasovic et al. (2022) in-
+ing two variants of Cos-E dataset (CoS-E v1.0 troducesafew-shotself-rationalizationsettingthat
+and CoS-E v1.11 (Rajani et al., 2019)) and the asks a model to generate free-form explanations
+ECQA (Aggarwal et al., 2021) dataset. Many re- andthelabelssimultaneously. Similarly,Bhatetal.
+centworks(Narangetal.,2020;Sunetal.,2022) (2021)proposesamulti-taskself-teachingframe-
+havefoundexplanationsinCoS-Etobenoisyand work with only 100 train data per category, and
+low-quality,andthus,Aggarwaletal.(2021)care- Braggetal.(2021)providesguidanceonunifying
+fullydesignedandfollowedtheexplanationannota- evaluationforfew-shotsettings.
+tionprotocolstocreatedECQA,whichisofhigher
+qualitycomparedwithCoS-E. 2.3 NaturalLanguageExplanation
+Inthispaper,weleveragethee-SNLIdatasetas Generation
+the benchmark dataset for our AL simulation ex-
+Different approaches have been explored to en-
+perimentbecause1)theclassificationtaskispop-
+hance the model’s explainability by asking them
+ular and representative, 2) the massive data size
+to generate natural language explanations. Some
+ensures data diversity, and 3) explanations for a
+classificationtaskmayprovidemoreeffectivehelp ofthem(Talmoretal.,2020;Tafjordetal.,2021;
+Latcinnik and Berant, 2020) propose systems to
+comparedtoCQAtaskwheretrainingandtesting
+generatetextexplanationsforspecifictasks. Dalvi
+datamaybeunrelated. Weadditionallyconductan
+etal.(2022)proposea3-foldreasoningsystemthat
+ablationstudyontheECQAdatasettoexplorethe
+generatesareasoningchainandasksusersforcor-
+generalizabilityofourproposedALarchitecture.
+rection. Otherrecentworks(Paranjapeetal.,2021;
+Liuetal.,2022;Chenetal.,2022)exploredifferent
+2.2 ActiveLearningforDataAnnotation
+prompt-based approaches to generate additional
+Owningtothepaucityofhigh-quality,large-scale information for the task and examine the robust-
+benchmarks for a long tail of NLP tasks, learn- nessandvalidity. Webelievethatourdual-model
+ingbettermethodsforlow-resourcelearningisac- system provides and uses explanations explicitly
+quiring more attention, such as Active Learning towards prediction, while the self-rationalization
+(AL)(Sharmaetal.,2015;Shenetal.,2017;Ash settingfallsshort. HaseandBansal(2022)argues
+etal.,2019;TesoandKersting,2019;Kasaietal., thatexplanationsaremostsuitableasinputforpre-
+2019; Zhang et al., 2022). AL iteratively 1) se- dicting,andKumarandTalukdar(2020)designeda
+lectssamplesfromtheunlabeleddatapool(based systemtogeneratelabel-wiseexplanations,which
+on AL sampling strategies) and queries their an- is aligned with our design hypothesis. Neverthe-
+notationfromhumanannotators,2)fine-tunesthe less,thereexistotherworks(Wiegreffeetal.,2021;
+underlyingmodelwithnewlyannotateddata,and Marasovicetal.,2022;Zelikmanetal.,2022)that
+3)evaluatesmodelperformance. exploretheuseofself-rationalizationsetting. We
+AfewALsurveys(Settles,2009;Olsson,2009; includetheself-rationalizationsettinginourhuman
+evaluationoftheexplanationqualityinSection4.4. Explanation-generationModel:
+TrainingInput explain:whatistherelationshipbetween
+3 Dual-ModelALSystem [hypothesis]and[premise]choice1:entailmentchoice2:
+neutralchoice3:contradiction
+TrainingTarget [humanannotatedexplanations]
+3.1 SystemArchitecture
+ModelGeneration [generatedfree-formexplanation]
+Figure 1 illustrates our proposed dual-model AL
+PredictionModel:
+framework. The system comprises three primary TrainingInput question: whatistherelationshipbe-
+modules: 1) an explanation-generation model tween [hypothesis] and [premise] choice1: entailment
+choice2:neutralchoice3:contradiction<sep>because
+thattakesthedata,fine-tunesonhuman-annotated
+[generatedfree-formexplanation]
+explanations,andgeneratesfree-formexplanations; TrainingTarget [humanannotatedlabel]
+ModelPrediction [predictedcategory]
+2)apredictionmodelthatacceptsthedatacontent
+andthegeneratedexplanationsasinput,fine-tunes Table 1: The prompt-based input templates for both
+on human-provided labels, and predicts the final modelsinoursystem,withthee-SNLI(Camburuetal.,
+label; 3) an AL data selector that selects a set 2018)datasetasanexample.
+ofrepresentativeexamplesintermsoftheseman-
+theoriginaltaskcontent. Forthee-SNLIdataset,
+ticsimilaritybetweeneachunlabeleddatatextand
+thetaskcontentbecomes“whatistherelationship
+labeleddata’shumanexplanations. TheALdatase-
+between”thehypothesisandpremisesentences;
+lectorplaysacrucialroleinfindingasmall,highly
+2)“choiceN”isfollowedbycandidateanswers,
+representativesetofsamplesateveryiteration,and
+where N ∈ [1,3] for the e-SNLI dataset corre-
+furtherdetailsofourALselectorareinSection3.2.
+sponds to entailment, neutral, and contradiction.
+IneachALiteration,afterthedataselectorsam-
+Wepassthechoicestotheexplanation-generation
+ples unlabeled examples for human annotations,
+model,expectingthatitwilllearntogeneratefree-
+wefirstfine-tunetheexplanation-generationmodel
+textexplanationsthatmayreflectpotentialrelation-
+supervisedbyhuman-providedfree-formexplana-
+shipsbetweenthedatacontentandthetask;
+tions. Then,weinstructthismodeltogenerateex-
+3)forthepredictionmodel,anadditionalprompt
+planationsforthesamesetofdata. Subsequently,
+“because:” isfollowedbytheexplanationsgener-
+wefine-tuneapredictionmodelusingthedatacon-
+atedbytheexplanation-generationmodel. Weuse
+tent and explanations generated by the previous
+aspecialtokentoseparatetheoriginaltaskcontent
+model as input, supervised by human-annotated
+andtheexplanation."
+labels. Thefine-tuningprocessteachesthepredic-
+tionmodeltorelyontheexplanationsforpredic- 3.2 ALDataSelector
+tions(Yaoetal.,2023). Additionally,wefine-tune
+thepredictionmodelwithmodel-generatedexpla- Algorithm1OurDataDiversity-basedALSelector
+nationsinsteadofhuman-annotatedonesforbetter Variables:
+D ⇒unlabeleddataintrainsplit
+alignment during inference, especially when no train
+D ⇒previously-annotateddata
+prev
+humanannotationsareavailable. AftereachALit- ddata⇒datacontentasastringofd (fore-SNLI,itisthe
+p p
+eration,weevaluatetheframeworkonastandalone premiseandhypothesis
+dexp⇒previously-annotatedfree-formexplanationofd
+evaluationdatasplit. p p
+x⇒numberofdatatobeselectedeachiteration
+Boththeexplanation-generationmodelandthe n =len(D ); n =len(D )
+train train prev prev
+prediction model can be any SoTA sequence-to- forD i ∈D train do
+ifiteration==0then
+sequence models, such as BART (Lewis et al., score = 1 · (cid:80) similarity(ddata,ddata)
+2020) and T5 (Raffel et al., 2020). In this work, else di ntrain dp∈Dtrain i p
+weutilizeT5asthebackboneforbothmodelsand score di = np 1 rev · (cid:80) dp∈Dprev similarity(d i data,de p xp)
+designaprompt-basedinputtemplateforbothmod- endif
+endfor
+els,asshowninTable1,inspiredbyafewexisting D′ =rankD byscore
+train train
+works(SchickandSchütze,2021;Gaoetal.,2021; D = selectxdata fromD′ withequalintervals
+selected train
+Zhouetal.,2023). Toelucidatehoweachprompt HumanannotationonD selected
+D −=D ;D +=D
+addressesadifferentpartofdatacontent: train selected prev selected
+1) “explain:” and “question:” are the leading According to recent surveys of AL (Settles,
+promptsintheexplanation-generationmodeland 2009; Olsson, 2009; Fu et al., 2013; Schröder
+thepredictionmodel,respectively,indicatingdif- and Niekler, 2020; Ren et al., 2021), there are
+ferent tasks for both models and are followed by two primary approaches for AL data selection:
+modelprobability-basedanddatadiversity-based
+approaches. Modelprobability-basedapproaches,
+firstly,aimtoselectexamplesaboutwhichthemod-
+elsareleastconfident. Theseapproachesinvolve
+conductinginferenceonunlabeleddataateveryit-
+eration,whichconsumesmoretimeandcomputing
+resources. Unlikedatadiversity-basedapproaches,
+theyarenotmodel-agnostic,whichmayaffectthe
+effectivenessofthesamplingstrategiesdepending
+onthemodelinuse.
+Secondly,datadiversity-basedapproacheslever- Figure 2: Preliminary experiment result of our dual-
+agevariousdatafeatures,suchasdatadistribution modelsystemone-SNLI(Camburuetal.,2018)dataset.
+andsimilarity,toselectarepresentativesetofex-
+eachunlabeledexampleandrankalltheunlabeled
+amplesfromthecandidatepoolwhilemaximizing
+data in terms of the average similarity score. To
+diversity. Thispaperintroducesadatadiversity-
+selectthemostrepresentativedatainthecandidate
+basedALselectionstrategythatsharesaconcept
+poolwhilemaximizingdiversity,wechooseexam-
+similar to traditional data-based clustering strat-
+plesfromtherankeddatalistwithequalintervals.
+egy Nguyen and Smeulders (2004) and core-set
+strategy. However,ourstrategydiffersfromtradi- Notethatinthefirstiteration,sincenopreviously
+annotatedexplanationsareavailable,wecompare
+tionalstrategiesbecauseoursincorporateshuman-
+thesimilaritybetweenthedatacontent.
+annotatedexplanationsforselection. Morespecif-
+ically, ourdata selectoraimsto chooseexamples
+4 Evaluation
+that are representative of the unlabeled data pool
+intermsofaveragesimilaritytohuman-annotated
+WeconducttheALsimulationexperimentwiththe
+explanations of all previously-labeled data while
+e-SNLI (Camburu et al., 2018) dataset. The pri-
+maximizingthediversityofnewly-selecteddata.
+maryobjectiveistojustifythatourproposeddual-
+We assume that human-annotated explana- model framework, when combined with human-
+tionscontributesignificantlytothemodel’spre- annotated explanations in AL data selection, can
+dictionandconveymoreinformationthanthe effectivelyidentifymorerepresentativeandhelpful
+originaldatacontentalone. Theseexplanations datafromareasonablylarge-scaledataset.
+can reveal underlying relationships between con- Giventhate-SNLIdatasetcomprisesasubstan-
+ceptsinthedatacontentandtherelationsbetween tial 549,367 examples in the train split, we per-
+thedatacontentandchoices. Forinstance,inthe formed a preliminary experiment to determine a
+e-SNLI dataset, the data content consists of the reasonable number of candidate data for the AL
+concatenationofhypothesisandpremisesentences. simulation. This approach aims to save time and
+Later, we construct a baseline selector in the AL computing resources. Our goal is to identify an
+simulation experiment (Sec. 4.2) with the same idealcandidatedatasizethatwouldnotintroduce
+setup, except that it only compares the similarity potentially biased feature distributions or signifi-
+betweendatacontent. Additionally,weincluderan- cantlydegrademodelperformancewhencompared
+dombaselineandprobability-basedbaselinestrate- to fine-tuning on the full dataset. We employ the
+gies. Our results demonstrate that using human- pre-trainedT5-base(Raffeletal.,2020)astheback-
+annotated explanations for data selection consis- boneforalltheexperimentsandprovidethehyper-
+tently leads to improved prediction performance parametersinAppendixC.
+comparedtousingdatacontentalone.
+4.1 PreliminaryExperiment
+Herewedelveintothedetailsofourdata-based
+AL data selector (shown in Algorithm 1). For Theexpectedoutcomeoftheaforementionedpre-
+each unlabeled data instance, we use sentence- liminary experiment is 1) to determine the upper
+transformers(ReimersandGurevych,2019)tocal- bound of performance and observe how the per-
+culatethesemanticsimilaritybetweenitsdatacon- formanceofourdual-modelsystemgraduallyde-
+tent and every previously annotated explanation. creasesaswereducetheamountoftrainingdata,
+Then, we take the averaged similarity scores for and2)toidentifyasuitablecandidatedatasizefor
+theALsimulation.
+We also randomly sample the same amount of
+data for each category in the preliminary experi-
+menttominimizepotentialbiasintroducedbyun-
+even distribution, especially when the sampling
+size per iteration is very small. Specifically, we
+select eight different sampling amounts per cate-
+goryfromthee-SNLItrainingsplit,rangingfrom
+[10,50,100,500,1500,3000,5000]andthecom-
+pletedatapercategory. Sincethee-SNLIdataset (a)Setting1:9examplesperiteration+20iterations
+consists of three categories: entailment, neutral,
+andcontradiction,thetotalsamplingsizeineach
+settingbecomes[30,150,300,1500,4500,9000,
+15000,and549,367(fulltrainsplit)],respectively,
+asshowninFigure2.
+Foreachsamplingsetting,weconductthreetri-
+als to obtain an averaged result. In eachtrial, we
+fine-tunetheexplanationgenerationmodelandthe
+predictionmodelonceandconductahyperparame-
+tersearch. Theframeworkisthenevaluatedonthe
+(b)Setting2:30examplesperiteration+15iterations
+testsplitofe-SNLI(9,824examples).
+Figure3: ResultsofALSimulationexperimentonour
+Thepreliminaryexperimentresultsareshownin
+Dual-modelsystemwithdifferentdataselectors.
+Figure2,wherethebluedotdenotestheaveraged
+predictionaccuracy(inpercentages)ateachsetting,
+formanceforoursandthebaselinedataselectors
+andtheredbarindicatesthestandarddeviationof
+at every iteration. During each trial, we start by
+accuracy among three trials. Notably, with more
+randomly selecting 3,000 examples per category
+than1,500datapercategory,theperformancedrop
+fromthecompletetraindataset,thenusethesame
+compared to the full train split is inconspicuous datatoconductALsimulationswithdifferentdata
+(84.08%to87.02%),whilethestandarddeviation
+selectorsinourdual-modelframework. Thisway,
+isbelow0.5%. Thisobservationindicatesthatus- wecanensuretheperformancedifferencesduring
+ing1%oftheoriginaltrainingdatasizeonlyleads each trial are not due to different unlabeled data
+toaperformancedropofmerely3%. Additionally, poolsbuttoactualdifferencesintheperformance
+we found that even with only 10 data points per
+of the AL data selectors. For the evaluation, we
+category(30dataintotal),oursystemstillachieves
+randomlysample300examplespercategory(900
+anaverageaccuracyof45%,althoughthedeviation
+intotal)fromthetestsplitofe-SNLIeverytrialand
+isrelativelysignificant. Furthermore,whenweex-
+evaluatewiththesametestdataaftereachiteration.
+tendthetrainingdatasizefrom100to500dataper
+The AL simulation comprises two settings,
+category(300to1500intotal),areasonablyappli-
+where we simulate annotating 180 and 450 data
+cablesettinginreal-worldscenarios,theaccuracy
+instances, respectively. These two levels of data
+canreachover80%accuracy,showingpromising
+annotationsreasonablymimicreal-worldscenarios
+resultsconsideringthattheamountoftrainingdata
+whereusershavelimitedbudgets,annotators,and
+ismuchsmallerthanthesizeofevaluationsamples.
+data for annotation. Specifically, we experiment
+withthefollowingtwosettings:
+4.2 SimulationExperiment: EvaluationSetup
+1)Foreveryiteration,select3examplespercat-
+Basedonthefindingsfromthepreliminaryexper- egory(9intotal)with20iterations,whichresults
+iment, we decide to use 3,000 examples per cat- in180examplesaltogether;
+egory (9,000 in total) as the candidate unlabeled 2)Foreveryiteration,select10examplespercat-
+datapoolfortheActiveLearningsimulation. egory(30intotal)with15iterations,whichresults
+Inspired by the few-shot evaluation guid- in450examplesaltogether.
+ance (Bragg et al., 2021), we conduct 80 trials OurALsimulationexperimentinvolvesourdata
+foreachALsettingandcalculatetheaveragedper- selector, two baselines, and an additional model
+probability-based selector. Our data selector, de- Yes/NoCount Label Exp. Exp.→Label TrustworthyAI
+scribed in Section 3.2, is a novel data diversity- Ground-truth 83/7 86/4 87/3 78/12
+Dual-model(ours) 64/26 68/22 48/42 35/55
+based sampling strategy that leverages human- Self-rationalization 42/48 67/23 51/39 21/69
+annotatedexplanations. Forcomparison,weusea
+Table2: Humanevaluationresults.
+randomdataselectorasthebasicbenchmarkand
+anothertraditionaldatadiversity-basedalgorithm
+a SoTA few-shot explanation-generation system,
+thatsharesthesameprocedureswithours,except
+theself-rationalizationbaseline(Marasovicetal.,
+thatitonlycomparesthesimilaritybetweeneach
+2022), andthehumanground-truth, werecruited
+unlabeleddata’scontentandthepreviously-labeled
+threehumanparticipantstoconductahumaneval-
+data’scontent,notusingthehuman-annotatedex-
+uation following the prior literature (Xu et al.,
+planations. The probability-based selector con-
+2022). The self-rationalization baseline is a T5-
+ductsinferenceonunlabeleddataandselectsexam-
+basemodel,whichusesthesameinputtemplateof
+pleswiththeleastprobabilityateveryiteration. We
+ourexplanation-generationmodelshowninTable1
+fixthesamesetofhyperparameters(AppendixC).
+butasksthemodeltogenerateboththelabeland
+Worthnotingthatourdataselectordoesnotuse
+explanationsimultaneously.
+task content in previously labeled examples; in-
+We leverage AL setting 1 described in Sec-
+stead,weexclusivelyrelyonhuman-annotatedex-
+tion 4.2 to fine-tune our system with a total of
+planationstodemonstratetheirgreaterutilitycom-
+180 examples over 20 epochs and use the same
+paredtotaskcontent. Inthefirstiteration,bothours
+180examplestofine-tunetheself-rationalization
+andthedatadiversitybaselineperformidentically
+baseline. Bothsystemsareusedtoinferthecom-
+becausenopreviouslyannotateddataisavailable.
+pletetestsplitofe-SNLIafterfine-tuning;then,we
+4.3 SimulationExperiment: Result randomlysample80examplesforthehumanstudy.
+Foreachdatainstance,theraterispresentedwith
+The AL simulation results are presented in Fig-
+the textual content of the premise and hypothesis
+ure3. Toexplainthediagramsindetail,eachdotis
+oftheoriginaldatapairedwiththreesetsoflabels
+theaverageaccuracyon80trialsateveryiteration
+foreachdataselector. Thegreen/yellow/red/blue andexplanationsfromoursystem,baselinesystem,
+dotsdenoteourdataselector/datadiversity-based andthehuman-annotatedground-truthfromthee-
+baseline/randomselector/modelprobability-based SNLI dataset. Participants who are not aware of
+thesourceofeachlabel-explanationpairareasked
+selector, respectively. We observe that our data
+toanswerfourquestionswith[Yes/No]:
+selectorconsistentlymaintainsanadvantageover
+thetraditionaldata-basedsamplingbaseline,while 1)IsthePredictioncorrect?
+the traditional one consistently beats the random 2)IstheExplanationitselfacorrectstatement?
+baselinebyasignificantmargin. Additionally,we 3)RegardlessofwhethertheAIPredictionandExplanation
+observethatthemodelprobability-basedselector iscorrectornot,cantheExplanationhelpyoutounderstand
+outperformstherandombaselineinbothsettings. whyAIhassuchPrediction?
+To summarize, our data selector outperforms 4) Will you trust & use this AI in real-world decision-
+both baselines in every iteration for both AL set- making?
+Toensureinter-coderconsistency,wefirstcon-
+tings,indicatingthatusinghuman-annotatedex-
+ducta30-mintutorialsessiontoeducateallthree
+planations in the data selector with our dual-
+participants with ten examples to build a consen-
+model AL framework is more beneficial than
+sus among them. In the actual experiment, each
+using the data content alone. Even with only
+of the three participants is then asked to rate 30
+180 and 450 data to be annotated in each setting,
+datainstances(20uniqueonesand10sharedones),
+oursystemcanachieve55%and72%accuracyon
+whichmakeupatotalof70datainstances,and360
+average,respectively. Weanticipatethatourexper-
+ratings(3rater*30instances*4questions). Wefirst
+imentwillreachasimilarperformancearound85%
+calculated the Inter-Rater Reliability score (IRR)
+asshowninFigure2butconvergemuchfasterthan
+amongthemforeachofthefourquestions. With
+therandomselectorifwecontinuetheALprocess.
+theIRRscoreof(Q1: 1,Q2: 0.89,Q3: 0.98,Q4:
+4.4 HumanEvaluationSetupandResults 0.87),weareconfidentthatthethreecodershave
+Toqualitativelyevaluatetheexplainabilityofthe thesamecriteriaforfurtherresultanalysis.
+generated explanations from our system against Ourquestionsallhavebinaryresponses,andwe
+relyonChi-squareanalysis(ElliottandWoodward,
+2007)toexaminethestatisticalsignificanceofthe
+ratinggroups’differences. AsshowninTable2,the
+participantsratedhumanground-truthexplanations
+highest across all four dimensions. Between our
+systemandthefew-shotself-rationalizationsystem
+(baseline), participants believe our systems’ pre-
+dictedlabelsaremorelikelytobecorrect,with64
+‘valid’ ratings out of 90 for our system versus 42
+outof90ratingsforthebaseline. Chi-squaretest
+(a)Setting1:9examplesperiteration+20iterations
+indicatessuchadifferenceisstatisticallysignificant
+(χ2(1) = 21.61,p < 0.01).
+WhenaskedwhethertheywouldtrusttheAIif
+thereweresuchAIsystemssupportingtheirreal-
+worlddecision-making,35outof90answered‘Yes’
+for our system, and it is significantly better than
+thebaselinesystem(21‘Yes’outof90)(χ2(1) =
+12.17,p < 0.01). In comparison, 78 out of 90
+timespeoplevotedthattheywouldtrustthehuman-
+annotatedexplanation’squality.
+(b)Setting2:30examplesperiteration+15iterations
+AsforQuestion2(“thevalidityofthegenerated
+explanation”)andQuestion3(“whetherthegener- Figure4: AblationstudyresultsofALsimulationex-
+atedexplanationissupportingitsprediction”),the perimentonourDual-modelsystemwithdifferentdata
+humanevaluationfailstosuggeststatisticallymean- selectorsonECQAdataset.
+ingfulresultsbetweenoursystemandthebaseline
+system (χ2(1) = 0.06,p = 0.89 for explanation ingALsimulation. Wefine-tunetheexplanation-
+validity, and χ2(1) = 0.41,p = 0.52 for explana- generation models on e-SNLI with the same two
+settingsinthepreviousexperiment,averagethere-
+tion supporting prediction). In summary, human
+sulton15trialsofexperiments,andkeepconsistent
+participantsbelieveoursystemcanoutperformthe
+witheveryotherhyper-parameters.
+baseline system on the label prediction’s quality
+TheablationresultsareshowninFigure6ofAp-
+and the trustworthiness of AI dimensions. Still,
+pendixB.Theblue/redlinesdenotetheexplanation-
+thereisalargespacetoimproveashumanevalua-
+generationmodelisfine-tunedone-SNLIwitheach
+torsbelievetheground-truthlabelandexplanation
+settinginSection4.2correspondingly. Weobserve
+qualityismuchbetterthaneitherAIsystem.
+thattheexplanation-generationmodelconsistently
+provided helpful explanations, leading to an im-
+4.5 AblationStudy1: TransfertoMulti-NLI
+provementinthesystem’spredictionperformance,
+Weconductanablationstudywithtransferlearn- with accuracy reaching more than 65%. In addi-
+ingthroughALsimulationfrome-SNLItoMulti- tion,theexplanation-generationmodelfine-tuned
+NLI (Williams et al., 2018). This study explores onmoredatacanperformbetter,suggestingthatit
+whethertheexplanation-generationmodeltrained hadlearnedtogeneratemorehelpfulexplanations.
+one-SNLIishelpfulforALonasimilartask.
+4.6 AblationStudy2: OurALFrameworkon
+Thetransfer-learningablationstudyconsistsof
+ECQA
+the following steps: 1) fine-tune an explanation-
+generationmodelusingourALframeworkonthee- WeadditionallyconductanALSimulationexperi-
+SNLIdataset;2)freezetheexplanation-generation mentonECQA(Aggarwaletal.,2021)(arecent
+modelanduseittogenerateexplanationsintheAL datasetextendstheCommonsenseQAdatasetwith
+simulationforMulti-NLI;3)fine-tunethepredic- high-qualityhuman-annotatedexplanations)with
+tionmodelforMulti-NLIateveryiteration. Unlike ourdataselector,randombaseline,andsimilarity-
+thee-SNLIexperiment,ourALdataselectionalgo- basedbaselinethatdoesnotuseexplanations. We
+rithmwillusemodel-generatedexplanationstose- complywiththesameexperimentsettingsforthee-
+lectexamplesateveryiterationinthetransferlearn- SNLIALsimulationsdescribedinSection4.2. The
+one-SNLIandECQAdatasetstoexplorewhether
+wecanfurtherreducehumanannotationefforts.
+The results are presented in Figure 5, where a
+horizontal dotted line represents the benchmark
+of the explanation generation model fine-tuned
+on human-annotated explanations in Section 4.3
+and4.6. TheLLM-ALframeworksignificantlyout-
+performstheexplanationgenerationmodelguided
+byhumanannotationinbothActiveLearningset-
+(a)e-SNLIDataset tings. However, we hypothesize the LLM’s ex-
+planationgenerationcapabilitycanvaryfrom
+tasktotask. Itmaybehighlyefficientinrelatively
+easy tasks, such as e-SNLI and ECQA datasets,
+bothofwhicharetrainingdatasetsforFLAN-T5.
+Yet,LLMsmaystruggletoprovidehelpfulexplana-
+tionsincomplexreal-worlddomain-specifictasks,
+wherehumanexperts’feedbackmaystillbeneces-
+saryandpreferred. Thisleadstoanotherpotential
+avenue for future work: exploring the capability
+(b)ECQADataset
+andlimitationsofleveragingLLMsforexplanation
+generationinreal-worldscenarios.
+Figure5: AblationstudyresultsofALsimulationex-
+perimentwithFLAN-T5-XLforexplanation(exp.) gen-
+erationinourDual-modelframeworkcomparedwith
+5 ConclusionandFutureWork
+besthuman-annotatedexplanationsone-SNLI(top)and
+ECQA(bottom)datasets.
+In summary, this paper introduces a novel dual-
+resultsareshowninFigure4,whereourproposed model AL system designed to address the com-
+dataselectionstrategycanconsistentlyoutperform monreal-worldneedfordomainexpertstoprovide
+bothbaselinesinbothsimulationsettings. Interest- bothclassificationlabelsandnaturallanguageex-
+ingly,thesimilarity-basedbaselineperformssim- planations. Oursystemcomprisesapurpose-built
+ilarly to the random baseline, which could be be- datadiversity-basedALexampleselectorandtwo
+causeusingdatacontentaloneisnotsufficientto sequence-to-sequence language models, one for
+select more helpful and representative examples explanationgenerationandtheotherforlabelpre-
+whileusinghuman-annotatedexplanationscanfa- diction. ThroughanALsimulationevaluationand
+cilitatebetterdataselectionconsistently. ahumanassessmentofthee-SNLIdataset,ourre-
+sultsdemonstratetheeffectivenessofexplanations
+4.7 AblationStudy3: LLMforExplanation inALsamplingwithoursystem. Theyconsistently
+Generation outperform both baselines, and the explanations
+The recent prevalence of instructional-finetuned generatedbyoursystemarepreferredoverastate-
+large language models (LLMs) (Wei et al., 2021; of-the-artexplanation-generationsystem.
+Chowdheryetal.,2022;Ouyangetal.,2022)with Our work lays a step-stone towards a human-
+exceptionalgenerationcapabilitiesoff-the-shelfen- centered interactive AI solution (it can be easily
+abledastraightforwardideauponourdual-model implementedasaninteractivesystemasillustrated
+framework: can LLMs generate natural lan- inFig7inAppendixD)thatsupportsdomainex-
+guage explanations that are on par or even perts for their data annotation tasks. Many real-
+of higher quality than human-annotated ones, worldtasksstillrequiredomainexpertstoreview
+to facilitate the prediction model fine-tuning pro- andannotateeachdatainstancewithadecisionand
+cess? Weconductablationexperimentstoleverage anexplanationforaccountabilitypurposes(e.g.,a
+FLAN-T5-XL(Chungetal.,2022)forexplanation lawyer reviewing and signing off on a legal doc-
+generation in our framework to substitute the T5 ument). We invite fellow researchers to join us
+model fine-tuned on human explanations (LLM- inadvancingthisresearchdirection,essentialfor
+AL,hereinafter). WeconducttheALsimulations supportingthisprevalentreal-worldrequirement.
+6 Limitations Oana-Maria Camburu, Tim Rocktäschel, Thomas
+Lukasiewicz,andPhilBlunsom.2018. e-SNLI:Nat-
+In this paper, we demonstrate the effectiveness urallanguageinferencewithnaturallanguageexpla-
+of our framework on a representative large-scale nations. AdvancesinNeuralInformationProcessing
+Systems,31.
+classificationdataset(e-SNLI),buttherearemany
+otherNLPtasks,suchasquestionansweringand
+Samuel Carton, Anirudh Rathore, and Chenhao Tan.
+commonsense reasoning. The generalizability of 2020. Evaluating and characterizing human ratio-
+oursystemonotherNLPtasksremainsunexplored. nales. In Proceedings of the 2020 Conference on
+EmpiricalMethodsinNaturalLanguageProcessing
+Anotherlimitationisthatthisworkproposedadata
+(EMNLP),pages9294–9307,Online.Associationfor
+diversity-basedALselectordesign. Webenchmark
+ComputationalLinguistics.
+itwithatraditionaldatadiversity-basedselectoras
+wellasamodelprobability-baseddesigntodemon- HanxiongChen,XuChen,ShaoyunShi,andYongfeng
+Zhang. 2021. Generate natural language ex-
+stratetheusefulnessofexplanations. Priorlitera-
+planations for recommendation. arXiv preprint
+turehasproposedotherdesigns,suchasensemble
+arXiv:2101.03392.
+approaches,whicharenotevaluatedinthispaper.
+HowardChen,JacquelineHe,KarthikNarasimhan,and
+Acknowledgements DanqiChen.2022. Canrationalizationimprovero-
+bustness? InProceedingsofthe2022Conferenceof
+ThisworkwassupportedbytheRensselaer-IBM theNorthAmericanChapteroftheAssociationfor
+AI Research Collaboration (http://airc.rpi.edu), ComputationalLinguistics: HumanLanguageTech-
+nologies, pages 3792–3805, Seattle, United States.
+which is part of the IBM AI Horizons Network
+AssociationforComputationalLinguistics.
+(http://ibm.biz/AIHorizons).
+MichaelChmielewskiandSarahCKucker.2020. An
+mturkcrisis? shiftsindataqualityandtheimpacton
+References studyresults. SocialPsychologicalandPersonality
+Science,11(4):464–473.
+Shourya Aggarwal, Divyanshu Mandowara, Vishwa-
+jeetAgrawal,DineshKhandelwal,ParagSingla,and AakankshaChowdhery,SharanNarang,JacobDevlin,
+Dinesh Garg. 2021. Explanations for Common- Maarten Bosma, Gaurav Mishra, Adam Roberts,
+senseQA:NewDatasetandModels. InProceedings Paul Barham, Hyung Won Chung, Charles Sutton,
+of the 59th Annual Meeting of the Association for Sebastian Gehrmann, et al. 2022. Palm: Scaling
+ComputationalLinguisticsandthe11thInternational language modeling with pathways. arXiv preprint
+JointConferenceonNaturalLanguageProcessing arXiv:2204.02311.
+(Volume1: LongPapers),pages3050–3065,Online.
+Hyung Won Chung, Le Hou, Shayne Longpre, Bar-
+AssociationforComputationalLinguistics.
+ret Zoph, Yi Tay, William Fedus, Eric Li, Xuezhi
+JordanTAsh,ChichengZhang,AkshayKrishnamurthy, Wang,MostafaDehghani,SiddharthaBrahma,etal.
+John Langford, and Alekh Agarwal. 2019. Deep 2022. Scalinginstruction-finetunedlanguagemodels.
+batchactivelearningbydiverse,uncertaingradient arXivpreprintarXiv:2210.11416.
+lowerbounds. arXivpreprintarXiv:1906.03671.
+BhavanaDalvi,OyvindTafjord,andPeterClark.2022.
+MeghanaMoorthyBhat,AlessandroSordoni,andSub- Towardsteachablereasoningsystems. arXivpreprint
+habrataMukherjee.2021. Self-trainingwithfew-shot arXiv:2204.13074.
+rationalization. InProceedingsofthe2021Confer-
+enceonEmpiricalMethodsinNaturalLanguagePro- Jacob Devlin, Ming-Wei Chang, Kenton Lee, and
+cessing,pages10702–10712,OnlineandPuntaCana, Kristina Toutanova. 2019. BERT: Pre-training of
+DominicanRepublic.AssociationforComputational deepbidirectionaltransformersforlanguageunder-
+Linguistics. standing. InProceedingsofthe2019Conferenceof
+theNorthAmericanChapteroftheAssociationfor
+SamuelR.Bowman,GaborAngeli,ChristopherPotts, ComputationalLinguistics: HumanLanguageTech-
+and Christopher D. Manning. 2015. A large anno- nologies,Volume1(LongandShortPapers),pages
+tatedcorpusforlearningnaturallanguageinference. 4171–4186,Minneapolis,Minnesota.Associationfor
+In Proceedings of the 2015 Conference on Empiri- ComputationalLinguistics.
+calMethodsinNaturalLanguageProcessing,pages
+632–642,Lisbon,Portugal.AssociationforCompu- Jaimie Drozdal, Justin Weisz, Dakuo Wang, Gaurav
+tationalLinguistics. Dass, Bingsheng Yao, Changruo Zhao, Michael
+Muller,LinJu,andHuiSu.2020. Trustinautoml:
+JonathanBragg,ArmanCohan,KyleLo,andIzBeltagy. exploringinformationneedsforestablishingtrustin
+2021. Flex: Unifying evaluation for few-shot nlp. automatedmachinelearningsystems. InProceedings
+AdvancesinNeuralInformationProcessingSystems, of the 25th international conference on intelligent
+34:15787–15800. userinterfaces,pages297–307.
+Nan Duan, Duyu Tang, Peng Chen, and Ming Zhou. fornaturallanguagegeneration,translation,andcom-
+2017. Questiongenerationforquestionanswering. prehension. InProceedingsofthe58thAnnualMeet-
+In Proceedings of the 2017 Conference on Empiri- ingoftheAssociationforComputationalLinguistics,
+calMethodsinNaturalLanguageProcessing,pages pages7871–7880,Online.AssociationforComputa-
+866–874, Copenhagen, Denmark. Association for tionalLinguistics.
+ComputationalLinguistics.
+ZacharyCLipton.2018. Themythosofmodelinter-
+AlanCElliottandWayneAWoodward.2007. Statisti- pretability: Inmachinelearning, theconceptofin-
+calanalysisquickreferenceguidebook: WithSPSS terpretabilityisbothimportantandslippery. Queue,
+examples. Sage. 16(3):31–57.
+YifanFu,XingquanZhu,andBinLi.2013. Asurvey JiachengLiu,AlisaLiu,XimingLu,SeanWelleck,Pe-
+oninstanceselectionforactivelearning. Knowledge terWest,RonanLeBras,YejinChoi,andHannaneh
+andinformationsystems,35:249–283. Hajishirzi.2022. Generatedknowledgeprompting
+forcommonsensereasoning. InProceedingsofthe
+Tianyu Gao, Adam Fisch, and Danqi Chen. 2021.
+60thAnnualMeetingoftheAssociationforCompu-
+Makingpre-trainedlanguagemodelsbetterfew-shot
+tationalLinguistics(Volume1: LongPapers),pages
+learners. In Proceedings of the 59th Annual Meet-
+3154–3169,Dublin,Ireland.AssociationforCompu-
+ingoftheAssociationforComputationalLinguistics
+tationalLinguistics.
+andthe11thInternationalJointConferenceonNatu-
+ralLanguageProcessing(Volume1: LongPapers),
+ScottMLundbergandSu-InLee.2017. Aunifiedap-
+pages3816–3830,Online.AssociationforComputa-
+proachtointerpretingmodelpredictions. Advances
+tionalLinguistics.
+inneuralinformationprocessingsystems,30.
+MorGeva,YoavGoldberg,andJonathanBerant.2019.
+AnaMarasovic,IzBeltagy,DougDowney,andMatthew
+Arewemodelingthetaskortheannotator? aninves-
+Peters.2022. Few-shotself-rationalizationwithnat-
+tigationofannotatorbiasinnaturallanguageunder-
+urallanguageprompts. InFindingsoftheAssocia-
+standingdatasets. arXivpreprintarXiv:1908.07898.
+tion for Computational Linguistics: NAACL 2022,
+pages410–424,Seattle,UnitedStates.Association
+Peter Hase and Mohit Bansal. 2022. When can mod-
+forComputationalLinguistics.
+els learn from explanations? a formal framework
+forunderstandingtherolesofexplanationdata. In
+Sharan Narang, Colin Raffel, Katherine Lee, Adam
+ProceedingsoftheFirstWorkshoponLearningwith
+Roberts,NoahFiedel,andKarishmaMalkan.2020.
+NaturalLanguageSupervision,pages29–39,Dublin,
+Wt5?! training text-to-text models to explain their
+Ireland.AssociationforComputationalLinguistics.
+predictions. arXivpreprintarXiv:2004.14546.
+JungoKasai,KunQian,SairamGurajada,YunyaoLi,
+Hieu T Nguyen and Arnold Smeulders. 2004. Ac-
+and Lucian Popa. 2019. Low-resource deep entity
+tive learning using pre-clustering. In Proceedings
+resolutionwithtransferandactivelearning. InPro-
+of the twenty-first international conference on Ma-
+ceedings of the 57th Annual Meeting of the Asso-
+chinelearning,page79.
+ciationforComputationalLinguistics,pages5851–
+5861,Florence,Italy.AssociationforComputational
+Fredrik Olsson. 2009. A literature survey of active
+Linguistics.
+machinelearninginthecontextofnaturallanguage
+processing.
+TomášKocˇiský,JonathanSchwarz,PhilBlunsom,Chris
+Dyer,KarlMoritzHermann,GáborMelis,andEd-
+LongOuyang,JeffreyWu,XuJiang,DiogoAlmeida,
+wardGrefenstette.2018. TheNarrativeQAreading
+CarrollWainwright,PamelaMishkin,ChongZhang,
+comprehensionchallenge. TransactionsoftheAsso-
+SandhiniAgarwal,KatarinaSlama,AlexRay,etal.
+ciationforComputationalLinguistics,6:317–328.
+2022. Traininglanguagemodelstofollowinstruc-
+SawanKumarandParthaTalukdar.2020. NILE:Natu- tions with human feedback. Advances in Neural
+rallanguageinferencewithfaithfulnaturallanguage InformationProcessingSystems,35:27730–27744.
+explanations. In Proceedings of the 58th Annual
+Meeting of the Association for Computational Lin- Bhargavi Paranjape, Julian Michael, Marjan
+guistics,pages8730–8742,Online.Associationfor Ghazvininejad, Hannaneh Hajishirzi, and Luke
+ComputationalLinguistics. Zettlemoyer.2021. Promptingcontrastiveexplana-
+tionsforcommonsensereasoningtasks. InFindings
+VeronicaLatcinnikandJonathanBerant.2020. Explain- of the Association for Computational Linguistics:
+ingquestionansweringmodelsthroughtextgenera- ACL-IJCNLP 2021, pages 4179–4192, Online.
+tion. arXivpreprintarXiv:2004.05569. AssociationforComputationalLinguistics.
+Mike Lewis, Yinhan Liu, Naman Goyal, Marjan AlecRadford,JeffreyWu,RewonChild,DavidLuan,
+Ghazvininejad,AbdelrahmanMohamed,OmerLevy, DarioAmodei,IlyaSutskever,etal.2019. Language
+Veselin Stoyanov, and Luke Zettlemoyer. 2020. modelsareunsupervisedmultitasklearners. OpenAI
+BART:Denoisingsequence-to-sequencepre-training blog,1(8):9.
+ColinRaffel,NoamShazeer,AdamRoberts,Katherine ManaliSharma,DiZhuang,andMustafaBilgic.2015.
+Lee,SharanNarang,MichaelMatena,YanqiZhou, Activelearningwithrationalesfortextclassification.
+WeiLi,PeterJLiu,etal.2020. Exploringthelimits InProceedingsofthe2015ConferenceoftheNorth
+oftransferlearningwithaunifiedtext-to-texttrans- AmericanChapteroftheAssociationforComputa-
+former. J.Mach.Learn.Res.,21(140):1–67. tionalLinguistics: HumanLanguageTechnologies,
+pages441–451,Denver,Colorado.Associationfor
+DheerajRajagopal,VidhishaBalachandran,EduardH ComputationalLinguistics.
+Hovy,andYuliaTsvetkov.2021. SELFEXPLAIN:A
+self-explainingarchitectureforneuraltextclassifiers. YanyaoShen,HyokunYun,ZacharyLipton,YakovKro-
+InProceedingsofthe2021ConferenceonEmpirical nrod, and Animashree Anandkumar. 2017. Deep
+MethodsinNaturalLanguageProcessing,pages836– active learning for named entity recognition. In
+850, OnlineandPuntaCana, DominicanRepublic. Proceedings of the 2nd Workshop on Representa-
+AssociationforComputationalLinguistics. tionLearningforNLP,pages252–256,Vancouver,
+Canada.AssociationforComputationalLinguistics.
+Nazneen Fatema Rajani, Bryan McCann, Caiming
+Xiong, and Richard Socher. 2019. Explain your- Jiao Sun, Swabha Swayamdipta, Jonathan May, and
+self! leveraginglanguagemodelsforcommonsense XuezheMa.2022. Investigatingthebenefitsoffree-
+reasoning. InProceedingsofthe57thAnnualMeet- formrationales. arXivpreprintarXiv:2206.11083.
+ingoftheAssociationforComputationalLinguistics,
+pages 4932–4942, Florence, Italy. Association for OyvindTafjord,BhavanaDalvi,andPeterClark.2021.
+ComputationalLinguistics. ProofWriter: Generating implications, proofs, and
+abductivestatementsovernaturallanguage. InFind-
+PranavRajpurkar,JianZhang,KonstantinLopyrev,and ingsoftheAssociationforComputationalLinguis-
+PercyLiang.2016. SQuAD:100,000+questionsfor tics: ACL-IJCNLP2021,pages3621–3634,Online.
+machinecomprehensionoftext. InProceedingsof AssociationforComputationalLinguistics.
+the2016ConferenceonEmpiricalMethodsinNatu-
+ralLanguageProcessing,pages2383–2392,Austin, Alon Talmor, Jonathan Herzig, Nicholas Lourie, and
+Texas.AssociationforComputationalLinguistics. JonathanBerant.2019. CommonsenseQA:Aques-
+tion answering challenge targeting commonsense
+NilsReimersandIrynaGurevych.2019. Sentence-bert: knowledge. InProceedingsofthe2019Conference
+Sentenceembeddingsusingsiamesebert-networks. oftheNorthAmericanChapteroftheAssociationfor
+InProceedingsofthe2019ConferenceonEmpirical ComputationalLinguistics: HumanLanguageTech-
+MethodsinNaturalLanguageProcessing.Associa- nologies,Volume1(LongandShortPapers),pages
+tionforComputationalLinguistics. 4149–4158,Minneapolis,Minnesota.Associationfor
+ComputationalLinguistics.
+Pengzhen Ren, Yun Xiao, Xiaojun Chang, Po-Yao
+Huang,ZhihuiLi,BrijBGupta,XiaojiangChen,and AlonTalmor,OyvindTafjord,PeterClark,YoavGold-
+XinWang.2021. Asurveyofdeepactivelearning. berg,andJonathanBerant.2020. Leap-of-thought:
+ACMcomputingsurveys(CSUR),54(9):1–40. Teaching pre-trained models to systematically rea-
+son over implicit knowledge. Advances in Neural
+Marco Tulio Ribeiro, Sameer Singh, and Carlos InformationProcessingSystems,33:20227–20237.
+Guestrin.2016. "whyshoulditrustyou?"explaining
+thepredictionsofanyclassifier. InProceedingsof Stefano Teso and Kristian Kersting. 2019. Explana-
+the22ndACMSIGKDDinternationalconferenceon toryinteractivemachinelearning. InProceedingsof
+knowledgediscoveryanddatamining,pages1135– the2019AAAI/ACMConferenceonAI,Ethics,and
+1144. Society,pages239–245.
+Timo Schick and Hinrich Schütze. 2021. Exploiting Alex Wang, Amanpreet Singh, Julian Michael, Felix
+cloze-questionsforfew-shottextclassificationand Hill,OmerLevy,andSamuelBowman.2018. GLUE:
+natural language inference. In Proceedings of the Amulti-taskbenchmarkandanalysisplatformfornat-
+16thConferenceoftheEuropeanChapteroftheAsso- urallanguageunderstanding. InProceedingsofthe
+ciationforComputationalLinguistics: MainVolume, 2018 EMNLP Workshop BlackboxNLP: Analyzing
+pages 255–269, Online. Association for Computa- and Interpreting Neural Networks for NLP, pages
+tionalLinguistics. 353–355,Brussels,Belgium.AssociationforCom-
+putationalLinguistics.
+Christopher Schröder and Andreas Niekler. 2020.
+A survey of active learning for text classifica- Jason Wei, Maarten Bosma, Vincent Y Zhao, Kelvin
+tion using deep neural networks. arXiv preprint Guu, Adams Wei Yu, Brian Lester, Nan Du, An-
+arXiv:2008.07267. drewMDai,andQuocVLe.2021. Finetunedlan-
+guagemodelsarezero-shotlearners. arXivpreprint
+Ozan Sener and Silvio Savarese. 2017. Active learn- arXiv:2109.01652.
+ing for convolutional neural networks: A core-set
+approach. arXivpreprintarXiv:1708.00489. SarahWiegreffeandAnaMarasovic.2021. Teachmeto
+explain: Areviewofdatasetsforexplainablenatural
+BurrSettles.2009. Activelearningliteraturesurvey. languageprocessing. InThirty-fifthConferenceon
+NeuralInformationProcessingSystemsDatasetsand Eric Zelikman, Jesse Mu, Noah D Goodman, and
+BenchmarksTrack(Round1). YuhuaiTonyWu.2022. Star: Self-taughtreasoner
+bootstrappingreasoningwithreasoning.
+SarahWiegreffe,AnaMarasovic´,andNoahA.Smith.
+2021. Measuring association between labels and ShaoZhang,JianingYu,XuhaiXu,ChangchangYin,
+free-textrationales. InProceedingsofthe2021Con- YuxuanLu,BingshengYao,MelanieTory,LaceM
+ferenceonEmpiricalMethodsinNaturalLanguage Padilla,JeffreyCaterino,PingZhang,etal.2023. Re-
+Processing,pages10266–10284,OnlineandPunta thinkinghuman-aicollaborationincomplexmedical
+Cana,DominicanRepublic.AssociationforCompu- decisionmaking: Acasestudyinsepsisdiagnosis.
+tationalLinguistics. arXivpreprintarXiv:2309.12368.
+AdinaWilliams,NikitaNangia,andSamuelBowman. Shujian Zhang, Chengyue Gong, Xingchao Liu,
+2018. A broad-coverage challenge corpus for sen- PengchengHe,WeizhuChen,andMingyuanZhou.
+tenceunderstandingthroughinference. InProceed- 2022. ALLSH:Activelearningguidedbylocalsen-
+ingsofthe2018ConferenceoftheNorthAmerican sitivityandhardness. InFindingsoftheAssociation
+Chapter of the Association for Computational Lin- forComputationalLinguistics: NAACL2022,pages
+guistics: Human Language Technologies, Volume 1328–1342, Seattle, United States. Association for
+1 (Long Papers), pages 1112–1122, New Orleans, ComputationalLinguistics.
+Louisiana.AssociationforComputationalLinguis-
+tics. ZhanZhang,YeginGenc,DakuoWang,MehmetEren
+Ahsen, and Xiangmin Fan. 2021. Effect of ai ex-
+GentaIndraWinata,AndreaMadotto,ZhaojiangLin, planations on human perceptions of patient-facing
+RosanneLiu,JasonYosinski,andPascaleFung.2021. ai-poweredhealthcaresystems. JournalofMedical
+Languagemodelsarefew-shotmultilinguallearners. Systems,45(6):64.
+InProceedingsofthe1stWorkshoponMultilingual
+Representation Learning, pages 1–15, Punta Cana, Yangqiaoyu Zhou, Yiming Zhang, and Chenhao Tan.
+DominicanRepublic.AssociationforComputational 2023. FLamE:Few-shotlearningfromnaturallan-
+Linguistics. guageexplanations. InProceedingsofthe61stAn-
+nualMeetingoftheAssociationforComputational
+YingXu,DakuoWang,MoYu,DanielRitchie,Bing-
+Linguistics (Volume 1: Long Papers), pages 6743–
+shengYao,TongshuangWu,ZhengZhang,TobyJia-
+6763, Toronto, Canada. Association for Computa-
+JunLi,NoraBradford,BrandaSun,etal.2022. Fan-
+tionalLinguistics.
+tasticquestionsandwheretofindthem: Fairytaleqa–
+an authentic dataset for narrative comprehension.
+ACL’22.
+ZhaoXu,KaiYu,VolkerTresp,XiaoweiXu,andJizhi
+Wang.2003. Representativesamplingfortextclassi-
+ficationusingsupportvectormachines. InEuropean
+conferenceoninformationretrieval,pages393–407.
+Springer.
+Bingsheng Yao, Prithviraj Sen, Lucian Popa, James
+Hendler, and Dakuo Wang. 2023. Are human ex-
+planationsalwayshelpful? towardsobjectiveevalua-
+tionofhumannaturallanguageexplanations. arXiv
+preprintarXiv:2305.03117.
+BingshengYao,DakuoWang,TongshuangWu,Zheng
+Zhang, Toby Li, Mo Yu, and Ying Xu. 2022. It
+is AI’s turn to ask humans a question: Question-
+answer pair generation for children’s story books.
+In Proceedings of the 60th Annual Meeting of the
+AssociationforComputationalLinguistics(Volume
+1: Long Papers), pages 731–744, Dublin, Ireland.
+AssociationforComputationalLinguistics.
+MoYu,ShiyuChang,YangZhang,andTommiJaakkola.
+2019. Rethinking cooperative rationalization: In-
+trospective extraction and complement control. In
+Proceedings of the 2019 Conference on Empirical
+Methods in Natural Language Processing and the
+9thInternationalJointConferenceonNaturalLan-
+guageProcessing(EMNLP-IJCNLP),pages4094–
+4103,HongKong,China.AssociationforComputa-
+tionalLinguistics.
+Appendix
+A e-SNLIExamples
+Table3illustratesanexampledataofeachcategory
+in the e-SNLI dataset. Every data instance con-
+tainsapremiseandhypothesisalongwithahuman
+annotatedlabelandfree-formexplanation.
+Premise: Thischurchchoirsingstothemassesasthey
+singjoyoussongsfromthebookatachurch.
+(a) Active Learning on Mulit-NLI using explanation-
+Hypothesis: Thechurchisfilledwithsong.
+generationmodelfrome-SNLIwithSetting1
+Label: entailment
+Human-annotatedexplanation: “Filledwithsong”is
+arephrasingofthe"choirsingstothemasses.
+Premise: Amanplayinganelectricguitaronstage.
+Hypothesis: Amanisperformingforcash.
+Label: neutral
+Human-annotatedexplanation: Itisunknownifthe
+manisperformingforcash.
+Premise: Acouplewalkhandinhanddownastreet.
+Hypothesis: Acoupleissittingonabench.
+Label: contradiction
+Human-annotatedexplanation: Thecouplecannotbe
+walkingandsittingathesametime. (b) Active Learning on Mulit-NLI using explanation-
+generationmodelfrome-SNLIwithSetting2
+Table3: Sampledataofeachcategoryine-SNLI(Cam-
+Figure6: ResultsofTransferLearningAblationStudy
+buruetal.,2018)dataset.
+ofALSimulationexperimentonourDual-modelsystem
+B TransferLearningAblationStudy from e-SNLI to Multi-NLI. Setting 1/2 refers to the
+Diagrams settingsforActiveLearningSimulationinSection4.2.
+Figure 6 shows the results of our Ablation Study of hyper-parameters is: batch_size_per_GPU =
+resultsdescribedinSection4.5. Theexplanation- 2;learning_rate = 1e−4;input_max_length =
+generationmodelisfine-tunedfromALone-SNLI 512;target_max_length = 64
+dataset with two different AL settings, then we We conduct a hyper-parameter search for the
+freeze the explanation-generation model to train numberoffine-tuningepochsforeachamountof
+the prediction model in AL simulation for Multi- sampledexamples,detailsareshowninTable4.
+NLIdatasetundertwosettings. Setting1/2refers
+to the settings for Active Learning Simulation in #oftraindata
+epochforM epochforM
+Section4.2.
+percategory/total RG P
+10/30 25 100
+C SystemEnvironmentand 50/150 25 250
+Hyper-Parameters 100/300 10 250
+500/1500 5 50
+Thecomputingresourceofalltheexperimentswe 1500/4500 5 50
+3000/9000 5 25
+conductedinthispaperhas128GigabytesofRAM.
+5000/15000 5 25
+Inaddition,weuse2NVIDIATeslaV100GPUfor
+Full 1 1
+the preliminary experiment and 8 NVIDIA Tesla
+V100GPUfortheALsimulationexperiment. Table4: Fine-tuningepochsofeachmodelinourdual-
+modelsystemwithdifferentdataamountsettings.
+C.1 PreliminaryExperiment
+ForthePreliminaryexperimentdescribedinSec-
+C.2 ALSimulationExperiment
+tion 4.1, we leverage the same set of fine-
+tuning hyper-parameters other than the num- For both of the AL Simulation settings we ex-
+ber of fine-tuning epochs for the explanation- perimented in Section 4.2, we leverage the same
+generation model (denotes as M ) and the pre- set of hyper-parameters for fine-tuning our dual-
+EG
+diction model (denotes as M ). The same set model AL system: batch_size_per_GPU =
+P
+2;learning_rate = 1e−4;M _train_epoch =
+EG
+20,M _train_epoch = 250;input_max_length =
+P
+512;target_max_length = 64
+D ProposalforanInteractiveSystem
+Ourproposeddual-modelsystemcanbeeasilyim-
+plementedasaninteractivehuman-centeredAIsys-
+temforsupportingdomainexpertsandhumanan-
+notatorsinlabelingbothlabelsandexplanations.
+Figure7: Ourproposeddual-modelsystemcanbeim-
+plementedasaninteractiveAL-baseddataannotation
+systemtospeedupusers’annotationproductivity. Such
+asystemcansimplyhaveaninterfacewithfouroutput
+functions(i.e., displayunlabeleddata, displayALse-
+lecteddata,displaygenerated-explanation,anddisplay
+predictedlabeled)andoneinputfunction(i.e.,annotate
+labelandexplanationfortheunlabeleddata.

@@ -1,0 +1,1605 @@
+5202
+nuJ
+11
+]LC.sc[
+1v13201.6052:viXra
+Classifying Unreliable Narrators with Large Language Models
+AnnelieseBrei1* KatharineHenry1† AbhisheikSharma2∗
+ShashankSrivastava1∗ SnigdhaChaturvedi1∗
+1UNCChapelHill 2VirginiaPolytechnicInstituteandStateUniversity
+abrei@cs.unc.edu, katharinehenry@alumni.unc.edu, abhisharma@vt.edu,
+{ssrivastava, snigdha} @cs.unc.edu
+Abstract
+Oftenwhenweinteractwithafirst-personac-
+count of events, we consider whether or not
+the narrator, the primary speaker of the text,
+is reliable. In this paper, we propose using
+computationalmethodstoidentifyunreliable
+narrators, i.e. thosewhounintentionallymis-
+representinformation. Borrowingliterarythe-
+oryfromnarratologytodefinedifferenttypes
+ofunreliablenarratorsbasedonavarietyoftex-
+tualphenomena,wepresentTUNA,ahuman-
+annotateddatasetofnarrativesfrommultiple
+domains,includingblogposts,subredditposts,
+hotelreviews,andworksofliterature. Wede-
+Figure 1: Real-world text with first-person narrators,
+fine classification tasks for intra-narrational,
+suchasthenarrativeshown(left),canbeanalyzedto
+inter-narrational, and inter-textual unreliabil-
+determine the unreliability of the narrator. We sepa-
+ities and analyze the performance of popular
+ratelyclassifythreetypesofunreliability(right): intra-
+open-weight and proprietary LLMs for each.
+narrational,inter-narrational,andinter-textual.
+Weproposelearningfromliteraturetoperform
+unreliablenarratorclassificationonreal-world
+text data. To this end, we experiment with
+read, and your family differs on how reliable the
+few-shot, fine-tuning, and curriculum learn-
+candidateactuallyis. Foreachofthesesituations,
+ing settings. Our results show that this task
+isverychallenging, andthereispotentialfor it would be useful to have an automatic tool that
+using LLMs to identify unreliable narrators. identifiesunreliability.
+We release our expert-annotated dataset and Readersofpersonalaccounts,suchasreviews,
+code at https://github.com/adbrei/unreliable-
+onlinecomments,coverletters,andcollegeapplica-
+narratorsandinvitefutureresearchinthisarea.
+tionessays,oftenimplicitlyquestionthereliability
+ofthenarrator: CanItrusthowthisnarratorhas
+1 Introduction
+perceivedandisdescribingtheevent? Meanwhile,
+Imaginethatyouareonsocialmediawarningyour writers who wish to defend their points are con-
+friends about a recent shopping experience, and cernedabouthowtheytextualizetheirideas: AmI
+beforesubmittingthepost,youwonderifthepre- sharinginformationinareliableway? Answering
+sentation of your writing undermines your credi- suchquestionsiscriticalforthesafetransmission
+bility. Inanotherwindow,youarewritingacover ofinformation(Nünning,2015).
+letter. You recount a critical learning experience However,answeringthesequestionsisnotasim-
+fromyourpastjobandwonderifyourpresentvoice ple task. That is because unreliability cues are
+soundsreliabletothereader. Inthenextroom,your oftensubtleandcontext-dependent(Hansen,2007).
+familyisdiscussingthedebatetranscriptbetween Theymightbescatteredacrossthetextorinvolve
+politicalcandidates. Yoursisterthinksoneofthe adeeperunderstandingbeyondwhatisexplicitly
+candidates speaks like a villain from a novel she stated. Sometimesitisnecessarytodrawabstract
+inferencesabouttheemotionalandmentalstateof
+*DepartmentofComputerScience
+†DepartmentofEnglishandComparativeLiterature thenarrator. Also,atextmighthavemanyreaders,
+someofwhomfocusondifferentaspectsofthese not another. It is valuable to analyze narrators in
+cues. From a writer’s perspective, it is important thiswaybecauseitprovidesin-depthviewsofthe
+to pay attention to all of these cues to ensure the narratorfromlexicaltoabstractcontextuallevels.
+writingsoundsreliabletoallreaders. Determiningnarratorunreliabilityultimatelycon-
+Narratologyhasexploredthesequestionsbyat- sidersallthreeformssincetogethertheyprovidea
+temptingtodefinetheunreliablenarrator,afirst- morecompletepicture.
+person speaker who unintentionally describes
+Inthiswork,weborrowthesedefinitionsfrom
+situations misleadingly (Booth, 1961). Hansen
+narratologyandintroducethetaskofautomatically
+(2007)considersleadingdefinitionsandobserves
+identifyingthreeformsofunreliablenarrators. We
+“theunreliablenarratorisaconceptcoveringvery
+pose this problem as a set of binary/multi-class
+diversetextualphenomena”andaccordinglypro-
+classificationscorrespondingtothethreetypesof
+poses a taxonomy containing different forms of
+unreliability(shownintherightofFigure1). We
+unreliablenarratorswith“conceptualdistinction.”
+proposethattheseideasfromthetheoreticalfield
+These forms include intra-narrational, inter-
+ofnarratologycanbeusedmorebroadlytoidentify
+narrational,andinter-textualunreliability. Thefirst
+unreliabilityacrossdiversereal-worlddomains.
+form,intra-narrationalunreliabilityistheclassi-
+caldefinitionthatfocusesonthepresenceofverbal We observe that as of date there has been no
+tics(textualcuesthatindicateuncertainty). Theleft workonanalyzingnarratorunreliabilitywithauto-
+halfofFigure1showsanexample: anexcerptfrom maticmethods,andtherearenoavailableresources
+ablogpostwherethewriternarratesanexperience orlabeleddatasets. Hence,weintroduce TUNA,a
+withanotherperson,Dorian,atabar. Thetextin collectionofpersonalanecdotesfromblogposts,
+orangefontindicatescontentthatisnarratedinan subreddit posts, online reviews, and fiction. We
+intra-narrationallyunreliablemannerbecausethe hireexpertannotatorsobtaininghonorsundergrad-
+narratoradmitshavingtroublerememberingdetails uate or graduate degrees in English literature to
+duetobeinginebriated. Consequentlytheirnarra- annotatetheseaccountsforthethreeformsofunre-
+tionispossiblyunreliable. Thesecondform,inter- liabilitymentionedabove.
+narrationalunreliabilityoccurswhenasecondary
+To identify unreliable narrators automatically,
+voicepresentsacontrastingversionofevents. For
+weexploreusinglargelanguagemodels(LLMs).
+example, in Figure 1, highlighted in green, Do-
+We conduct experiments with 6 open and closed-
+riandoesnotagreewiththenarratorregardingthe
+sourceLLMsofavarietyofsizes. Wetryzero/few-
+whereaboutsofanotebook. Suchacontradiction
+shotsettings,fine-tuning,andcurriculumlearning
+indicatesthateitherthenarratororDorianmustbe
+(Bengio et al., 2009). With these methods, we
+wrong and raises reader’s doubts about the relia-
+attempttolearnfromlabeleddatafromfictionand
+bilityofthenarrator. Thethirdform,inter-textual
+generalizethisknowledgetoreal-worldtext. We
+unreliabilityinvolvespattern-matchingthenarrator
+observe that classifying unreliable narrators is a
+with established unreliable character tropes (Rig-
+very difficult task and encourage future research
+gan Jr, 1978). In Figure 1, highlighted in purple,
+tofurtherexploreitsnuancesandchallenges. Our
+the reader questions the narrator’s reliability be-
+contributionsareasfollows:
+causetheyseemcunningastheybribethebartender
+(fittingthetropeofpícaro). Moredetaileddefini- • Weintroducethetaskofautomaticallyidentify-
+tions of each type of unreliability are outlined in ingunreliablenarrators;
+Section3. • We borrow narratological definitions for unre-
+Identifyingthesethreeformsofunreliablenarra- liable narrator (i.e., we consider three diverse
+torsrequirespickinguponsubtlecuesthatrange andincreasinglyabstractforms: intra-narrational,
+from specific lexical choices (e.g., a direct state- inter-narrational,andinter-textual);
+mentsuchas“it’shardtoremember”)toincreas- • WeintroduceTUNA,anexpertannotateddataset
+inglyabstractinferences(e.g.,drawinginferences ofunreliablefirst-personaccountsspanningfour
+throughstatementsandactionsthatanarratorhas differenttextdomains;
+cunningandself-interest). Theseformsmaycon- • Weexperimentwithmultiplemethodsthatlearn
+tainoverlappingcharacteristics;however,theyare how to identify unreliable narrators in snippets
+classifiedanddeterminedseparately. Hence,anar- fromfictionandtransferthisknowledgetocom-
+ratormightbeunreliableinoneoftheseformsbut montextreadineverydaysituations.
+2 BackgroundandRelatedWork personnarratorsandconsideraspectsofnarrative
+believability. However,Booth(1961)drawsaclear
+Theterm“unreliablenarrator”isoriginallydefined distinctionbydeterminingthatconsciouslyingis
+byBooth(1961): “Forlackofbetterterms,Ihave notacharacteristicofunreliablenarrators;instead
+calledanarratorreliablewhenhespeaksfororacts unreliabilityis“amatterof[whatiscalled]incon-
+inaccordancewiththenormsofthework(which science; the narrator is mistaken, or he believes
+is to say, the implied author’s norms), unreliable himselftohavequalitieswhichtheauthordenies
+when he does not.” The vagueness of this defini- him.” WefollowBooth’sreasoninganddonotcon-
+tionhasencouragedmorerecentnarratologiststo sidernarratorswhodeliberatelyintendtomislead
+attempt to define the unreliable narrator in more readersbutonlythosewhosoundunreliable.
+certainterms(Cannings,2023;Jacke,2018;Heyd,
+2006;Olson,2003;Fludernik,2000;Currie,1995;
+3 DefinitionsofUnreliability
+RigganJr,1978). Culler(1997)states,“Narrators
+are sometimes termed unreliable when they pro-
+videenoughinformationaboutsituationsandclues In choosing our definitions of unreliability, we
+abouttheirownbiasestomakeusdoubttheirinter- make two assumptions. Firstly, given a text, we
+pretationsofevents...” Hansen(2007)buildsupon assumethatitcontainsexplicitorimplicitinforma-
+theworkofCullerandothersalientnarratologists tionthatcanbeleveragedtoascertainthenarrator’s
+toproposeataxonomywithdefinitionsofmultiple unreliability (Chatman, 1990). By explicit infor-
+aspectsofnarratorunreliability. Inthiswork,we mation, we refer to statements that directly state
+adoptthesedefinitionsandtaxonomy. thatanaccountmaybeunreliable(e.g.,thenarrator
+admits to being inebriated during the time of the
+Tothebestofourknowledge,thereiscurrently
+describedevents,asdemonstratedinthenarrative
+noexistingliteraturethatexploresautomatedap-
+inFigure1). Byimplicit information,wereferto
+proachesforidentifyingunreliablenarrators. We
+less direct details (e.g., patterns exhibited by the
+note recent efforts to automatically understand
+narratorthatresembleunreliablecharactertropes).
+otheraspectsofprotagonists,whoaresometimes
+Secondly,followingWall(1994),weassumeanar-
+depicted in first-person (Yuan et al., 2024; Jang
+ratorisreliableuntilthereadernoticesexplicitor
+andJung,2024;Brahmanetal.,2021;Huangetal.,
+implicitinformationindicatingunreliability.
+2021; Bamman et al., 2013). Additionally, some
+works attempt to analyze the emotions of protag- We borrow definitions from the taxonomy for
+onists (Brahman and Chaturvedi, 2020; Rahim- unreliablenarrationintroducedbyHansen(2007).
+toroghietal.,2017)ortheirrelationshipswithother Wenotethistaxonomy, proposedastheculmina-
+characters (Vijjini et al., 2022; Kim and Klinger, tionofabroadrangeofpriordefinitions,provides
+2019; Chaturvedi et al., 2017; Iyyer et al., 2016; adiversesetoftoolsforanalyzingnarratorsfrom
+Srivastavaetal.,2016). Suchworksindicatethat differentperspectivesandlevelsofdifficulty. We
+usingautomaticmethodsisareasonableapproach usethreeformsthatanalyzetraitswithincreasingly
+foraddressingourtask. abstractconceptionsofunreliability,asdescribed
+Classifying unreliable narrators is to a limited in the next three subsections. Examples for each
+extentrelatedtotaskssuchastheautomaticidentifi- oftheseunreliableformsfromthedifferenttextual
+cationofmisinformation(Saeidniaetal.,2025;Jar- domainsaregiveninAppendixA.
+rahiandSafari,2023)andrumors(Heetal.,2025;
+Kwaoetal.,2025). Itisalsodistantlyrelatedtode-
+3.1 Intra-narrationalUnreliability
+ceptiondetection,definedbyBurgoonandBuller
+(1994)astheidentificationofnarratorswhointend In intra-narrational unreliability the narrator ex-
+tocommitdeception,“adeliberateactperpetrated hibits verbal tics, “small interjections and com-
+by a sender to engender in a receiver beliefs con- ments that hint at an uncertainty in the narrator’s
+trarytowhatthesenderbelievesistruetoputthe relatingoftheevents”,suchas“Ithink”or“itwas
+receiveratadisadvantage”(HazraandMajumder, solongago,it’shardtoremember.” (Hansen,2007).
+2024; Constâncio et al., 2023; Sarzynska-Wawer Table1showsvarioustypesofverbalticsandcor-
+etal.,2023;Fornaciarietal.,2021;VanderWalt respondingexamples. Ifatleastonetypeofverbal
+etal.,2018;Eloffetal.,2015;Almelaetal.,2013). tic is present in a text, its narrator is considered
+Thesetasksaresimilarbecausetheyanalyzefirst- intra-narrationallyunreliable.
+Type Example
+Admissionoffaultorbias:Explicitadmissionofmistakes,biases,miss- “Itendtoseethingsfromauniquepointofview.”,
+ingdetails,orreportingdetailsfromanotherlikelyunreliablecharacter. “Likeothersofmygeneration...”
+Defensivetone:Multiplephrasesinprotestation. “IfeelIshouldexplain”
+Digressions:Statementthatveersoff-topic. “Iwilldothatinaminute.Bytheway...”
+Hedginglanguage:Multiplephrasesthatindicateuncertaintyorvague- “it seems that”, “it appears to be”, “I think”,
+ness. “maybe”,“sortof”
+Inconsistencies:Twoormorecontradictingstatementsoreventsthatdo “I am a nobody. But look! There is a plane
+notaddup. drawingmynameinthesky.”
+Selectivememory:Explicitadmissionthatnarratormayhaveforgotten “Itwassolongago,it’shardtoremember”,“My
+details. memoryisnotwhatitusedtobe”
+Statementofpotentialdisbelief:Explicitadmissionthatnarrativesounds “Youmightnotbelieveme,but...”,“whathap-
+unlikely. penednextmightseemstrange”
+Table1: Examplesofverbalticsexhibitedbyintra-narrationallyunreliablenarrators.
+3.2 Inter-narrationalUnreliability eredinter-textuallyunreliable:
+Inthisform,thenarratorisunreliablefromasec- Naïf : Blindtowrongs. Naiveobserverwho
+ondarypointofviewasinthefollowingtwocases: lacks the social savvy, maturity, or awareness to
+understand the complexity of their environment.
+Same-unreliable-character-over-time :
+Forexample: “Iacceptedtheassignmentwillingly.
+The narrator is reflecting on events in the distant
+Dimly, I heard the people around me muttering –
+pastwhenhe/sheexhibitstraitsofunreliabilityand
+talking about some danger? I ignored them and
+thepresent-daynarratordoesnotindicatechange
+wenttotheotherroom.” Inthissnippet,thenarrator
+withinthenarrativesnippet(i.e.,thecurrentvoice
+actsblindlywithoutunderstandingthesituation.
+of the narrator has traits of unreliability). For ex-
+ample: “Iusedtobeacrazyman. I’dwaitinline Madman : Highlyemotional. Narrator,often
+eachday,desperatelyhopingthattheywouldletme with a frantic voice, who feels deep positive or
+in. Weee,thoseweregoodtimes.” Inthissnippet, negativeemotionstowardothersandismaddened
+thenarratordescribeshisdistantpastasunreliable by perceived torture or alienation. For example:
+with “I used to be a crazy man...” His last state- “Myheartbeatwildly. Ittookmygreateststrengthto
+ment,“Weee,thoseweregoodtimes”,indicateshis turnandwalkaway. Howcouldhe? Mybestfriend,
+perspectivehasnotchangedovertime. abetrayer?!” Inthissnippet,thenarratorreveals
+Other-character-contradiction : An- deepnegativefeelings,perceivedalienation,anda
+other character contradicts the narrator, typically frantictonerevealedthroughstylisticchoices.
+in the form of direct dialogue. For example: “I Pícaro : Triestobecunning. Sociallyaware
+thoughttheofferfromHenry’swasincredible. AsI rogue or antihero who experiences the rise and
+pickedupapentosign,Iheardthejudge’svoice: fall of fortune while attempting to improve their
+hehadenteredtheroomthroughthefardoorand prospects and cleverly justifying their chaotic
+wastalkingtotwowell-dressedmen. “Whatscam- worldview. For example: “The school teacher
+mers these men from Henry’s have become,” he scoldedmeandtookawaythepaperairplane. As
+wassaying.” Inthissnippet,thenarratorbelieves soonasherbackwasturned,Iwhippedoutafresh
+hehasreceivedagoodoffer,butanothercharacter, sheetofpaper,determinedtobemorestealthythis
+a judge, has a contradicting perspective that the time. Allthewhile,Ikeptoneeyeonthegirlwho
+offerisascam. Thereaderdoesnotknowwhich hadreportedme.” Thisnarratorexperiencesafall
+characterunderstandsthesituationbest,leavingthe of fortune when his paper airplane is taken away.
+narrator’sreliabilityindoubt. Hetriestoimprovehisprospectsbymakinganew
+airplaneandshowscunningwhenhestealthilytries
+3.3 Inter-textualUnreliability toavoidbeingcaughtagain.
+Inthisform, ifthenarratorfitsthedescriptionof Clown : Flipsthenarrative. Narratorwhoof-
+oneofthefollowingunreliablecharactertropes,as fersreinterpretationsthatrepackageinternaland/or
+definedbyRigganJr(1978),thenarratorisconsid- external conflict in a new light, potentially from
+Corpus #Samples Avg Min Max Opinion2 (Reviews) (Ott et al., 2011, 2013). We
+Fiction 499 194.31 24 924 intendtofirstlearnhowtoclassifynarratorsfrom
+Train/Valid 373 194.74 24 514 afictionaldomainandthengeneralizethisknowl-
+Test 126 193.06 48 924
+edge to other textual domains. To this end, we
+Blogposts 106 315.31 114 1050
+Subreddit 112 396.88 73 858 additionally collect about 500 narrative snippets
+Reviews 100 157.43 53 460 fromstoriesfromProjectGutenberg(Fiction).3
+Alltextsamplesarewritteninfirst-person(hand-
+Table 2: TUNA statistics, including the total number
+verified)andrangefrom24to1050tokens. Sam-
+ofsamplesandtheaverage,minimum,andmaximum
+ples from Blog post, Subreddit, and Review con-
+numberoftokensineachsampleperdomain. Thefirst
+taintheentireoriginalwrittentextandarearguably
+row of Fiction is the combination of Train/Valid and
+Testsubsets(rows2and3respectively). complete narratives. We note that Fiction sam-
+plesarenarrativesnippetsanddonotnecessarily
+containcompletestorieswithfullydevelopedbe-
+ginnings, middles, and endings. Table 2 shows
+corporastatistics. Additionaldetails,suchashow
+snippetsareselectedfromthesourcecorporaare
+giveninAppendixD.1.
+Wedesignanannotationstudy, determinedex-
+emptbytheInstitutionalReviewBoard,andask10
+humanannotatorswithundergraduateorgraduate
+degreesinEnglishliteraturetoreadanddetermine
+the intra-narrational, inter-narrational, and inter-
+Figure2: Distributionofresolvedlabels. Forintra-nar
+textual unreliabilities of each narrative. We note
+(left): # narratives with (A) verbal tics or (R) none
+that this is a time-consuming task: each sample
+(reliable). For inter-nar (middle): # narratives with
+takes annotators roughly 5 minutes each to read,
+(A)“sameunreliablecharacterovertime”,(B)“other
+analyze, and annotate. Because the 3 tasks focus
+character contradiction”, or (R) none. For inter-tex
+(right): # narratives with (A) naïf, (B) madman, (C) ondifferentaspectsofthenarrative,annotatorsre-
+pícaro,(D)clown,or(R)none. port having to re-evalutate the narrative for each
+task. For 817 narratives, each annotated at least
+twice,weestimatethestudytook172hours. See
+behindafacadethatallowsthemtosaywhatever
+AppendixBforadditionaldetails.
+theywant. Forexample: “Theycalledmeacoward.
+Annotatorsaregiventhedefinitionsandexam-
+Whatho! Isawmyselfratherasmyownliberator.”
+plesofthethreeformsofunreliabilityasdescribed
+Thisnarratordescribesasocietalview(thattheyare
+inSection3. Foreachform,theyaretaskedwith
+acoward)andmakesitcleartheyhaveadifferent,
+choosingthemostrelevantunreliablelabel. Ifnone
+reinterpretedview(thattheyarealiberator).
+fit,theymaydecidethatthenarratorisreliablefor
+thatform. Forexample,forinter-textualunreliabil-
+3.4 The TUNADataset
+ity,theannotatorisaskedtochooseonelabelfrom
+Since there are no currently available resources “naïf”,“madman”,“pícaro”,“clown”,or“none: re-
+for classifying unreliable narrators, we build an liable”. See Appendix B.1 for an outline of the
+expert-annotated dataset, Texts with Unreliable instructionsgiventotheannotators.
+Narrators(TUNA),containingtextswithlabeled Each text sample is annotated by a minimum
+intra-narrationally, inter-narrationally, and inter- of two expert annotators. For these pairs of ini-
+textually unreliable narrators. We collect short tialresults,wecalculateinter-annotatoragreement
+textsamplescontainingfirst-personnarratorsfrom withCohenKappa’sscoreandobservesubstantial
+multiple textual domains, including personal ac- agreement(LandisandKoch,1977)acrossallsam-
+countsfromPersonaBank(Blogpost)(Lukinetal., ples: intra-narrationalκ = 0.75,inter-narrational
+2016), posts from r/AITA1 (Subreddit) (Vijjini
+2TheReviewdatasetcontainsrealandfake(deceptive)ho-
+et al., 2024), and hotel reviews from Deceptive
+telreviewsandisintendedforthetaskofidentifyingdeceptive
+reviews.SincetheReviewstaskdiffersfromidentifyingunre-
+1PostsarescrapedbetweenApril2020andOctober2021 liablenarrators,weonlycollectrealreviewsforourdataset.
+fromhttps://www.reddit.com/r/AmItheAsshole/ 3https://www.gutenberg.org/
+κ = 0.71, inter-textual κ = 0.73. We improve tings, fine-tuning using Parameter-Efficient Fine-
+labelconsistencybyresolvingdisagreeinglabels: Tuning with Low-Rank Adaptation (LoRA) (Hu
+annotatorsparticipateinrobustconversations4 re- etal.,2022),andcurriculumlearning(CL)which
+garding differing labels and choose the best one. trainsmodelsfirstoneasyandthenhardersamples.
+Statisticsforthedistributionofresolvedlabelsare For CL, the training dataset is divided into
+given in Figure 2 and additional information, in- easysamples(Subset-Easy)anddifficultsamples
+cludinganumericalbreakdownofcounts,isgiven (Subset-Difficult). We define difficulty of a sam-
+inAppendixC. ple based on how ambiguous it is. Specifically,
+To encourage thoughtful choices, annotators foreachtypeofunreliability(i.e.,intra-narrational,
+write short descriptions listing observations and inter-narrational, inter-textual), weobservesome
+briefexplanationsforwhytheydemonstrateunre- samplesmightcontaintraitsofmorethanonelabel.
+liability. All resolved labels have corresponding Forexample,indifficultsamples,anarratorwhois
+descriptions; hence, each narrative has three de- predominantlyamadmanmightalsoexhibitsome
+scriptions(1perunreliability). Wecalculateacross pícaro-likeorclown-liketraits. Hence,forthissam-
+alldescriptionsanaverageof21.2tokens,witha ple,inadditiontomadman,pícaroorclownarealso
+maximumof299tokensinagivendescription. See incorrect but reasonable candidates for the label.
+AppendixAforexamples. Wehypothesizethatsampleswithfewercandidates
+are easier to classify because there are fewer po-
+4 IdentifyingUnreliableNarrators
+tential choices for the final label. Samples with
+multiplecandidatesaremorechallengingbecause
+4.1 TaskDefinition
+eachcandidatehasanarguable,albeitpotentially
+Givenn,atextnarratedbyafirst-personnarrator, weak,claimtobeingchosenasthefinallabel.
+we classify narrators for intra-narrational, inter-
+Based on this motivation, we create (Subset-
+narrational, and inter-textual unreliability as fol-
+Easy) and (Subset-Difficult). For this, the LLM
+lows. Forintra-narrationalunreliability, wewant
+isqueriedtoproducealistofcountsforthenum-
+todeterminen ∈ {A,R}whereAcorrespondsto
+beroftraitsforeachlabel. Forexample,forinter-
+n having verbal tics and R corresponds to n not
+textualunreliabilitytheLLMgeneratesalistsuch
+havingverbaltics(intra-narrationallyreliable). For
+as, [A:<NUM>, B:<NUM>, C:<NUM>, D:<NUM>]
+inter-narrationalunreliability,wewanttodetermine
+where A, B, C, D respectively correspond to naïf,
+n ∈ {A,B,R}whereAcorrespondstonhavinga
+madman, pícaro, and clown, and NUM is the to-
+“samereliablecharacterovertime”,B corresponds
+tal number of traits present in the narrative for
+tonhavingan“othercharactercontradiction”,and
+the given label. Candidates are labels with a NUM
+Rcorrespondston ∈/ {A,B}(inter-narrationally
+value > 0. The training samples are ranked ac-
+reliable). For inter-textual unreliability, we want
+cordinglyinorderoftheleasttothemostnumber
+to determine n ∈ {A,B,C,D,R} where A, B,
+ofcandidates. Thereorderedsetisdividedinhalf
+C,D correspondstonhavinganaïf,madman,pí-
+intoSubset-EasyandSubset-Difficult. AnLLMis
+caro,orclown,respectively,andRcorrespondsto
+firstfine-tunedonSubset-EasyandthenonSubset-
+n ∈/ {A,B,C,D} (inter-textually reliable). See
+DifficultusingLoRAadapterswith8-bitquantiza-
+Figure1foranexamplewiththelistofclasses.
+tionfor3epochsanddefaultPEFTconfiguration.
+4.2 Methods
+5 Experiments
+We seek methods that deal with the complexi-
+tiesofclassifyingunreliablenarratorsbylearning ExperimentsareperformedonInstructmodelsfor
+from snippets from Fiction and testing in an out- Llama3.1-8B, Llama3.3-70B, Mistral-7B, Phi3-
+of-domain manner on real-world domains. For medium, GPT-4o mini, and o3-mini (reasoning
+this purpose, we try zero-shot and few-shot set- model). WealsocompareresultswithsmallerLM
+classifiers, BERT and ModernBERT. Setup and
+4Annotators either meet via video-call or exchange de-
+promptsaredescribedinAppendixD.WeuseFic-
+tailed messages. For disagreeing labels, they discuss their
+choicesandselectafinalresolvedlabel. Iftheyareunable tiontraining/validationsamplesformodeltraining
+toagree,athirdannotatordecidestheresolvedlabel,given and development and the (remaining) narratives
+theirarguments. Timespentperdiscussion: simpletexts≈
+fromFiction,Blogposts,Subreddit,andReviews
+2minutes,sampleswithverycomplicatednarrators≈15-20
+minutes. as testing samples. In this way, we test on Fic-
+tioninanin-domainmannerandontheremaining
+datasetsinanout-of-domainmanner.
+5.1 Results
+Table 3 presents performances of CL, fine-tuned,
+zero-shot, and few-shot methods where macro-
+averagedF1scoresareprovidedforeachdomain
+(usingLlama3.1-8B).Table4presentstheperfor-
+manceofLLMsaveragedacrossdomains,andTa-
+ble5showstheperformanceofLMclassifiers.
+We notice six key takeaways. First, generally
+speaking, allmethodsandmodelsperformbetter
+fortheintra-narrationaltaskthanfortheothertwo
+tasks. Similarly,theyperformbetterfortheinter- Figure3: Breakdownofcorrectlypredicted(green)vs.
+narrationaltaskthanforinter-textual. Thisfinding incorrectly predicted (blue) unreliable narrators. Top
+indicates the intra-narrational task is easiest, and row: with respect to the narrator’s gender ∈ {female,
+male, other}. Middle row: with respect to narrative
+theinter-textualtask(requiringmoreabstractinfer-
+style∈{conversational,descriptive}. Bottomrow: with
+ences) is most difficult for LLMs. Appendix E.2
+respecttonarrativesentimenttone∈{positive,negative,
+shows an example demonstrating how the inter-
+neutral}. ResultsarefromLlama3.1-8Bexperiments.
+textualtaskrequiresadeeperunderstandingofthe
+narrator’sstateofmind,makingitmoredifficult.
+Second, methods using training samples (i.e., LLMs. Tounderstandtheseobservations,wenote
+CL,fine-tuning,few-shot)outperformthezero-shot thatforFiction(in-domainexperiment),LMsgive
+method,indicatingthattrainingdatadoesimprove resultscomparabletoourzero-shotmethod;how-
+LLMperformance. AppendixE.3showssamples ever, for all the other test sets (out-of-domain ex-
+where incorrect labels are predicted in zero-shot periment),theperformanceoftheLMsdrastically
+andcorrectlabelsarepredictedinfew-shotbecause drops. Hence,wedeterminethatLMsarelesscapa-
+themodellearnsfromtheshots. blethanLLMsofgeneralizingknowledgelearned
+Third, for most cases, CL outperforms fine- fromonedomaintootherdomains.
+tuning,indicatingthatmoresophisticatedwaysof Weprovideindividualperformancebreakdowns
+leveragingthetrainingdataispromisingforbetter of the remaining LLMs for each domain in Ap-
+performance. pendix E (including a breakdown of class-wise
+Fourth, in Table 3, we observe that out-of- scores in Table 9) and an error analysis of incor-
+domain performances, especially those whose rectlyclassifiednarratorsinAppendixE.1.
+methodsusemoretrainingdata(i.e.,CLandfine-
+tuning), are not better but good compared to in- 6 Analysis
+domainperformances. Thisresultindicatesthatit
+is possible to learn from the Fiction text domain Inthissectionweanalyzeunreliabilityclassifica-
+andapplythatknowledgetootherreal-worldtext tion with respect to various narrative properties:
+domains. Wemakesimilarobservationsforother narrator’sgender,numberofcharacters,narration
+models(notshownhereduetospaceconstraints). style,andoverallnarrativesentiment. Fortheseex-
+Fifth,Table4showsCLimprovesperformance periments,weuseCLoutputsforonemodelfrom
+of smaller models but not larger ones. E.g., each open-source LLM family (3 total models).
+Llama3.3-70B few-shot performs competitively WeuseLlama3.3-70Btoautomaticallyinferthese
+withCLandfine-tuning,indicatingthatasmodel narrativeproperties(thecompletepromptsandan
+sizeincreases,learningfromfewersamplesyields erroranalysisaregiveninAppendixF.1andF.2).
+comparablepredictivecapabilitiestolearningwith
+moresamples. RQ1: Doesthegenderofthenarratoraffectthe
+Finally,forexperimentswithLMclassifiers,we prediction? Acrossalltestingsamples,wecount
+observeaveragevaluesacrossalltestsetsareless 125 female, 215 male, and 43 other/ambiguous
+thanaveragevaluesforCLandfine-tunedmethods. narrators. The first row of Figure 3 shows the
+TheseresultsindicatethatLMsdonotoutperform percentages of female, male, and other narrators
+CL Fine-tuned Zero-Shot One-Shot Three-Shot
+Intra-nar Fiction 58.51±1.93 50.09±1.96 45.17±1.83 52.67±2.00 51.72±2.12
+Blogpost 53.94±2.22 50.63±2.27 45.56±1.80 29.33±4.48 40.54±0.73
+Subreddit 50.04±2.21 49.00±2.05 47.41±1.32 52.03±2.38 48.87±1.86
+Review 67.17±2.16 55.85±2.35 58.46±2.29 60.22±2.20 52.81±2.25
+Inter-nar Fiction 34.59±1.82 34.63±2.26 16.20±2.19 15.97±1.19 17.09±1.26
+Blogpost 35.92±2.47 28.73±1.80 23.15±2.92 22.19±1.40 27.46±1.47
+Subreddit 30.91±1.80 25.59±1.90 30.97±1.77 22.65±1.35 21.68±1.37
+Review 35.29±1.66 36.59±2.18 25.85±1.79 25.67±3.11 25.37±3.10
+Inter-tex Fiction 27.42±1.87 28.59±1.87 18.22±2.38 24.00±1.55 23.54±1.69
+Blogpost 19.58±1.78 18.99±1.34 24.23±2.79 28.59±1.75 24.35±1.56
+Subreddit 13.49±1.55 10.85±1.31 12.95±1.21 12.01±1.11 10.71±1.14
+Review 16.72±0.67 17.54±1.35 15.75±1.31 20.32±1.08 19.30±2.08
+Table3: BreakdownofunreliabilityF1(macro)scoresforeachdomainforLlama3.1-8B.Improvementsonleftare
+statisticallysignificantcomparedtoresultsonrightrow-wisewithp<0.05(Droretal.,2018).
+CL Fine-tuned Zero-Shot One-Shot Three-shot
+Intra-nar Llama3.1-8B 57.42±2.13 51.39±2.16 49.15±1.81 48.56±2.76 48.48±1.74
+Llama3.3-70B 51.26±2.12 51.28±2.09 54.20±1.65 63.89±2.28 61.41±1.91
+Mistral-7B 55.76±1.70 56.46±2.11 56.79±2.05 50.87±1.96 52.99±2.24
+Phi3-medium 53.75±2.14 52.18±2.36 60.00±2.22 44.70±1.69 44.86±1.49
+GPT-4omini — — 47.88±2.05 50.51±1.67 51.77±2.25
+o3-mini — — 42.22±1.97 43.47±2.00 44.32±2.04
+Inter-nar Llama3.1-8B 34.18±1.94 31.39±2.03 24.04±2.17 21.62±1.76 22.90±1.80
+Llama3.3-70B 33.49±2.31 30.32±1.29 29.11±1.63 31.23±1.72 34.02±2.23
+Mistral-7B 31.15±1.45 25.75±0.44 19.49±1.36 33.07±1.92 31.29±1.86
+Phi3-medium 22.32±1.49 35.76±1.81 25.23±1.88 23.42±1.71 24.66±1.73
+GPT-4omini — — 28.15±1.49 31.48±1.70 26.00±1.52
+o3-mini — — 32.18±1.90 28.79±0.91 27.40±1.59
+Inter-tex Llama3.1-8B 19.30±1.47 18.99±1.47 17.79±1.92 21.23±1.37 19.48±1.62
+Llama3.3-70B 21.04±1.69 21.02±1.64 28.52±1.96 30.80±1.81 28.23±1.89
+Mistral-7B 29.68±2.01 24.38±1.29 20.23±1.51 18.35±1.43 17.12±1.35
+Phi3-medium 25.00±1.51 26.24±1.82 27.56±1.70 18.84±1.84 16.41±1.38
+GPT-4omini — — 17.84±1.41 20.66±1.42 19.98±1.38
+o3-mini — — 16.65±1.14 15.44±0.33 15.84±1.54
+Table4: UnreliabilityF1(macro)scoresforcombineddomainsforallmodelfamiliesandsizes. Resultsonleftare
+statisticallysignificantcomparedtoresultsonrightrow-wise.
+BERT ModernBERT inter-textualtasks,other/ambiguouscharactersare
+Intra-nar Fiction 48.42 49.48 predictedmorecorrectlythaneitherfemaleormale
+Avg 17.77 39.94 narrators, indicating that performance improves
+Inter-nar Fiction 31.37 38.46 whenthenarratorisnotspecifiedasfemaleormale.
+Avg 25.76 27.07
+Inter-tex Fiction 12.46 14.71
+Avg 11.12 16.98 RQ2: How does the narration style change
+the difficulty of the prediction? The middle
+Table5: UnreliabilityF1(macro)scoresforFictionand
+row of Figure 3 shows that narratives written in
+combineddomainsforsmallerLMclassifiers.
+a conversational style tend to perform slightly
+better than those written in a descriptive style
+classified w.r.t. unreliable narrators correctly vs. for intra-narrational unreliability. This could be
+incorrectly by Llama3.1-8B for 5 runs across because it might be easier to detect the verbal
+all testing samples. Figure 5 in Appendix F.3 tics within a conversational tone. However, for
+shows results from other models. We observe inter-narrationalandinter-textualtasks,narratives
+across all model families that male narrators written in a descriptive tone perform better.
+are predicted correctly more frequently than Figure5inAppendixF.3showsresultsfromother
+female narrators. For inter-narrational and models.
+forminganalysisaregiveninAppendixF.
+7 Conclusion
+We propose using automatic methods to classify
+intra-narrationally, inter-narrationally, and inter-
+textually unreliable narrators. Borrowing defini-
+tionsfromnarratologywedefinebinaryandmulti-
+classclassificationtasks,annotatenarrativesfroma
+diversedomainoftexts,andevaluatetheabilityof
+LLMstoperformtheseclassificationtasksinzero-
+Figure4: Numberofcharactersvs. numberofsamples. shot,few-shot,fine-tuned,andcurriculumlearning
+AllSamples(solidblack)isthedistributionofallnar-
+settings. Weobservethatthesetasksareverytricky
+rativeswithrespecttothenumberofcharacters. Blue,
+forLLMstosolveandofferourfindingsasacall
+green,andorangesolidlinesshowcorrectpredictions,
+for future work to further investigate the use of
+andcorrespondingdashedlinesshowincorrectpredic-
+NLPmethodstoidentifyunreliablenarrators.
+tions. ResultsarefromMistralexperiments.
+8 Limitations
+Firstly,thisworkfocusesonshorttexts(nolonger
+RQ3: Howdoestheoverallnarrationsentiment than1050tokenseach),someofwhichdonotcon-
+affect the prediction? The last row of Figure 3 tain complete beginnings, middles, and endings.
+demonstratesthatnarrativeswritteninanegative Weencouragefutureworktoconsiderthistaskfor
+tone perform better than narratives written in a longer-lengthtexts,suchasfull-lengthshortstories
+positive tone for intra-narrational unreliability. orbooks. Secondly,wenotethatallsamplesinour
+This result is likely a consequence of negative datasetsarewritteninEnglish. Asthedefinitions
+tonesoftenharboringmultipleverbaltics,resulting ofunreliabilityareapplicabletoworksofotherlan-
+in an easier prediction. For inter-narrational and guages,werecommendfutureworkexploringthis
+inter-textual unreliabilities, narratives written taskonotherlanguages. Thirdly,forRQ1inSec-
+in a positive tone result in significantly better tion6,welimitouranalysistoonlyfemale,male,
+predictions than narratives written in a negative andother/ambiguousgenders. Finally,weobserve
+tone. SeeFigure7inAppendixF.3forresultsfrom thatthesizeofthedatasetisrelativelysmalldueto
+othermodels. thehighcostofhigh-qualityannotations.
+Acknowledgments
+RQ4: Are narratives with multiple characters
+trickier to predict? Figure 4 shows the majority Wearegratefulforthesuggestionsfromouranony-
+of narratives contain 1-5 characters. Within this mousreviewers,andwethankHaoyuanLi,Anvesh
+range,correctpredictionsforunreliabilities(solid Rao Vijjini, Somnath Basu Roy Chowdhury, and
+blue,green,yellow)peakatnarrativeswith1and Amartya Banerjee for their discussions and valu-
+3 characters. For intra-narrational classification, ableinsights. Thisworkwassupportedinpartby
+thereareconsistentlymorecorrect(solidblue)than NSFgrantIIS2047232.
+incorrect(dottedblue)predictions,indicatingthe
+numberofcharactersdoesnotchangethedifficulty
+of the narratives to classify. For inter-narrational References
+and inter-textual classification, the number of in-
+Angela Almela, Rafael Valencia-García, and Pascual
+correctlypredictednarratives(dottedgreenandyel- Cantos.2013. Seeingthroughdeception: Acompu-
+low) surpasses the number of correctly predicted tationalapproachtodeceitdetectioninspanishwrit-
+tencommunication. LinguisticEvidenceinSecurity,
+narratives(solidgreenandyellow)whenthenum-
+LawandIntelligence,1(1):3–12.
+ber of characters ≥ 2, suggesting that narratives
+withmultiplecharactersaretrickertopredictthan DavidBamman,BrendanO’Connor,andNoahASmith.
+narrativeswithonlythenarrator. SeeFigure8and 2013. Learning latent personas of film characters.
+In Proceedings of the 51st Annual Meeting of the
+Figure9inAppendixF.3forothermodelresults.
+AssociationforComputationalLinguistics(Volume
+Additionaldetailsregardingourmethodsofper- 1: LongPapers),pages352–361.
+Yoshua Bengio, Jérôme Louradour, Ronan Collobert, andComputationalIntelligence(CSCI),pages416–
+and Jason Weston. 2009. Curriculum learning. 419.IEEE.
+In Proceedings of the 26th annual international
+conferenceonmachinelearning,pages41–48. Monika Fludernik. 2000. Unreliable narration. stu-
+dienzurtheorieundpraxisunglaubwürdigenerzäh-
+WayneCBooth.1961. Therhetoricoffiction. Univer- lens in der englischsprachigen literatur. Poetica,
+sityofChicagoPress. 32(1/2):251–255.
+FaezeBrahmanandSnigdhaChaturvedi.2020. Mod- TommasoFornaciari,FedericoBianchi,MassimoPoe-
+elingprotagonistemotionsforemotion-awarestory- sio, Dirk Hovy, et al. 2021. Bertective: Language
+telling. In Proceedings of the 2020 Conference on models and contextual information for deception
+EmpiricalMethodsinNaturalLanguageProcessing detection. In Proceedings of the 16th Conference
+(EMNLP),pages5277–5294. of the European Chapter of the Association for
+Computational Linguistics: Main Volume. Associ-
+FaezeBrahman,MengHuang,OyvindTafjord,Chao
+ationforComputationalLinguistics.
+Zhao, Mrinmaya Sachan, and Snigdha Chaturvedi.
+2021. “let your characters tell their story”: A PerKroghHansen.2007. Reconsideringtheunreliable
+datasetforcharacter-centricnarrativeunderstanding. narrator. Semiotica,165(1/4):227–246.
+In Findings of the Association for Computational
+Linguistics: EMNLP2021,pages1734–1752. Sanchaita Hazra and Bodhisattwa Prasad Majumder.
+2024. To tell the truth: Language of deception
+JudeeKBurgoonandDavidBBuller.1994. Interper-
+and language models. In Proceedings of the 2024
+sonal deception: Iii. effects of deceit on perceived
+Conference of the North American Chapter of the
+communication and nonverbal behavior dynamics.
+AssociationforComputationalLinguistics: Human
+JournalofNonverbalBehavior,18:155–184.
+Language Technologies (Volume 1: Long Papers),
+pages8506–8520,MexicoCity,Mexico.Association
+Max Cannings. 2023. Reading unreliable narra-
+forComputationalLinguistics.
+tion. The Transformative Power of Literature
+and Narrative: Promoting Positive Change: A
+QiangHe,SongyangjunZhang,YuliangCai,WeiYuan,
+Conceptual Volume in Honour of Vera Nünning,
+LianboMa,andKepingYu.2025. Asurveyonex-
+86:131.
+ploringrealandvirtualsocialnetworkrumors: State-
+of-the-artandresearchchallenges. ACMComputing
+SeymourBenjaminChatman.1990. Comingtoterms:
+Surveys.
+Therhetoricofnarrativeinfictionandfilm. Cornell
+UniversityPress.
+TheresaHeyd.2006. Understandingandhandlingun-
+reliablenarratives: Apragmaticmodelandmethod.
+SnigdhaChaturvedi,MohitIyyer,andHalDaumeIII.
+Semiotica,162:217–243.
+2017. Unsupervised learning of evolving relation-
+ships between literary characters. In Proceedings
+EdwardHu,YelongShen,PhillipWallis,ZeyuanAllen-
+of the AAAI Conference on Artificial Intelligence,
+Zhu, Yuanzhi Li, Shean Wang, and Weizhu Chen.
+volume31.
+2022. Lora: Low-rankadaptationoflargelanguage
+models. ICLR.
+Alex Sebastião Constâncio, Denise Fukumi Tsunoda,
+HelenadeFátimaNunesSilva,JocelaineMartinsda
+Tenghao Huang, Faeze Brahman, Vered Shwartz,
+Silveira,andDeborahRibeiroCarvalho.2023. De-
+and Snigdha Chaturvedi. 2021. Uncovering im-
+ception detection with machine learning: A sys-
+plicit gender bias in narratives through common-
+tematicreviewandstatisticalanalysis. PLoSONE,
+senseinference. InFindingsoftheAssociationfor
+18(2):e0281323.
+Computational Linguistics: EMNLP 2021, pages
+Jonathan Culler. 1997. Literary theory: A very short 3866–3873.
+introduction. OxfordUniversityPress.
+MohitIyyer,AnupamGuha,SnigdhaChaturvedi,Jor-
+GregoryCurrie.1995. Unreliabilityrefigured:Narrative danBoyd-Graber,andHalDauméIII.2016. Feuding
+inliteratureandfilm. TheJournalofAestheticsand familiesandformerfriends: Unsupervisedlearning
+ArtCriticism,53(1):19–29. fordynamicfictionalrelationships. InProceedings
+of the 2016 Conference of the North American
+Rotem Dror, Gili Baumer, Segev Shlomov, and Roi Chapter of the Association for Computational
+Reichart.2018. Thehitchhiker’sguidetotestingsta- Linguistics: HumanLanguageTechnologies, pages
+tisticalsignificanceinnaturallanguageprocessing. 1534–1544.
+In Proceedings of the 56th annual meeting of the
+associationforcomputationallinguistics(volume1: Janina Jacke. 2018. Unreliability and narrator types.
+Longpapers),pages1383–1392. on the application area of> unreliable narration<.
+JournalofLiteraryTheory,12(1):3–28.
+JHP Eloff et al. 2015. A big data science
+experiment–identity deception detection. In 2015 Woori Jang and Seohyon Jung. 2024. Evaluating
+InternationalConferenceonComputationalScience llm performance in character analysis: A study
+of artificial beings in recent korean science fic- Proceedingsofthe18thAnnualSIGdialMeetingon
+tion. In Proceedings of the 4th International DiscourseandDialogue,pages360–369.
+Conference on Natural Language Processing for
+DigitalHumanities,pages339–351. William Edward Riggan Jr. 1978. Pícaros, Madmen,
+Naïfs, and Clowns: The Unreliable First-Person
+AliJarrahiandLeilaSafari.2023. Evaluatingtheeffec-
+Narrator. Ph.D.thesis,IndianaUniversity.
+tivenessofpublishers’featuresinfakenewsdetection
+onsocialmedia. MultimediaToolsandApplications,
+Hamid Reza Saeidnia, Elaheh Hosseini, Brady Lund,
+82(2):2913–2939.
+MaralAlipourTehrani,SanazZaker,andSabaMo-
+laei.2025. Artificialintelligenceinthebattleagainst
+Evgeny Kim and Roman Klinger. 2019. Frowning
+disinformationandmisinformation: asystematicre-
+frodo, wincing leia, and a seriously great friend-
+viewofchallengesandapproaches. Knowledgeand
+ship: Learning to classify emotional relationships
+InformationSystems,pages1–20.
+of fictional characters. In Proceedings of the 2019
+Conference of the North American Chapter of the
+Justyna Sarzynska-Wawer, Aleksandra Pawlak, Julia
+AssociationforComputationalLinguistics: Human
+Szymanowska, Krzysztof Hanusz, and Aleksander
+LanguageTechnologies,Volume1(LongandShort
+Wawer.2023. Truthorlie: Exploringthelanguage
+Papers),pages647–653.
+ofdeception. PloSONE,18(2):e0281179.
+LazarusKwao,YangYang,JieZou,andJingMa.2025.
+Asurveyofapproachestoearlyrumordetectionon Shashank Srivastava, Snigdha Chaturvedi, and Tom
+microbloggingplatforms: Computationalandsocio- Mitchell.2016. Inferringinterpersonalrelationsin
+psychological insights. Wiley Interdisciplinary narrative summaries. In Proceedings of the AAAI
+Reviews: Data Mining and Knowledge Discovery, ConferenceonArtificialIntelligence,volume30.
+15(1):e70001.
+Estée Van der Walt et al. 2018. Identity deception
+JRLandisandGGKoch.1977. Themeasurementof
+detection on social media platforms. Ph.D. thesis,
+observeragreementforcategoricaldata. Biometrics,
+UniversityofPretoria.
+33(1):159174.
+Anvesh Rao Vijjini, Faeze Brahman, and Snigdha
+Stephanie Lukin, Kevin Bowden, Casey Barackman,
+Chaturvedi. 2022. Towards inter-character
+and Marilyn Walker. 2016. PersonaBank: A cor-
+relationship-drivenstorygeneration. InEMNLP.
+pusofpersonalnarrativesandtheirstoryintention
+graphs. In Proceedings of the Tenth International
+Anvesh Rao Vijjini, Rakesh R Menon, Jiayi Fu,
+ConferenceonLanguageResourcesandEvaluation
+ShashankSrivastava,andSnigdhaChaturvedi.2024.
+(LREC’16), pages 1026–1033, Portorož, Slovenia.
+Socialgaze: Improvingtheintegrationofhumanso-
+EuropeanLanguageResourcesAssociation(ELRA).
+cial norms in large language models. In Findings
+Vera Nünning. 2015. Conceptualising (un) reliable of the Association for Computational Linguistics:
+narration and (un) trustworthiness. Unreliable EMNLP2024,pages16487–16506.
+Narration and Trustworthiness: Intermedial and
+InterdisciplinaryPerspectives,pages1–28. KathleenWall.1994. “Theremainsoftheday”andits
+challenges to theories of unreliable narration. The
+GretaOlson.2003. Reconsideringunreliability:Fallible JournalofNarrativeTechnique,24(1):18–42.
+and untrustworthy narrators. Narrative, 11(1):93–
+109.
+Thomas Wolf, Lysandre Debut, Victor Sanh, Julien
+Chaumond,ClementDelangue,AnthonyMoi,Pier-
+MyleOtt,ClaireCardie,andJeffreyT.Hancock.2013.
+ricCistac,TimRault,RemiLouf,MorganFuntow-
+Negativedeceptiveopinionspam. InProceedingsof
+icz,JoeDavison,SamShleifer,PatrickvonPlaten,
+the2013ConferenceoftheNorthAmericanChapter
+Clara Ma, Yacine Jernite, Julien Plu, Canwen Xu,
+of the Association for Computational Linguistics:
+Teven Le Scao, Sylvain Gugger, Mariama Drame,
+HumanLanguageTechnologies,pages497–501,At-
+QuentinLhoest,andAlexanderRush.2020. Trans-
+lanta,Georgia.AssociationforComputationalLin-
+formers:State-of-the-artnaturallanguageprocessing.
+guistics.
+InProceedingsofthe2020ConferenceonEmpirical
+Methods in Natural Language Processing: System
+Myle Ott, Yejin Choi, Claire Cardie, and Jeffrey T.
+Demonstrations, pages 38–45, Online. Association
+Hancock. 2011. Finding deceptive opinion spam
+forComputationalLinguistics.
+by any stretch of the imagination. In Proceedings
+of the 49th Annual Meeting of the Association
+for Computational Linguistics: Human Language XinfengYuan,SiyuYuan,YuhanCui,TianheLin,Xin-
+Technologies, pages 309–319, Portland, Oregon, taoWang,RuiXu,JiangjieChen,andDeqingYang.
+USA.AssociationforComputationalLinguistics. 2024. Evaluating character understanding of large
+languagemodelsviacharacterprofilingfromfictional
+ElaheRahimtoroghi,JiaqiWu,RuiminWang,Pranav works. In Proceedings of the 2024 Conference on
+Anand,andMarilynWalker.2017. Modellingpro- EmpiricalMethodsinNaturalLanguageProcessing,
+tagonistgoalsanddesiresinfirst-personnarrative. In pages8015–8036.
+A ExamplesofUnreliableNarratorTypes newspapers.” As we had never stirred out of our
+homesbefore,thedemeanourofthemanstruckus
+Samples from the training set are given in Sec-
+dumbwithwonder. Bethetopiceversotrivial,he
+tionsA.1,A.2,A.3. Samplesfromthetestingssets
+wouldquotescience,orcommentontheVedas,or
+aregiveninSectionsA.4,A.5,A.6.
+repeat quatrains from some Persian poet; and as
+we had no pretence to a knowledge of science or
+A.1 Intra-narrationalTrainingSample
+theVedasorPersian,ouradmirationforhimwent
+VerbalTicsPresent:(Fiction)“Don’tyou’mais’
+onincreasing,andmykinsman,atheosophist,was
+me, sir! I had two trunks—deux troncs—when
+firmly convinced that our fellow-passenger must
+I got aboard that wabbly old boat at Dover this
+havebeensupernaturallyinspiredbysomestrange
+morning, and I’m not going to budge from this
+“magnetism”or“occultpower,”byan“astralbody”
+wharf until I find the other one. Where did you
+orsomethingofthatkind. Helistenedtothetritest
+learnyourFrench,anyway? Can’tyouunderstand
+sayingthatfellfromthelipsofourextraordinary
+whenIspeakyourlanguage?”
+companion with devotional rapture, and secretly
+tookdownnotesofhisconversation. Ifancythat
+Explanation: Defensivetonethroughout. Digres- the extraordinary man saw this, and was a little
+sion: “WheredidyoulearnyourFrenchanyway?” pleasedwithit.”
+A.2 Inter-narrationalTrainingSamples
+Explanation: Thenewfriendcontradictswhatthe
+SameUnreliableNarratorOverTime:(Fiction) narratorbelievesisoccurringintheworld.
+“This is written from memory, unfortunately. If
+A.3 Inter-textualTrainingSamples
+I could have brought with me the material I so
+carefullyprepared,thiswouldbeaverydifferent Naïf: (Fiction) “They went off and I got aboard
+story. Whole books full of notes, carefully the raft, feeling bad and low, because I knowed
+copied records, firsthand descriptions, and the verywellIhaddonewrong,andIseeitwarn’tno
+pictures—that’s the worst loss. We had some use for me to try to learn to do right; a body that
+bird’s-eyesofthecitiesandparks; alotoflovely don’tgetstartedrightwhenhe’slittleain’tgotno
+views of streets, of buildings, outside and in, show—whenthepinchcomesthereain’tnothing
+and some of those gorgeous gardens, and, most tobackhimupandkeephimtohiswork, andso
+importantofall,ofthewomenthemselves.” he gets beat. Then I thought a minute, and says
+tomyself,holdon;s’poseyou’dadonerightand
+Explanation: The narrator is reflecting back on give Jim up, would you felt better than what you
+events in the past where narrator has admitted donow? No,saysI,I’dfeelbad—I’dfeeljustthe
+unreliability. There is no indication of change in samewayIdonow. Well,then,saysI,what’sthe
+reliabilityovertime. useyoulearningtodorightwhenit’stroublesome
+to do right and ain’t no trouble to do wrong, and
+OtherCharacterContradiction: (Fiction) “My thewagesisjustthesame? Iwasstuck. Icouldn’t
+kinsman and myself were returning to Calcutta answer that. So I reckoned I wouldn’t bother no
+fromourPujatripwhenwemetthemaninatrain. moreaboutit, butafterthisalwaysdowhichever
+Fromhisdressandbearingwetookhimatfirstfor comehandiestatthetime.”
+anup-countryMahomedan,butwewerepuzzledas
+weheardhimtalk. Hediscourseduponallsubjects Explanation: Narrator appears to have made a
+so confidently that you might think the Disposer mistake and has become a foil to a lamentable
+ofAllThingsconsultedhimatalltimesinallthat social condition. They clearly do not understand
+Hedid. Hithertowehadbeenperfectlyhappy,as thecomplexityoftheirenvironment: “Well,then,
+wedidnotknowthatsecretandunheard-offorces saysI,what’stheuseyoulearningtodorightwhen
+wereatwork,thattheRussianshadadvancedclose it’stroublesometodorightandain’tnotroubleto
+tous,thattheEnglishhaddeepandsecretpolicies, do wrong, and the wages is just the same? I was
+thatconfusionamongthenativechiefshadcome stuck. Icouldn’tanswerthat.”
+toahead. Butournewly-acquiredfriendsaidwith
+aslysmile: “Therehappenmorethingsinheaven Madman: (Fiction) “You lie, cursed dog! What
+and earth, Horatio, than are reported in your a scandalous tongue! As if I did not know that it
+is envy which prompts you, and that here there A.4 Intra-narrationalTestingSample
+is treachery at work—yes, the treachery of the
+VerbalTicsPresent: (Subreddit) “The guy I
+chiefclerk. Thismanhatesmeimplacably;hehas
+bought the truck from patched it together for the
+plottedagainstme,heisalwaysseekingtoinjure
+sale at first small stuff like not vacuuming the
+me. I’ll look through one more letter; perhaps it
+AC system or armrest falling off the door from
+willmakethematterclearer.”
+double sided tape, but then one day the throattle
+got stuck wide open I pulled it out of gear killed
+Explanation: Narrator uses a frantic voice with theignitionpulledoverripapartthethroattlebody
+accusations and exclamation points and seems openandfoundaplasticcapcrammedinthere... I
+maddened by perceived torture (the second texttheowneraboutitandhesaid“wrongnumber”
+character has said things which the narrator does Iliveinametropolitanareaandhavebeenputting
+notlike). Thenarratorhasstrongnegativefeelings off transferring title and racking up tolls at first I
+towardsothersandappearstofeelalienatedfrom was vengefully self righteous but now I’m over
+therestofthecharacters,includingthechiefclerk. thinkingit. AmItheasshole?”
+Explanation: Exampleofadmissionoffault/bias:
+Pícaro: (Fiction) “I grew the greatest artist of
+“Iliveinametropolitanareaandhavebeenputting
+my time and worked myself out of every danger
+off transferring title and racking up tolls at first
+withsuchdexterity,thatwhenseveralmoreofmy
+I was vengefully self righteous but now I’m over
+comradesranthemselvesintoNewgatepresently,
+thinkingit. AmItheasshole?”
+and by that time they had been half a year at the
+trade, I had now practised upwards of five years,
+A.5 Inter-narrationalTestingSamples
+and the people at Newgate did not so much as
+know me; they had heard much of me indeed, SameUnreliableNarratorOverTime: (Blog
+andoftenexpectedmethere,butIalwaysgotoff, post) “I got a haircut yesterday and I hate hate
+thoughmanytimesintheextremestdanger.” HATEit! Ikindofgotitdoneonimpulse(imean
+I needed it done anyway) so I wasn’t prepared
+with photos or anything and I had to flip through
+Explanation: Narrator fits picaro with rise/fall
+a magazine looking for what i wanted. I wanted
+of fortune and roguish characteristics. Seems
+a short version of this basically. Like where the
+to approach problems cleverly and with clear
+top layer curled into my chin. I found similar
+motivations.
+enoughhaircutsinamagazineandtoldherwhatI
+wanted. Itlookedfinewetbutitdriedcompletely
+Clown:(Fiction)“Therefore, mydearfriendand
+wrong. She cut it way too short in the front and
+companion, if you should think me somewhat
+its basically a shorter version of what I just had
+sparing of my narrative on my first setting
+WHICHISNOTWHATIWANTED.Becausemy
+out—bearwithme,—andletmegoon,andtellmy
+hair is f****** THICK so short hair is f******
+storymyownway:—Or,ifIshouldseemnowand
+POOFY. And I dunno I just think I look really
+thentotrifleupontheroad,—orshouldsometimes
+stupid now. It’s just completely wrong and I had
+putonafool’scapwithabelltoit,foramomentor
+her layer the back, which by the way, she didn’t
+twoaswepassalong,—don’tflyoff,—butrather
+even do that right. Just uuuuuugh I should have
+courteouslygivemecreditforalittlemorewisdom
+just gotten my bangs trimmed or something and
+thanappearsuponmyoutside;—andaswejogon,
+idkIwanttocrynow. AndI’mnotevendepressed
+eitherlaughwithme,oratme,orinshortdoany
+about that. Just being on campus for a week has
+thing,—onlykeepyourtemper.”
+mademefeelsof******shitty. Likeshittierthan
+Ifeltshutupinmyroomallsummer. psIrealized
+Explanation: Narrator flips the narrative of his I’mscaredtowearlolitaoncampusnow. awesome
+past (“if you should think me somewhat sparing y/y:|”
+ofmynarrativeonmyfirstsettingout—bearwith
+me,—andletmegoon,andtellmystorymyown Explanation: Narrator is recounting event from
+way”)andseemsintenttorepackageconflictina the past and demonstrates intra-narrational
+newlight. unreliabilitywithoutindicatinggrowthorchange
+overtime. they talked about it amongst themselves. I told
+them I don’t understand why they were so angry
+OtherCharacterContradiction: (Review) “I withme. MomaskedmewhichIwouldlikesoI
+stayed at the Monaco-Chicago back in April. toldherifgiventheoptionIwouldlikethering.
+I was in town on business, and the hotel was Weallhavedaughterssoiunderstandwhymy
+recommendedbyafriendofmine. Havingspenta sisters might also want the ring. However, how
+weekendthere,Ihavenoideawhatmyfriendwas canIbeheldaccountableforthefactthatmymom
+talkingabout. Thecomplimentarymorningcoffee gavemethefirstchoiceandsoIchoose?
+was weak; the fitness room was dimly lit; and I AITAHforchoosingtoinherittheringwhenmy
+thoughtI’dhavetohavemyclothesmailedbackto motherspecificallyaskedmewhichitemIwould
+mewhenIusedtheirsupposed’overnight’laundry prefer?”
+serviceforasuitIspilledsomewineon. Myroom
+was adequate, but nowhere near what I’ve seen Explanation: Thenarrator’sexperienceexposes“a
+elsewhere at this price point. Recent renovation lamentable socialcondition” (sheis dealing with
+mustbeslangfor’everythingisstiffandsmellsof aging, possibly even dying, parents and is put in
+industrialadhesive.’ Themattressinmyroomwas the “awkward and uncomfortable” situation of
+incrediblyfirm,andIsleptpoorly. WhenItravel, choosingherinheritanceinthemidstofbickering
+I expect an experience similar to or better than siblings). Doesournarratorlackthe“experience
+myexperienceathome. Atmosthotels,Ireceive to fully understand the narrated events or the
+excellentserviceandcomfortableaccomodations. complexityoftheirenvironment”perourrevised
+Thiswasanexceptiontomyusual,andIwon’tbe naif definition? One could say yes. That she
+backanytimesoon.” is surprised by all this drama suggests this is
+the first time she is in this situation and so she
+Explanation: The friend who recommended the is inexperienced in this matter. Also, she is
+hotelisincontradictionwiththenarrator. struggling with understanding the complexity
+of her environment (arguing siblings): “I was
+taken aback because I didn’t even know this was
+A.6 Inter-textualTestingSamples
+an issue with them but apparently they talked
+Naïf: (Subreddit) “My parents are 80 years old. about it amongst themselves. I told them I don’t
+Lately they both have been having some health understandwhytheyweresoangrywithme. Mom
+issues and it appears they are finalizing/updating askedmewhichIwouldlikesoItoldherifgiven
+their Last Will & Testaments. I, (44f) am the the option I would like the ring.... how can I be
+youngestofthreegirls. Earlierthisyearmymother held accountable for the fact that my mom gave
+cameupforavisitandshewasstayingatmyhouse. methefirstchoiceandsoIchoose?”
+Duringherfirstnightshetoldmesomeofthehealth
+issuesmyfatherhasbeenexperiencing. Laterthat Madman: (Blog post) “Today I realized how
+night she told me she had three items that were much I actually love her, and no not that crazy
+special to her (her wedding ring, a painting, and chickthatIfinallygotridof. Iwastalkingonthe
+some china my father bought in Eqypt when he phonewithherandwehadrunoutofthingstotalk
+was in the service). I don’t know if its relevant about so I had started singing Lips of an Angel.
+but they are all worth roughly the same value, a She’doccasionallysingalongbutIdon’tthinkshe
+modestsum, nothing overthe top. Sheasked me was paying much attention to it. But the whole
+which one I would like to inherit when the time damnsongIwaspicturingher. Thelyricsjustkept
+came. Thewholeconversationwasawkwardand screaming out at me. I mean, not how the song
+uncomfortablebutintheendIselectedthewedding wasintended. Itsreallyabouttwopeoplebreaking
+ring. upandthegirlcallingupherexandthey’retalking
+Afewmonthslater, mytwooldersistersandI about how they still have feelings for each other.
+wereoutatabarandthistopiccameup. Apparently But the way I took it in was how her boyfriend
+theywereangrywithmeaboutchoosingthering. doesn’t like us talking but she kept talking to me
+Theysay“Whodoesthat? Whydidyouevenpick anywaysandallthesestupidfeelingsIhaveforher.
+one?”. I was taken aback because I didn’t even Idon’tevenknow. I’mjustanidiot,Iguess. Butit
+know this was an issue with them but apparently gottentothepointIstartedcrying. Ididn’tlether
+knowthatbecauseIalreadymadethingsawkward refusedtotakethegoodie-bag.
+enoughinthepastandIdidn’twanttobringitup
+He had talked about it with the teacher and let
+again. Because she only looks at me as a friend
+allofustakeslicesofhiscakeandpasseditaround
+andasmuchasitkillsme...thatsallwe’lleverbe.”
+toeveryone. IpersonallydislikedcakesoIsaidno,
+alongwithsomefew2or3otherpeople.
+Explanation: Narrator is a madman who demon-
+Heunderstoodwherewewerecomingfromso
+strateshighemotions. Heseemsmaddenedbythe
+he didn’t take it to heart. After everyone had en-
+perceived torture of not being able to date a girl
+joyed their cake, the teacher had asked us all to
+he thinks he is in love with. He has really strong
+groupuptotakeapicture. Everyonestartedhud-
+feelingsthatcanaffecthissanity(“Ialreadymade
+dlinginthemiddlebutsinceIdidn’tfeelcomfort-
+thingsawkwardenoughinthepast”).
+abletakingapicturewithabunchofpeople,Ijust
+keptsittingonmyseatandpolitelyrefusedtotake
+Pícaro:(Review)“Iwanttoissueatravel-warning
+apicturewiththem.
+to folks who might sign up for the weekend deal
+they offer through travelzoo from time to time: They just accepted it, it was all good until my
+Thedealsays’freebreakfast’includedintheprice. parents scolded me for not taking a picture with
+However, what they don’t tell you, is that the them(sincethepicturewaspostedonInstagram)
+breakfastconsistsofacupofcoffeeandabisquit andshedidn’twanttheotherparentstothinkIwas
+(or two)! Moreover, you need to ask for these rudeorinconsiderate. Shetoldmetoapologizethe
+’tickets’ at the lobby when you check in - they nexttimeIsawhimandIagreed.
+won’tgivethemtoyouautomatically! Westayed
+Time-skip to the day after, I went up to him
+there over Christmas ’03, and we, and I noticed
+andapologizedifhethoughtIdidn’tlikehimand
+severalguestswhoboughtthesamepackage,had
+toldhimthatIfeltuncomfortablewithcrowdsof
+a rather unpleasant experience! The hotel is nice
+people, as well as accepting things that weren’t
+though,ifyoudon’tconsidertheirlousyservice!”
+mine. Hedidn’tmindandsaiditwasalright,that
+he understood how I felt but he said it in a really
+Explanation: The clever vibes stick out to me a
+sadvoicethatbrokemyheart. AITA?”
+little bit. Rather than just stating that “travelzoo”
+is lame, the narrator writes “I want to issue a
+Explanation: Narratorisaclownwhore-interprets
+travel-warning.” Also, the air quotes around free
+the situation. Instead of considering the events
+breakfast and tickets also read to me as clever.
+as a time of celebration, the narrator focuses on
+And the exclamation, parenthetical, and slyness
+his/herpersonalviewpoints(e.g.,refusingtotake
+in the following sentence also seems to suggest
+thegoodiebagbecausenarratordoesnotliketoac-
+cleverness: “what they don’t tell you, is that
+ceptgifts,noteatingcakebecausenarratorperson-
+the breakfast consists of a cup of coffee and a
+allydislikesit,andnotjoiningtheclassphotobe-
+bisquit (or two)!” The narrator also states in an
+causenarratordidn’tfeelcomfortableincrowds).
+understated way that them and other guests who
+bought this package “had a rather unpleasant
+experience!” with“rather”suggestingtryingtobe
+B AnnotationStudyDetails
+clevertoo. Andlastly,“Thehotelisnicethough,if
+youdon’tconsidertheirlousyservice!” feelslike
+thelastbitingremarkattemptingcleverness. Wehire10expertworkerswhoareintheprocessor
+havecompletedauniversitydegree(honorsbache-
+Clown:(Subreddit)“Someguyinclass,whoI’m lor’s,master’s,PhD)inEnglishliteratureandhave
+sort-of close to, had planned his birthday and hadpreviousexperienceanalyzingnarrators. Work-
+wanted to celebrate it with all of us in the class- ersarepaid$7.25/hour(equivalenttothestatemin-
+room. imumwage). Theyprovidewrittenconsentandun-
+Hebroughtusallgoodie-bags,andevenbrought derstandingofthetaskbeforebeginningandmay
+acake. Atfirst,Iwasannoyed. BecauseIthought completeasmanynarrativesastheyareablewithin
+thiswaskindofexcessiveforabirthdaybutIkept asetnumberofhours. Theyarefreetostopatany
+quiet because I didn’t want to hurt his feelings. pointoftheprocess. Duringthestudy,nopersonal
+AndsinceIdislikedacceptinggiftsfromothers,I informationiscollectedfromtheannotators.
+B.1 InstructionsforAnnotators (c) Pícaro
+Eachannotatorisgivenasetofnarrativesandalist (d) Clown
+ofdefinitionsforintra-narrational,inter-narrational, (e) None: inter-textuallyreliable
+andinter-textualunreliabilities(sameasdefinitions
+6. InColumnH,pleaseleaveannotator’snotes.
+andexamplesgiveninSection3). Theyagreenot
+Thisisaspaceforanyadditionalcomments
+touseAIassistantswhilechoosinglabels. Toen-
+youmighthave. Feelfreetouseitorleaveit
+sure consistency across labeling, annotators are
+blank.
+instructed:
+“Classify narrators according to the given
+C AnnotatedLabelStatistics
+definitions. Focus on characteristics of the
+narrator,notonthesituationdescribed. Classify
+Wereportthedistributionoflabelschosenbythe
+usingdefiningcharacteristicswithinthenarrative
+human annotators for each text domain for intra-
+only. Donotcreatehypotheticalstofillinmissing
+narrational,inter-narrational,andinter-textualun-
+details. Assume the narrator is reliable unless
+reliabilitiesinTable6.
+unreliabletraitsarepresentinthenarrative.”
+D ExperimentalSetup
+Annotatorsaretaskedwithlabelingeachnarra-
+We describe licenses of source corpora in Sec-
+tiveinthefollowingsteps:
+tion D.1 and implementation in Section D.2. All
+1. InColumnC,readthenarrative. promptsareprovidedinSectionD.3.
+2. In Column D, list any observed verbal tics D.1 SourceCorporaDetails
+(thisisaspacefornotes,orenteringthecorre-
+Wereportthelicenseofeachsourceofnarratives
+spondingletter):
+forTUNAinTable7. Alldataisusedforresearch
+(a) Admissionoffault/bias purposes only, consistent with their intended use.
+Narrativeswerecheckedtoensurethereisnoper-
+(b) Defensivetone
+sonally identifying information or offensive con-
+(c) Digressions
+tent. AllsamplesareinEnglish.
+(d) HedgingLanguage
+We select snippets from the source corpora in
+(e) Inconsistencies
+thefollowingways. Fortrain-testsplits,snippets
+(f) SelectiveMemory areselectedatrandombecausewedesireclassbal-
+(g) StatementofPotentialDisbelief ancesthatarerepresentativeofeachdomain. We
+do not use LLMs to pre-select snippets because
+3. InColumnE,selectthebestoptionforintra-
+thisprocesswouldmostlikelyfavorsnippetsthat
+narrational unreliabilities (choose the corre-
+areeasiertoclassifyandwouldnotchoosetrickier
+spondingletter):
+snippets. Forselectingdemonstrationexamplesin
+(a) Verbaltic(s)present few-shot methods, we acknowledge that a more
+careful shot selection could potentially help the
+(b) None: intra-narrationallyreliable
+LLMmakebetterpredictions. However,thisselec-
+4. InColumnF,selectthebestoptionforinter- tionprocessrequirescarefulresearchthatanalyzes
+narrational unreliabilities (choose the corre- narrativesfromtheperspectiveofvariouselements
+spondingletter): like characters, setting, etc. While this would be
+a good direction for future work, it is out of the
+(a) Sameunreliablecharacterovertime
+scopeofthecurrentwork.
+(b) Othercharactercontradiction
+(c) None: inter-narrationallyreliable D.2 ImplementationDetails
+Our experiments are conducted using up to four
+5. InColumnG,selectthebestoptionforinter-
+48GB Nvidia RTX A6000 GPUs and 2 Nvidia
+textualunreliabilities(choosethecorrespond-
+A100-80G GPUs. Open-source checkpoints for
+ingletter):
+Llama, Mistral, Phi3, BERT, and ModernBERT
+(a) Naïf modelsareobtainedfromHuggingFace(Wolfetal.,
+(b) Madman 2020)library. API-basedGPTmodelsareobtained
+Intra-nar Inter-nar Inter-tex
+Corpus (A) (R) (A) (B) (R) (A) (B) (C) (D) (R)
+Fiction 264 235 48 38 413 49 76 64 75 235
+Train/Valid 180 193 41 31 301 37 59 49 50 178
+Test 84 42 7 7 112 12 17 15 25 57
+Blogposts 75 31 36 6 64 11 23 10 19 43
+Subreddit 97 15 18 63 31 29 28 15 24 16
+Reviews 52 48 2 5 93 3 24 7 3 63
+Table6: Labelstatistics(numericalbreakdown)foreachtypeofunreliabilityacrossalltextdomains. Forintra-
+narrationalunreliabilities: Totalnumberofnarrativeswith(A)verbalticsor(R)none(intra-narrationallyreliable).
+Forinter-narrationalunreliabilities: Totalnumberofnarrativeswith(A)“Sameunreliablecharacterovertime”,(B)
+“Othercharactercontradiction”,or(R)none(inter-narrationallyreliable). Forinter-textualunreliabilities: Total
+numberofnarrativeswith(A)Naïf,(B)Madman,(C)Pícaro,(D)Clown,or(R)none(inter-textuallyreliable).
+Corpora License Alias ModelName Size
+ProjectGutenberg ProjectGutenbergLicense Llama3.1-8B meta-llama/
+Meta-Llama-3.1-8B-Instruct 8B
+Personabank CreativeCommonsAttribution
+4.0InternationalLicense Llama3.3-70B meta-llama/
+Llama-3.3-70B-Instruct 70B
+AITA(Vijjinietal.,2024) CreativeCommonsAttribution
+4.0InternationalLicense Mistral-7B mistralai/
+Mistral-7B-Instruct-v0.3 7B
+DeceptiveOpinion CreativeCommonsAttribution
+-NonCommercial-ShareAlike Phi3-medium microsoft/
+3.0UnportedLicense Phi-3-medium-4k-instruct 14B
+GPT-4omini gpt-4o-mini-2024-07-18 –
+Table7:Licensesforthesourcesofeachtextualdomain
+o3-mini o3-mini-2025-01-31 –
+inTUNA.
+BERT-base google-bert/bert-base-uncased 110M
+ModernBERT answerdotai/ModernBERT-base 150M
+fromOpenAIAPI.SeeTable8forcheckpointver-
+sionsandmodelsizes. Forallmodels,weuseatem- Table8: ModelcheckpointsfromHuggingFacelibrary
+peraturevalueof0.7andtop-pvalueof0.9(chosen andOpenAIAPI.
+after experimentation with higher and lower val-
+ues). Themodelo3-minireasoning_levelisleft
+at the default medium level. Inference time for a D.3 PromptsforExperiments
+singleexperimentonanopensourcemodeltakes
+In this section, we provide the templates and
+approximately 30 minutes. Fine-tuning a LoRA
+prompts used for zero-shot, one-shot, and three-
+(Huetal.,2022)adapterfor3epochstakesapprox-
+shotsettings.
+imately1hour. TrainingBERTandModernBERT
+modelsfor3epochstakesapproximately1minute.
+InadditiontoutilizingHuggingFace,PEFT,Py- D.3.1 Templates
+Torchlibrariesformodelinferenceandfine-tuning,
+Forzero-shotinference,weusethefollowing:
+we utilize existing Python packages such as Py-
+Torch, pandas, re, scikit-learn, and statistics for
+Zero-ShotTemplate
+pre/post-processingofdataandanalysisofresults.
+F1(macro)scoresforallmethodsarecalculated ###SYSTEM:[SystemPrompt]
+using a bootstrapping evaluation method. For a ###PROMPT:[UnreliabilityDefinition]
+testing set containing m samples, we perform in- [ShotInstruction]
+ference on all m samples 5 times to predict the ###INPUT:[Narrative]
+intra-narrational,inter-narrational,andinter-textual ###SOLUTION:
+labels. Fromthese5runs,1000outputpredictions
+arerandomlysampledwithreplacementandcom- For few-shot inference, we include shots after
+paredtothecorrespondinggoldlabels. the shot instruction. We notice best performance
+WeuseAIassistantstoassistwithminordebug- whenwerepeattheshotinstructionasecondtime
+gingandcoding. aftertheshots. Weusethefollowing:
+Few-ShotTemplate anobody. Butlook! Thereisaplanedrawingmy
+nameinthesky.”
+###SYSTEM:[SystemPrompt]
+• SelectiveMemory: Narratoracknowledgesthey
+###PROMPT:[UnreliabilityDefinition]
+may have forgotten important details or their
+[ShotInstruction]
+memory is faulty. Examples: “It was so long
+[Shots]
+ago,it’shardtoremember”,“Mymemoryisnot
+[ShotInstruction]
+whatitusedtobe”
+###INPUT:[Narrative]
+• Statement of Potential Disbelief: Narrator ac-
+###SOLUTION:
+knowledgesthenarrativemaysoundunlikely. Ex-
+amples: “Youmightnotbelieveme,but”,“what
+D.3.2 SystemPrompts
+happenednextmightseemstrange”
+Wereplace[SystemPrompt]inthetemplateswith
+Giventhislistofverbalticsandanarrative,we
+thecorrespondingsystemprompt:
+definethefollowingoptions:
+Intra-narrational: <A>: Verbalticspresentinnarrative
+DetermineiftheINPUTnarrativecontainsanyver- <B>: Noverbalticspresentinnarrative
+baltics.
+Inter-narrational:
+Inter-narrational:
+We define the following types of unreliable nar-
+Determine if the narrator in the INPUT narrative
+ratorsbasedonanalternativecharacter’spointof
+isunreliablebasedonanothercharacter’spointof
+view:
+view.
+<A>: Sameunreliablenarratorovertime: Nar-
+Inter-textual:
+rator is reflecting on his/her past self,
+Determine if the narrator in the INPUT narrative
+whoisunreliable,ANDthepresent-day
+fitsacharactertrope.
+narratordoesnotindicatechangewithin
+D.3.3 Definitions narrativesnippet.
+<B>: Other character contradiction: Another
+We replace [Unreliability Definition] in the
+character contradicts narrator who has
+Templatewiththecorrespondingsetofdefinitions:
+demonstrated at least one form of intra-
+narrationalunreliability.
+Intra-narrational:
+<C>: Neither: narratorisreliablefromdiffer-
+Hereisalistofverbaltics:
+entcharacters’pointsofview.
+• Admissionoffault/bias: Narratordirectlystates
+Inter-textual:
+thathe/shehasmademistakes,hasparticularbi-
+Wedefinethefollowingtypesofunreliablenarra-
+ases,doesnotknowallthedetails,orisreporting
+torsbasedoncharactertropes:
+informationfromanothercharacterwhoislikely
+unreliable. Examples: “Likeothersofmygener- <A>: Naïf: Narrator who is a foil to a
+ation...”, “I tend to see things from a particular lamentable social condition and who
+pointofview” lacksexperiencetofullyunderstandthe
+• Defensivetone: Narratorusesmultiplephrasesin narratedeventsorthecomplexityoftheir
+protestation. Examples: “Letmemakeperfectly environment. (Defining characteristic:
+clear”,“Ishouldsay”,“Ishouldpointout”,“let Blindtowrongs)
+memakeitimmediatelyclear”,“IfeelIshould <B>: Madman: Narrator, often with a frantic
+explain” voice,whofeelsdeeppositiveornegative
+• Digressions: Narrator veers off-topic at least emotionstowardothersandismaddened
+once. Examples: “I will do that in a minute. byperceivedtortureoralienation. (Defin-
+Bytheway,...” ingcharacteristic: Highlyemotional)
+• Hedging language: Narrator uses phrases that <C>: Pícaro: Socially aware rogue or anti-
+indicate uncertainty or vagueness. Examples: hero who experiences the rise and fall
+“it seems that”, “it appears to be”, “I think”, of fortune while attempting to improve
+“maybe”,“sortof” theirprospectsandcunninglyjustifytheir
+• Inconsistencies: Narrator gives contradicting chaoticworldview. (Definingcharacter-
+statements and/or events don’t add up. “I am istic: Triestobeclever)
+<D>: Clown: Narratorwhooffersreinterpreta- Iwasout-of-doors. Icouldnotremaininthehouse;
+tions that repackage internal and/or ex- it had felt too small for me, but now nature felt
+ternalconflictinanewlight,potentially toolarge. Idimlysawthehugepileoftheschloss
+frombehindafacadethatallowsthemto definedagainstthegraylight;sometimeswhenthe
+saywhatevertheywant. (Definingchar- moonunveiledherselfitstartedoutclear,andblack,
+acteristic: Flipsthenarrative) andgrim. Iheardthewindmoanamongthetrees,
+<E>: None: Narratorisreliablebasedonchar- heardthegreatdogsbayingfromthekennels;from
+actertropes. an open window came rich, low, mellow sounds.
+Old Brunken was in the music-room, playing to
+D.3.4 Instruction
+himselfuponthevioloncello.
+Wereplace[Shot Instruction]intheTemplate SOLUTION2: <B>
+withthecorrespondinginstruction:
+Intra-narrational:Doesthenarrativedemonstrate Inter-narrational:INPUT1: InduetimeIfound
+anyverbaltics? DONOTGIVEANYDESCRIP- my ghost, or ghosts rather, for there were two of
+TION.GenerateONLYTHECORRESPONDING them. UptillthathourIhadsympathizedwithMr.
+LETTER enclosed in angle brackets (’<A>’ or Besant’s method of handling them, as shown in
+’<B>’). “The Strange Case of Mr. Lucraft and Other Sto-
+Inter-narrational:Whattypeofnarratorisgiven? ries.”IamnowintheOpposition. Wewillcallthe
+DONOTGIVEANYDESCRIPTION.Generate bungalowKatmaldâk-bungalow. ButTHATwas
+ONLY THE CORRESPONDING LETTER en- thesmallestpartofthehorror. Amanwithasensi-
+closed in angle brackets ([List of possible letters tivehidehasnorighttosleepindâk-bungalows. He
+enclosedinanglebrackets]). shouldmarry. Katmaldâk-bungalowwasoldand
+Inter-textual: What type of narrator is given? rottenandunrepaired. Thefloorwasofwornbrick,
+DONOTGIVEANYDESCRIPTION.Generate thewallswerefilthy,andthewindowswerenearly
+ONLY THE CORRESPONDING LETTER en- blackwithgrime. Itstoodonabypathlargelyused
+closedinanglebrackets(’<A>’or’<B>’or’<C>’ bynativeSub-DeputyAssistantsofallkinds,from
+or’<D>’or’<E>’). FinancetoForests;butrealSahibswererare. The
+khansamah,whowasnearlybentdoublewithold
+D.3.5 Shots
+age,saidso.
+In this section we show one example shot per SOLUTION1: <A>
+label. Duringinference,wereplace[Shots]inthe INPUT 2: “I suppose you would like to take
+Templatewithoneorthreeshotsperlabel: themtotheCasinotoplayroulette? Well,excuse
+myspeakingsoplainly,butIknowhowaddicted
+Intra-narrational: youaretogambling. ThoughIamnotyourmentor,
+INPUT1: Thisiswrittenfrommemory,unfortu- nor wish to be, at least I have a right to require
+nately. IfIcouldhavebroughtwithmethematerial that you shall not actually compromise me.” “I
+I so carefully prepared, this would be a very dif- have no money for gambling,” I quietly replied.
+ferentstory. Wholebooksfullofnotes,carefully “Butyouwillsoonbeinreceiptofsome,”retorted
+copiedrecords,firsthanddescriptions,andthepic- theGeneral,reddeningalittleashedivedintohis
+tures—that’stheworstloss. Wehadsomebird’s- writingdeskandappliedhimselftoamemorandum
+eyesofthecitiesandparks; alotoflovelyviews book. From it he saw that he had 120 roubles of
+of streets, of buildings, outside and in, and some mine in his keeping. “Let us calculate,” he went
+ofthosegorgeousgardens,and,mostimportantof on. “Wemusttranslatetheseroublesintothalers.
+all, of the women themselves. Nobody will ever Here—take100thalers,asaroundsum. Therest
+believehowtheylooked. Descriptionsaren’tany will be safe in my hands.” In silence I took the
+good when it comes to women, and I never was money.
+good at descriptions anyhow. But it’s got to be SOLUTION2: <B>
+donesomehow;therestoftheworldneedstoknow INPUT 3: “I heard the sound of a stick and a
+aboutthatcountry. shamblingstepontheflagsinthepassageoutside,
+SOLUTION1: <A> and the door creaked on its hinges as a second
+INPUT 2: It was a wild night. Driving clouds oldmanentered,morebent,morewrinkled,more
+kepthidingandrevealingthestormy-lookingmoon. agedeventhanthefirst. Hesupportedhimselfby
+asinglecrutch,hiseyeswerecoveredbyashade, ofmynarrativeonmyfirstsettingout—bearwith
+andhislowerlip,half-averted,hungpaleandpink me,—andletmegoon,andtellmystorymyown
+fromhisdecayingyellowteeth. Hemadestraight way:—Or, if I should seem now and then to tri-
+foranarm-chairontheoppositesideofthetable, fleupontheroad,—orshouldsometimesputona
+satdownclumsily,andbegantocough. Theman fool’scapwithabelltoit,foramomentortwoas
+withthewitheredarmgavethisnew-comerashort wepassalong,—don’tflyoff,—butrathercourte-
+glanceofpositivedislike;theoldwomantookno ouslygivemecreditforalittlemorewisdomthan
+notice of his arrival, but remained with her eyes appears upon my outside;—and as we jog on, ei-
+fixedsteadilyonthefire.” ther laugh with me, or at me, or in short do any
+SOLUTION3: <C> thing,—onlykeepyourtemper.
+SOLUTION4: <D>
+Inter-textual:INPUT1: TheywentoffandIgot INPUT 5: I first heard of Ántonia on what
+aboard the raft, feeling bad and low, because I seemedtomeaninterminablejourneyacrossthe
+knowed very well I had done wrong, and I see great midland plain of North America. I was ten
+itwarn’tnouseformetotrytolearntodoright; yearsoldthen;Ihadlostbothmyfatherandmother
+abodythatdon’tgetstartedrightwhenhe’slittle withinayear,andmyVirginiarelativesweresend-
+ain’t got no show—when the pinch comes there ing me out to my grandparents, who lived in Ne-
+ain’t nothing to back him up and keep him to his braska. I travelled in the care of a mountain boy,
+work,andsohegetsbeat. ThenIthoughtaminute, Jake Marpole, one of the ‘hands’ on my father’s
+andsaystomyself, holdon; s’poseyou’dadone oldfarmundertheBlueRidge,whowasnowgoing
+right and give Jim up, would you felt better than Westtoworkformygrandfather. Jake’sexperience
+what you do now? No, says I, I’d feel bad—I’d oftheworldwasnotmuchwider.
+feeljustthesamewayIdonow. Well,then,says SOLUTION5: <E>
+I,what’stheuseyoulearningtodorightwhenit’s
+troublesometodorightandain’tnotroubletodo E AdditionalDetailsAboutClassification
+wrong,andthewagesisjustthesame? Iwasstuck. Results
+I couldn’t answer that. So I reckoned I wouldn’t
+We show class-wise performance for combined
+bother no more about it, but after this always do
+test domains in Table 9 and performance break-
+whichevercomehandiestatthetime.
+downs for each textual domain (akin to Table 3)
+SOLUTION1: <A>
+using the remaining LLMs: Llama3.3-70B (Ta-
+INPUT 2: You lie, cursed dog! What a scan-
+ble10),Mistral-7B(Table11),Phi3-medium(Ta-
+daloustongue! AsifIdidnotknowthatitisenvy
+ble12),GPT-4omini(Table13),ando3-mini(Ta-
+whichpromptsyou,andthatherethereistreachery
+ble14). Furthermore,weprovideanerroranalysis
+atwork—yes,thetreacheryofthechiefclerk. This
+of the classification tasks (Appendix E.1), exam-
+man hates me implacably; he has plotted against
+ples showing how different tasks have different
+me, he is always seeking to injure me. I’ll look
+complexities(AppendixE.2),andexamplesofhow
+throughonemoreletter;perhapsitwillmakethe
+LLMlearnfromsnippetstomakebetterpredictions
+matterclearer.
+(AppendixE.3).
+SOLUTION2: <B>
+INPUT3: Igrewthegreatestartistofmytime
+E.1 ErrorsClassifyingUnreliableNarrators
+andworkedmyselfoutofeverydangerwithsuch
+dexterity,thatwhenseveralmoreofmycomrades WeanalyzetheLLMclassificationsbygenerating
+ranthemselvesintoNewgatepresently,andbythat explanations(i.e.,weprompttheLLMstoexplain
+time they had been half a year at the trade, I had theirchoices)andmakethefollowingobservations
+nowpractisedupwardsoffiveyears,andthepeople aboutincorrectlyclassifiedunreliablenarrators.
+atNewgatedidnotsomuchasknowme;theyhad Forintra-narrationalunreliability,theLLMover-
+heardmuchofmeindeed,andoftenexpectedme predictsthepresenceofhedginglanguageandde-
+there, butIalwaysgotoff, thoughmanytimesin fensivelanguageandisoverly-sensitivetophrases
+theextremestdanger. thatannotatorsdonotclassifyaseitherverbaltic.
+SOLUTION3: <C> TheLLMalsostrugglestorecognizedigressions.
+INPUT 4: Therefore, my dear friend and com- Insomecases,theLLMstatesaverbalticbutmis-
+panion,ifyoushouldthinkmesomewhatsparing takenlydeterminesthatitisnotstrongenoughto
+classifyasanunreliability. Intra-narrationalPrediction: A
+Forinter-narrationalunreliability,theLLMtends Intra-narrationalGoldLabel: A
+to overpredict “other character contradiction” by Why? Themodeleasilyfindsatleastoneverbal
+anticipatinganothercharactermightcontradictthe tic (e.g., inconsistency in the first two sentences,
+narratorwithoutexplicitevidencewithinthecon- hedginglanguage, admissionoffault/bias)inthe
+text. Sometimes the LLM considers instances narrative.
+where the narrator contradicts themself or seems
+manipulativeas“othercharactercontradiction.” Inter-textualPrediction: E
+For inter-textual unreliability, the LLM strug- Inter-textualGoldLabel: D
+gles with ambiguous samples (i.e., samples that Why? Themodelmissescontextualinformation
+containcharacteristicsofmultipletypesofunreli- scatteredthroughoutthenarrativethatindicatesthe
+abilities). For these samples, the LLM seems to narratorisbouncingbetweenconflictinginterpreta-
+over-emphasize characteristics of less dominant tionsofgettingaspeedingticket.
+unreliabilities. Forexample,theLLMoftenover-
+E.3 EffectofLearningfromExamples
+predicts Madman for samples where the narrator
+describesemotions. Ontheotherhand,theLLM In this section, we show one sample for each
+sometimes ignores characteristics of a Madman type of unreliability where the model predicts an
+notedbytheannotatorsiftheLLMdescribesother incorrect label in the zero-shot setting, and the
+minorattributescorrespondingtoanotherunrelia- modellearnsfromexamplesinthefew-shotsetting
+bility. topredictthecorrectlabel.
+E.2 DemonstrationofTaskComplexities
+Intra-narrational: (Subreddit) “I’m (21M) a ju-
+The following example demonstrates how the nior at an Ivy League school that gets really into
+intra-narrational task is more easily predicted holidays,andthestudentsocialcommitteespends
+by analyzing relatively explicit instances of atonofmoneyonthrowingHalloweenevents.
+verbal tics than the inter-textual task. We note Inparticular,there’sgoingtobeamassive,very
+that the inter-textual task is more challenging expensive-to-hostsquidgameparty. It’sgoingto
+becauseitrequiresadeeperunderstandingofthe besuperfancywithsquidgameconsumesandreal
+narrator’sframe-of-thoughtandsituation. Model life-sizegamesandawesomefood,andthebudget
+resultsarefromtheCLmethodusingLlama3.1-8B. ishuge.
+Iaskedforamuchsmalleramountforasimple
+Blog post: “I got pulled over this morning!! masqueradepartymyclubisthrowing. Everyoneis
+Err... Yesterday morning... On my way back to extremelyannoyedwithmefor“siphoningcommit-
+Owings Mills for my sorority retreat deal. Yeah. teefunds”awayfromthesquidgameparty. ButI
+Totallydidn’tnoticethecopslikeIusuallydo,and barelyaskedforanythingcomparedtowhatthey’re
+apparently flew past him doing 85. And I didn’t spending. Idon’tseethebigdeal. Myfriendplan-
+slowdownwhenIgotto695(theyreallyneedto ningthesquidgamepartyisparticularlyirate.”
+upthespeedlimitto65overthereIswear),sohe 0-ShotPrediction: B
+askedmewhatmyexcusewas. ’Idon’thaveone 1-ShotPrediction: A
+Sir.’ ’License and registration please.’ I sit there, GoldLabel: A
+waiting for the ticket. He hands me everything Why? There are many examples of hedging
+back and says Slow down. That’s way too fast. language: “gets really into holidays”, “spends
+Have agood day.’ ’... You too officer.’ Yeah. So a ton of money”, “going to be a massive, very
+never going over 65 on 695 ever again. Cruise expensive”,“superfancy”,“muchsmalleramount”
+control... Buddy... howyoudoin? Toldmomand
+dad I was doing 70 in a 55 they said if I get a Inter-narrational: (Review) “I stayed at the
+ticket,I’llmorethanlikelynothavecarinsurance. Monaco-Chicago back in April. I was in town
+Gah. Either way, no more than 10 above. Doing on business, and the hotel was recommended by
+the SPEED limit on the highways around here is a friend of mine. Having spent a weekend there,
+dangerous man. People almost hit me like, three I have no idea what my friend was talking about.
+timeson695.” Thecomplimentarymorningcoffeewasweak;the
+fitnessroomwasdimlylit;andIthoughtI’dhave
+Llama3.1-8B (A) (B) (C) (D) (E)
+CL Intra-nar 69.67±1.02 50.30±1.54 – – –
+Inter-nar 2.90±1.25 39.36±2.16 78.21±0.82 – –
+Inter-tex 10.96±2.17 14.90±1.98 15.66±2.50 11.84±1.91 57.24±1.18
+FT Intra-nar 59.84±1.18 48.87±1.33 – – –
+Inter-nar 6.89±1.86 20.00±2.18 80.16±0.75 – –
+Inter-tex 4.49±1.70 16.08±1.93 10.07±2.28 16.81±2.13 59.59±1.12
+Zero-shot Intra-nar 29.77±1.40 5.80±1.22 – – –
+Inter-nar 6.73±1.74 20.69±2.05 10.46±1.03 – –
+Inter-tex 12.75±1.98 2.47±1.01 4.68±1.87 1.62±0.92 16.43±1.55
+One-shot Intra-nar 29.56±1.37 7.38±1.35 – – –
+Inter-nar 9.26±1.83 16.23±2.03 11.99±1.13 – –
+Inter-tex 16.57±2.38 10.25±1.87 3.37±1.68 4.52±1.44 20.31±1.72
+Three-shot Intra-nar 30.03±1.34 4.52±1.09 – – –
+inter-nar 10.29±1.98 15.66±2.02 12.84±1.14 – –
+inter-tex 17.41±2.21 2.52±1.01 9.02±2.38 2.17±1.06 14.75±1.52
+Table9:Class-wiseF1(macro)scoresforcombinedtestdomainsforLlama3.1-8B.Forintra-nar:(A)→verbaltics,
+(B)→none. Forinter-nar: (A)→“Sameunreliablecharacterovertime”,(B)→“Othercharactercontradiction”,
+(C)→none. Forinter-texunreliabilities: (A)→Naïf,(B)→Madman,(C)→Pícaro,(D)→Clown,(C)→none.
+Wemakethefollowingobservations: Forintra-nar,CLandFTmethodsimprovetheperformanceofbothclasses.
+Forinter-nar,multi-shotsettingimprovesperformancefor‘sameunreliablenarratorovertime’andReliable;CL
+andFTimproves‘othercharactercontradiction’andReliable. Forinter-tex,CLandFTsubstantiallyimproves
+performanceforMadman,Picaro,Clown,andReliable.
+Llama3.3-70B CL Fine-tuned Zero-Shot One-Shot Three-Shot
+Intra-nar Fiction 54.74±2.03 54.72±1.96 45.90±1.72 64.56±1.92 62.94±2.14
+Blogpost 49.34±2.22 49.48±2.13 53.04±2.33 64.65±2.26 62.74±2.22
+Subreddit 44.55±1.96 44.54±2.00 46.37±0.42 56.44±2.94 47.16±1.26
+Review 56.39±2.26 56.37±2.26 71.51±2.11 69.91±2.01 72.82±2.01
+Inter-nar Fiction 43.47±3.21 35.81±2.39 27.48±2.41 23.40±1.58 24.23±1.72
+Blogpost 30.61±1.95 25.68±0.68 26.70±1.22 40.72±2.01 45.74±2.78
+Subreddit 28.57±3.50 27.84±1.88 28.27±1.32 31.38±1.90 28.29±1.81
+Review 31.32±0.57 31.94±0.22 33.98±1.59 29.44±1.41 37.84±2.60
+Inter-tex Fiction 23.45±1.75 23.42±1.67 29.83±1.91 32.59±1.90 31.95±1.83
+Blogpost 24.63±1.83 24.61±1.76 35.64±2.29 42.54±2.39 33.63±2.05
+Subreddit 13.43±1.38 13.46±1.40 19.68±2.32 27.53±1.99 19.40±1.47
+Review 22.66±1.81 22.61±1.75 28.94±1.32 20.55±0.97 27.93±2.20
+Table10: BreakdownofunreliabilityF1(macro)scoresforeachdomainusingLlama3.3-70B.
+tohavemyclothesmailedbacktomewhenIused GoldLabel: B
+their supposed ’overnight’ laundry service for a
+Why? Thefriendwhorecommendedthehotelis
+suit I spilled some wine on. My room was ade-
+incontradictionwiththenarrator.
+quate,butnowherenearwhatI’veseenelsewhere
+atthispricepoint. Recentrenovationmustbeslang
+Inter-textual: (Blog post) “So last week, my 95
+for’everythingisstiffandsmellsofindustrialad-
+yearoldGrandfatherfellandcrackedhisvertebrae..
+hesive.’ Themattressinmyroomwasincredibly
+Longstoryshort,itwasaroughroadlastweekwith
+firm,andIsleptpoorly. WhenItravel,Iexpectan
+dr.ssayingthathewasluckytobealiveandtoday
+experiencesimilartoorbetterthanmyexperience
+I receive a phone call from my sister saying that
+athome. Atmosthotels,Ireceiveexcellentservice
+his kidneys had failed and that my Grandmother
+andcomfortable accomodations. Thiswas anex-
+andaunts,unclesandfatherhadmadethedecision
+ceptiontomyusual,andIwon’tbebackanytime
+topullhislifesupport(hehasbeenunresponsive
+soon.”
+a day after it happened). While we live 6 hours
+0-ShotPrediction: B
+awaynow-Iusedtoliveinthesametownasallof
+1-ShotPrediction: A myfamilyuntilIwentawaytocollege.. EVERY
+Mistral CL Fine-tuned Zero-Shot One-Shot Three-Shot
+Intra-nar Fiction 54.66±2.06 56.76±2.04 54.91±2.13 49.74±1.98 53.36±2.08
+Blogpost 54.21±2.19 56.79±2.17 54.89±2.19 54.19±2.29 49.34±2.20
+Subreddit 46.43±0.41 49.92±2.12 48.83±1.80 47.20±1.33 51.54±2.51
+Review 67.73±2.14 62.35±2.13 68.54±2.06 52.34±2.24 57.73±2.17
+Inter-nar Fiction 22.16±1.02 31.37±0.24 12.28±1.38 30.79±2.01 28.97±1.87
+Blogpost 38.73±1.42 25.07±0.54 18.63±1.60 35.70±1.93 33.06±1.63
+Subreddit 33.14±1.92 14.41±0.78 25.66±1.15 37.88±2.18 30.96±1.99
+Review 30.58±1.44 32.12±0.20 21.38±1.30 27.91±1.55 32.18±1.95
+Inter-tex Fiction 32.43±2.02 29.89±1.69 21.76±1.75 19.35±1.56 18.80±1.49
+Blogpost 36.59±2.25 28.15±1.75 22.74±1.70 22.28±1.82 19.29±1.65
+Subreddit 22.53±1.80 9.08±0.92 15.78±1.50 16.03±1.49 13.29±1.27
+Review 27.15±1.98 30.40±0.82 20.63±1.08 15.73±0.84 17.11±0.97
+Table11: BreakdownofunreliabilityF1(macro)scoresforeachdomainforMistral-7B.
+Phi CL Fine-tuned Zero-Shot One-Shot Three-Shot
+Intra-nar Fiction 64.14±1.93 43.53±1.88 62.56±2.04 46.56±1.86 45.91±1.76
+Blogpost 53.42±2.23 36.93±2.46 55.37±2.25 43.71±1.52 46.31±1.88
+Subreddit 51.18±2.37 59.34±3.03 51.82±2.54 47.71±1.37 46.26±0.42
+Review 46.26±2.03 68.94±2.07 70.25±2.06 40.82±2.01 40.97±1.89
+Inter-nar Fiction 29.41±2.30 46.54±2.75 18.45±1.55 13.65±1.45 16.08±1.39
+Blogpost 13.34±1.17 28.77±1.24 26.81±1.74 26.55±1.83 26.41±1.76
+Subreddit 23.62±1.18 31.35±1.41 25.16±1.12 28.53±1.81 27.93±1.69
+Review 22.89±1.32 36.38±1.84 30.49±3.10 24.94±1.73 28.20±2.06
+Inter-tex Fiction 27.24±1.63 34.01±1.96 23.90±1.44 14.39±1.39 13.55±1.43
+Blogpost 26.62±1.40 30.90±2.11 28.42±1.78 20.37±1.68 18.38±1.42
+Subreddit 17.94±1.31 16.36±1.40 22.21±1.65 18.36±1.60 15.90±1.54
+Review 28.20±1.70 23.69±1.80 35.70±1.92 22.23±2.69 17.78±1.11
+Table12: BreakdownofunreliabilityF1(macro)scoresforeachdomainusingPhi3-medium.
+SundaywasspentatmyGrandparentshouseandI give all prompts used for inferring the properties
+havesomanymemoriesofhimwhenIwasakid. ofnarratives(SectionF.1)andadditionalanalysis
+ButIthinkthehardestpartformeismythinkingof results for Llama3.3-70B, Mistral-7B, and Phi3-
+myGrandmotherandIwonder,Howdoyoudoit? medium(SectionF.3).
+Howdoyousaygoodbye? Howdoyoukissyour
+F.1 Prompts
+loveslipsforthelasttimeandknowthatyouwill
+neverbeabletodothatagain? Howdoyoushare Forouranalysisexperiments,wepromptLlama3.3-
+yourwholelifewithsomeonegothroughwars,6 70Bwiththefollowing:
+kidsandover50yearsandtheninonemomentitis
+AnalysisTemplate
+allgone. MyprayersarewithherbecauseIdon’t
+knowhowshecandothis” ###PROMPT:Considerthenarrative.
+0-ShotPrediction: E [RQ#]
+1-ShotPrediction: B ###INPUT:[Narrative]
+###SOLUTION:Finallabel:
+GoldLabel: B
+Why? Narratorisamadmanbecauseofthestrong
+Foreachresearchquestion,wereplace[RQ#]in
+emotions described at the loss of the grandfather.
+theAnalysisTemplatewithoneofthefollowing:
+Narratorseemstofeeldeeppositiveemotionsfor
+thegrandparents • RQ1: Is the narrator female, male, other, or
+ambiguous? STATE ONLY THE GENDER
+F DetailsofAnalysis ASALABEL.
+In this section, we give additional information • RQ2: Isthestyleofnarration“conversational”
+abouthowweautomaticallydetermineproperties or“descriptive”? For“conversational”thenar-
+ofthenarrativesfortheanalysisinSection6. We ratorischattytothereader. For“descriptive”
+GPT-4omini Zero-Shot One-Shot Three-Shot
+Intra-nar Fiction 45.48±1.90 56.29±2.03 54.66±2.11
+Blogpost 55.03±2.20 46.65±1.90 44.40±1.74
+Subreddit 49.33±2.14 46.97±0.38 54.71±2.85
+Review 41.67±1.96 52.12±2.37 53.31±2.29
+Inter-nar Fiction 33.27±2.62 38.38±2.77 23.95±2.18
+Blogpost 23.81±1.23 25.42±1.28 22.14±1.05
+Subreddit 27.35±1.18 30.75±1.43 30.51±1.50
+Review 28.15±0.94 31.46±1.31 27.41±1.34
+Inter-tex Fiction 21.07±1.51 28.00±1.95 26.22±1.86
+Blogpost 21.66±1.77 29.06±2.09 24.21±1.99
+Subreddit 11.90±1.17 9.81±1.31 13.81±1.35
+Review 16.73±1.17 15.75±0.32 15.69±0.32
+Table13: BreakdownofunreliabilityF1(macro)scoresforeachdomainusingGPT-4omini.
+Zero-Shot One-Shot Three-Shot
+Intra-nar Fiction 41.84±1.93 45.07±1.96 43.08±1.97
+Blogpost 47.28±2.23 47.45±2.15 49.60±2.18
+Subreddit 39.87±1.79 42.12±1.94 42.70±1.97
+Review 39.89±1.91 39.25±1.96 41.88±2.03
+Inter-nar Fiction 35.13±1.84 32.33±1.42 31.57±1.19
+Blogpost 27.20±1.63 23.83±0.62 24.94±1.25
+Subreddit 30.35±1.43 26.87±1.40 26.39±1.44
+Review 36.02±2.71 32.12±0.20 32.16±0.20
+Inter-tex Fiction 21.99±1.73 22.81±1.68 22.85±1.85
+Blogpost 21.66±1.72 16.16±1.37 22.48±1.71
+Subreddit 13.88±1.69 14.13±1.55 16.13±1.65
+Review 16.65±1.14 15.44±0.33 17.84±1.54
+Table14: BreakdownofunreliabilityF1(macro)scoresforeachdomainusingo3-mini.
+thenarratorprimarilydescribesthesettingor For style, in general, if a narrative begins with
+situation. STATEONLYTHESTYLEASA description of the narrator or if the sample con-
+LABEL. tainsobviousverbaltics(e.g.,multipleexamples
+ofhedginglanguage),thesampleistypicallyclas-
+• RQ3: Isthenarrationtoneprimarily“positive”
+sifiedbytheLLMasconversational.
+or “negative” or “neutral”? STATE ONLY
+Forsentiment,sometimestheLLMpredictsthe
+THETONEASALABEL.
+wrongsentimentifthenarratorspeakssarcastically.
+• RQ4: Including the narrator, how many ex-
+F.3 AnalysisResultswithOtherModels
+plicit characters play a role in the narrative?
+Inthissection, weprovideadditionalanalysisre-
+STATE ONLY THE NUMBER OF CHAR-
+sultsforLlama3.1-8B,Mistral,andPhifornarrator
+ACTERSASANINTEGERLABEL.
+gender (Figure 5), narrative style (Figure 6), nar-
+F.2 ErrorsPromptingforAnalysis
+rative tone (Figure 7), and number of characters
+We hand-verify 200 narratives to ensure the in- (Figures8,9).
+ferred properties of narratives are comparable to
+humanjudgement. Weobservefewerthan15mis-
+classifications(minimumaccuracyof92.50%)for
+eachtaskandnoticethefollowing.
+Forgender,somenarratorswithambiguousgen-
+dersareincorrectlypredictedMaleorFemaledue
+tocontextcluescreatingbiasforthatgender(e.g.,
+ambiguousnarratorironingasuitispredictedMale,
+or ambiguous narrator getting mani/pedi is pre-
+dictedFemale).
+Figure7: Breakdownofcorrectlypredicted(green)vs.
+Figure5: Breakdownofcorrectlypredicted(green)vs.
+incorrectly predicted (blue) unreliable narrators with
+incorrectly predicted (blue) unreliable narrators with
+respecttonarrativesentimenttone∈{positive,negative,
+respecttothenarrator’sgender∈{female,male,other}.
+neutral}. ResultsarefromLlama3.1-8B(toprow),Mis-
+ResultsarefromLlama3.1-8B(toprow),Mistral(mid-
+tral(middlerow),andPhi(bottomrow)experiments.
+dlerow),andPhi(bottomrow)experiments.
+Figure 8: Number of characters vs. number of sam-
+Figure6: Breakdownofcorrectlypredicted(green)vs. ples (Llama3.1-8B experiments). All Samples (solid
+incorrectlypredicted(blue)unreliablenarratorswithre- black)isthedistributionofallnarrativeswithrespect
+specttonarrativestyle∈{conversational,descriptive}. tothenumberofcharacters. Blue, green, andorange
+ResultsarefromLlama3.1-8B(toprow),Mistral(mid- solidlinesshowcorrectpredictions,andcorresponding
+dlerow),andPhi(bottomrow)experiments. dashedlinesshowincorrectpredictions.
+Figure9: Numberofcharactersvs. numberofsamples
+(Phiexperiments). AllSamples(solidblack)isthedis-
+tributionofallnarrativeswithrespecttothenumberof
+characters. Blue,green,andorangesolidlinesshowcor-
+rectpredictions,andcorrespondingdashedlinesshow
+incorrectpredictions.
