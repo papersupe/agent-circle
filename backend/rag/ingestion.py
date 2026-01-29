@@ -1,3 +1,7 @@
+# backend/rag/ingestion.py
+
+from text_normalization import normalize_text
+
 import os
 from pathlib import Path
 import pdfplumber
@@ -48,7 +52,8 @@ def ingest_paper(file_path: Path):
     print(f"Ingesting {file_path.name}...")
 
     try:
-        text = extract_text_from_pdf(file_path)
+        raw_text = extract_text_from_pdf(file_path)
+        text = normalize_text(raw_text)
 
         # Save processed text
         processed_file = PROCESSED_DIR / f"{file_path.stem}.txt"

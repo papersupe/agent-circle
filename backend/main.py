@@ -1,5 +1,6 @@
 from fastapi import FastAPI
 from backend.api.routes import router
+
 from backend.config.logging import setup_logging
 from backend.config.settings import settings
 

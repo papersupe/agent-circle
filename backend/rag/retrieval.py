@@ -17,9 +17,24 @@ VECTORSTORE_DIR = Path("./backend/storage/vectorstore")
 # -------------------------------
 MODEL_NAME = "all-MiniLM-L6-v2"
 
+# -------------------------------
+# Caching
+# -------------------------------
+MODEL = None
+ALL_CHUNKS = None
+
+# -------------------------------
+# Load embedding model
+# -------------------------------
 def load_embedding_model():
     logger.info(f"Loading embedding model: {MODEL_NAME}")
     return SentenceTransformer(MODEL_NAME)
+
+def get_model():
+    global MODEL
+    if MODEL is None:
+        MODEL = load_embedding_model()
+    return MODEL
 
 # -------------------------------
 # Load all embeddings
@@ -41,25 +56,27 @@ def load_all_embeddings() -> List[Dict]:
     logger.info(f"Loaded {len(embeddings)} total chunks.")
     return embeddings
 
+def get_all_chunks():
+    global ALL_CHUNKS
+    if ALL_CHUNKS is None:
+        ALL_CHUNKS = load_all_embeddings()
+    return ALL_CHUNKS
+
 # -------------------------------
 # Similarity search
 # -------------------------------
-def retrieve_similar_chunks(
-    query: str,
-    top_k: int = 5
-) -> List[Dict]:
-    model = load_embedding_model()
-    all_chunks = load_all_embeddings()
+def retrieve_similar_chunks(query: str, top_k: int = 5) -> List[Dict]:
+    model = get_model()
+    all_chunks = get_all_chunks()
 
     if not all_chunks:
         logger.warning("No embeddings found.")
         return []
 
-    query_vector = model.encode(
-        query,
-        normalize_embeddings=True
-    )
+    # Encode query
+    query_vector = model.encode(query, normalize_embeddings=True)
 
+    # Compute similarity scores
     scores = []
     for chunk in all_chunks:
         vector = np.array(chunk["embedding"])
@@ -70,17 +87,25 @@ def retrieve_similar_chunks(
             "score": score
         })
 
+    # Return top-k
     scores.sort(key=lambda x: x["score"], reverse=True)
     return scores[:top_k]
 
 # -------------------------------
-# Run as script (debug only)
+# Wrapper for FastAPI
+# -------------------------------
+def retrieve(query: str, top_k: int = 5):
+    """
+    FastAPI-friendly function to retrieve top-k similar chunks.
+    """
+    return retrieve_similar_chunks(query, top_k)
+
+# -------------------------------
+# Run as script (debug)
 # -------------------------------
 if __name__ == "__main__":
-    results = retrieve_similar_chunks(
-        query="agent architectures for research reasoning",
-        top_k=5
-    )
+    query = "agent architectures for research reasoning"
+    results = retrieve(query, top_k=5)
 
     for r in results:
         print(r)

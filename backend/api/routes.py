@@ -1,6 +1,7 @@
-# backend/api.routes.py
+# backend/api/routes.py
 
 from fastapi import APIRouter
+from backend.api.search import router as search_router
 
 router = APIRouter()
 
@@ -11,9 +12,12 @@ def agent_status():
         "status": "Experimental",
         "mode": "Reading-Only",
         "capabilities": [
+            "semantic_search",
             "paper_ingestion",
-            "concept_extraction",
-            "concept_linking"
+            "evidence_lookup"
         ],
-        "interaction": "disabled"
+        "interaction": "enabled"
     }
+
+router.include_router(search_router)
+
