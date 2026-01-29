@@ -23,7 +23,7 @@ def search(
 
     results = []
     for hit in hits:
-        chunk_text = lookup_chunk(
+        chunk_text = lookup_chunks(
             paper_id=hit["paper_id"],
             chunk_id=hit["chunk_id"]
         )
